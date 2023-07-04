@@ -18,15 +18,19 @@ from PIL import Image
 from ultralytics import YOLO
 
 # state will have "last"
-state = {"last": None, "last_function_type": None, "last_function_args": None, "last_loaded_image": None}
+state = {
+    "last": None,
+    "last_function_type": None,
+    "last_function_args": None,
+    "last_loaded_image": None,
+}
 
-# check if --debug
 
 opt_parser = optparse.OptionParser()
 
+opt_parser.add_option("--validate", action="store_true", dest="validate", default=False)
 opt_parser.add_option("--ref", action="store_true", dest="ref", default=False)
 opt_parser.add_option("--debug", action="store_true", dest="debug", default=False)
-# add file loader
 opt_parser.add_option("--file", action="store", dest="file", default=None)
 
 options, args = opt_parser.parse_args()
@@ -42,7 +46,10 @@ Load["./abbey.jpg"] -> Load the image
 Size[] -> Get the size of the image
 Say[] -> Say the result of the last function
 Detect["person"] -> Detect the person
+Replace[] -> Replace the person with black image
 Cutout[] -> Cutout the last detections
+Count[] -> Count the last detections
+CountInRegion[0, 0, 500, 500] -> Count the last detections in the region (x1, y1, x2, y2)
 Classify["cat", "dog"] -> Classify the image in the provided categories
 Save["./abbey2.jpg"] -> Save the last image
 
@@ -75,17 +82,14 @@ else:
     Size[]
     Say[]
     Detect["person"]
-    Cutout[]
+    Replace["person"]
     Save["./abbey2.jpg"]
     """
 
-# expr can be "Find" "[" STRING "]" | "Replace" "[" STRING "]" | "Load" "[" STRING "]" | "Save" "[" STRING "]"
-# new lines are new exprs
-# comments start wiht #
 grammar = """
 start: expr+
 
-expr: classify | replace | load | save | say | detect | cutout | size | EOL
+expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | EOL
 classify: "Classify" "[" STRING ("," STRING)* "]"
 replace: "Replace" "[" STRING "]"
 load: "Load" "[" STRING "]"
@@ -93,8 +97,11 @@ save: "Save" "[" STRING "]"
 say: "Say" "[" "]"
 size: "Size" "[" "]"
 cutout: "Cutout" "[" "]"
+count: "Count" "[" "]"
+countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
 detect: "Detect" "[" STRING ("," STRING)* "]"
 EOL: "\\n"
+INT: /-?\d+/
 %import common.ESCAPED_STRING -> STRING
 %import common.WS_INLINE
 %ignore WS_INLINE
@@ -108,6 +115,11 @@ except Exception as e:
     print(e)
     exit(1)
 
+if options.validate:
+    print("Script is a valid VisualScript program.")
+    exit(0)
+
+
 def literal_eval(string):
     return string[1:-1]
 
@@ -115,16 +127,26 @@ def literal_eval(string):
 def load(filename, _):
     return Image.open(filename)
 
+
 def size(_, state):
     return state["last_loaded_image"].size
+
 
 def cutout(_, state):
     x1, y1, x2, y2 = state["last"].xyxy[0]
     image = state["last_loaded_image"]
     state["last_loaded_image"] = image.crop((x1, y1, x2, y2))
 
+
 def save(filename, state):
     state["last_loaded_image"].save(filename)
+
+
+def count(args, state):
+    if len(args) == 0:
+        return len(state["last"].xyxy)
+    else:
+        return len([item for item in state["last"].class_id if item == args[0]])
 
 
 def detect(classes, state):
@@ -168,6 +190,22 @@ def classify(labels, state):
     return label_name
 
 
+def countInRegion(x1, y1, x2, y2, state):
+    detections = state["last"]
+
+    xyxy = detections.xyxy
+
+    counter = 0
+
+    for i in range(len(xyxy)):
+        x1_, y1_, x2_, y2_ = xyxy[i]
+
+        if x1_ >= x1 and y1_ >= y1 and x2_ <= x2 and y2_ <= y2:
+            counter += 1
+
+    return counter
+
+
 def say(statement, state):
     if state.get("last_function_type", None) == "detect":
         last_args = state["last_function_args"]
@@ -181,6 +219,22 @@ def say(statement, state):
     print(statement)
 
 
+def replace(_, state):
+    detections = state["last"]
+
+    # random iamge is black xyxy
+    xyxy = detections.xyxy
+
+    random_img = np.zeros(
+        (int(xyxy[0][3] - xyxy[0][1]), int(xyxy[0][2] - xyxy[0][0]), 3), np.uint8
+    )
+
+    # paste image
+    state["last_loaded_image"].paste(
+        Image.fromarray(random_img), (int(xyxy[0][0]), int(xyxy[0][1]))
+    )
+
+
 function_calls = {
     "load": lambda x, y: load(x, y),
     "save": lambda x, y: save(x, y),
@@ -189,6 +243,9 @@ function_calls = {
     "say": lambda x, y: say(x, y),
     "detect": lambda x, y: detect(x, y),
     "cutout": lambda x, y: cutout(x, y),
+    "count": lambda x, y: count(x, y),
+    "countinregion": lambda x, y: countInRegion(*x, y),
+    "replace": lambda x, y: replace(x, y),
 }
 
 if DEBUG:
@@ -212,7 +269,10 @@ for node in tree.children:
         # convert children to strings
         for item in node.children:
             if hasattr(item, "value"):
-                item.value = literal_eval(item.value)
+                if item.value.startswith('"') and item.value.endswith('"'):
+                    item.value = literal_eval(item.value)
+                else:
+                    item.value = int(item.value)
 
         if len(node.children) == 1:
             value = node.children[0].value
