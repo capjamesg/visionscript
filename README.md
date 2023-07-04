@@ -73,6 +73,16 @@ When you have written your code, run:
 python3 lang.py --file ./your_file.vic
 ```
 
+### Run in debug mode
+
+Running in debug mode shows the full Abstract Syntax Tree (AST) of your code.
+
+```
+python3 lang.py --file ./your_file.vic --debug
+```
+
+Debug mode is useful for debugging code while adding new features to the VisualScript language.
+
 ## Documentation
 
 - `Load["./abbey.jpg"]` -> Load the image
