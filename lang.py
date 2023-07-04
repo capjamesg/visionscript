@@ -3,17 +3,19 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import logging
+import mimetypes
 import optparse
 import os
+import random
+import string
+import sys
 
 import cv2
 import numpy as np
 import supervision as sv
-from lark import Lark, UnexpectedToken, UnexpectedCharacters
-from spellchecker import SpellChecker
+from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
-import sys
-
+from spellchecker import SpellChecker
 
 # state will have "last"
 state = {
@@ -83,29 +85,31 @@ Detect["person"]
 Show[]
     """
 
-language_grammar_reference = [
-    "Load",
-    "Save",
-    "Size",
-    "Say",
-    "Detect",
-    "Replace",
-    "Cutout",
-    "Count",
-    "Segment",
-    "CountInRegion",
-    "Classify",
-    "Show",
-    "In",
-    "If",
-]
+language_grammar_reference = {
+    "Load": "Load an image",
+    "Save": "Save an image",
+    "Size": "Get the size of the image (width, height)",
+    "Say": "Say the result of the last function",
+    "Detect": "Find objects in the image",
+    "Replace": "Replace the last detections with a random image",
+    "Cutout": "Cutout the last detections",
+    "Count": "Count the last detections",
+    "Segment": "Segment the image",
+    "CountInRegion": "Count the last detections in the region (x1, y1, x2, y2)",
+    "Classify": "Classify the image in the provided categories",
+    "Show": "Show the image",
+    "In": "Iterate over the files in a directory",
+    "If": "If statement",
+}
 
-lowercase_language_grammar_reference = [item.lower() for item in language_grammar_reference]
+lowercase_language_grammar_reference = [
+    item.lower() for item in language_grammar_reference
+]
 
 grammar = """
 start: expr+
 
-expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | comment | show | exit | INT
+expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | comment | show | exit | help | INT
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -117,6 +121,7 @@ show: "Show" "[" "]"
 cutout: "Cutout" "[" "]"
 count: "Count" "[" "]"
 exit: "Exit" "[" "]"
+help: "Help" "[" STRING "]"
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
 detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" "]"
 segment: "Segment" "[" STRING "]"
@@ -146,27 +151,33 @@ except UnexpectedCharacters as e:
 
     # check if function name in grammar
     function_name = code.strip().split("\n")[line - 1].split("[")[0].strip()
-    
-    if function_name in language_grammar_reference:
+
+    language_grammar_reference_keys = language_grammar_reference.keys()
+
+    if function_name in language_grammar_reference_keys:
         print(f"Syntax error on line {line}, column {column}.")
         print(f"Unexpected character: {e.char!r}")
         exit(1)
 
     spell.known(lowercase_language_grammar_reference)
     spell.word_frequency.load_words(lowercase_language_grammar_reference)
-    
+
     alternatives = spell.candidates(function_name)
 
     if len(alternatives) == 0:
         print(f"Function {function_name} does not exist.")
         exit(1)
-    
+
     print(f"Function '{function_name}' does not exist. Did you mean one of these?")
     print("-" * 10)
 
     for item in list(alternatives):
         if item in lowercase_language_grammar_reference:
-            print(language_grammar_reference[lowercase_language_grammar_reference.index(item.lower())])
+            print(
+                language_grammar_reference[
+                    lowercase_language_grammar_reference.index(item.lower())
+                ]
+            )
 
     exit(1)
 except UnexpectedToken as e:
@@ -187,9 +198,37 @@ def literal_eval(string):
 
 
 def load(filename, _):
+    if "requests" not in sys.modules:
+        import requests
+    if "validators" not in sys.modules:
+        import validators
+
+    if validators.url(filename):
+        response = requests.get(filename)
+        file_extension = mimetypes.guess_extension(response.headers["content-type"])
+
+        # if not image, error
+        print(file_extension)
+        if file_extension not in (".png", ".jpg", ".jpeg"):
+            print(f"File {filename} does not represent a png, jpg, or jpeg image.")
+            exit(1)
+
+        # 10 random characters
+        filename = (
+            "".join(
+                random.choice(string.ascii_letters + string.digits) for _ in range(10)
+            )
+            + file_extension
+        )
+
+        with open(filename, "wb") as f:
+            f.write(response.content)
+
     if state.get("ctx") and state["ctx"].get("in"):
         filename = state["ctx"]["active_file"]
-        
+
+    state["last_loaded_image_name"] = filename
+
     return Image.open(filename)
 
 
@@ -264,13 +303,26 @@ def classify(labels, state):
 
     return label_name
 
-def segment(text_prompt, state):
-    logging.disable(logging.CRITICAL)
-    model = FastSAM('./weights/FastSAM.pt')
 
-    DEVICE = 'cpu'
-    everything_results = model(state["last_loaded_image_name"], device=DEVICE, retina_masks=True, imgsz=1024, conf=0.4, iou=0.9,)
-    prompt_process = FastSAMPrompt(state["last_loaded_image_name"], everything_results, device=DEVICE)
+def segment(text_prompt, state):
+    if "FastSAM" not in sys.modules:
+        from fastsam import FastSAM, FastSAMPrompt
+
+    logging.disable(logging.CRITICAL)
+    model = FastSAM("./weights/FastSAM.pt")
+
+    DEVICE = "cpu"
+    everything_results = model(
+        state["last_loaded_image_name"],
+        device=DEVICE,
+        retina_masks=True,
+        imgsz=1024,
+        conf=0.4,
+        iou=0.9,
+    )
+    prompt_process = FastSAMPrompt(
+        state["last_loaded_image_name"], everything_results, device=DEVICE
+    )
 
     # text prompt
     ann = prompt_process.text_prompt(text=text_prompt)
@@ -330,7 +382,6 @@ def say(statement, state):
 def replace(filename, state):
     detections = state["last"]
 
-    # random iamge is black xyxy
     xyxy = detections.xyxy
 
     if filename is not None:
@@ -346,9 +397,8 @@ def replace(filename, state):
         random_img = Image.fromarray(random_img)
 
     # paste image
-    state["last_loaded_image"].paste(
-        random_img, (int(xyxy[0][0]), int(xyxy[0][1]))
-    )
+    state["last_loaded_image"].paste(random_img, (int(xyxy[0][0]), int(xyxy[0][1])))
+
 
 def show(_, state):
     # if detections
@@ -360,11 +410,14 @@ def show(_, state):
         annotator = None
 
     if annotator:
-        image = annotator.annotate(cv2.imread(state["last_loaded_image_name"]), state["last"])
+        image = annotator.annotate(
+            cv2.imread(state["last_loaded_image_name"]), state["last"]
+        )
     else:
         image = cv2.imread(state["last_loaded_image_name"])
-    
+
     sv.plot_image(image, (8, 8))
+
 
 # if None, the logic is handled in the main parser
 function_calls = {
@@ -386,16 +439,18 @@ function_calls = {
     "expr": lambda x, y: None,
     "show": lambda x, y: show(x, y),
     "exit": lambda x, y: exit(0),
+    "help": lambda x, y: print(language_grammar_reference[x]),
 }
 
 if DEBUG:
     print(tree.pretty())
 
+
 def parse_tree(tree):
     if not hasattr(tree, "children"):
-        if (hasattr(tree, "value") and tree.value.isdigit()):
+        if hasattr(tree, "value") and tree.value.isdigit():
             return int(tree.value)
-    
+
     for node in tree.children:
         # ignore EOLs, etc.
         if node == "True":
@@ -410,8 +465,8 @@ def parse_tree(tree):
             node = node
         else:
             node = node.children[0]
-            
-        if not hasattr(node, "data"): 
+
+        if not hasattr(node, "data"):
             continue
 
         token = node.data
@@ -425,7 +480,7 @@ def parse_tree(tree):
 
         if token.type == "BOOL":
             return node.children[0].value == "True"
-        
+
         if token.type == "EQUALITY":
             return parse_tree(node.children[0]) == parse_tree(node.children[1])
 
@@ -470,14 +525,16 @@ def parse_tree(tree):
                         item.value = literal_eval(item.value)
                     else:
                         item.value = int(item.value)
-        
+
         if token.value == "in":
             state["ctx"] = {
                 "in": os.listdir(node.children[0].value),
             }
 
             for file_name in state["ctx"]["in"]:
-                state["ctx"]["active_file"] = os.path.join(literal_eval(node.children[0]), file_name)
+                state["ctx"]["active_file"] = os.path.join(
+                    literal_eval(node.children[0]), file_name
+                )
                 # ignore first 2, then do rest
                 context = node.children[3:]
 
@@ -499,12 +556,16 @@ def parse_tree(tree):
         state["last_function_type"] = token.value
         state["last_function_args"] = [value]
 
-        # if load
         if token.value == "load":
             state["last_loaded_image"] = result
-            state["last_loaded_image_name"] = value
+
 
 if options.repl:
+    print("Welcome to VisualScript!")
+    print("Type 'Exit[]' to exit.")
+    print("Read the docs at https://visualscript.org/docs")
+    print("For help, type 'Help[FunctionName]'.")
+    print("-" * 20)
     while True:
         code = input(">>> ")
         tree = parser.parse(code.strip())
