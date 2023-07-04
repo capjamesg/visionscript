@@ -7,6 +7,7 @@ warnings.filterwarnings("ignore")
 
 import logging
 import optparse
+import os
 
 import clip
 import cv2
@@ -16,6 +17,8 @@ import torch
 from lark import Lark
 from PIL import Image
 from ultralytics import YOLO
+from fastsam import FastSAM, FastSAMPrompt
+
 
 # state will have "last"
 state = {
@@ -46,7 +49,7 @@ Load["./abbey.jpg"] -> Load the image
 Size[] -> Get the size of the image
 Say[] -> Say the result of the last function
 Detect["person"] -> Detect the person
-Replace[] -> Replace the person with black image
+Replace["emoji.png"] -> Replace the person with black image
 Cutout[] -> Cutout the last detections
 Count[] -> Count the last detections
 CountInRegion[0, 0, 500, 500] -> Count the last detections in the region (x1, y1, x2, y2)
@@ -78,30 +81,48 @@ if options.file is not None:
         code = f.read()
 else:
     code = """
-    Load["./abbey.jpg"]
-    Size[]
-    Say[]
-    Detect["person"]
-    Replace["person"]
-    Save["./abbey2.jpg"]
+a = 1
+Say[]
     """
+#     code = """
+# IF [True]
+#     Load["./abbey.jpg"]
+#     Segment["person"]
+#     Say[]
+# """
+    # code = """
+    # Load["./abbey.jpg"]
+    # Size[]
+    # Say[]
+    # Detect["person"]
+    # Replace["emoji.png"]
+    # Save["./abbey2.jpg"]
+    # """
 
 grammar = """
 start: expr+
 
-expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | EOL
+expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | INT
 classify: "Classify" "[" STRING ("," STRING)* "]"
+var: variable "=" expr
 replace: "Replace" "[" STRING "]"
-load: "Load" "[" STRING "]"
+load: "Load" "[" STRING "]" | "Load" "[" "]"
 save: "Save" "[" STRING "]"
 say: "Say" "[" "]"
 size: "Size" "[" "]"
 cutout: "Cutout" "[" "]"
 count: "Count" "[" "]"
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
-detect: "Detect" "[" STRING ("," STRING)* "]"
+detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" "]"
+segment: "Segment" "[" STRING "]"
+in: "IN" "[" STRING "]" EOL (INDENT expr+)*
+if: "IF" "[" (expr+) "]" EOL (INDENT expr+)*
+EQUALITY: "=="
+variable: /[a-zA-Z]+/
 EOL: "\\n"
 INT: /-?\d+/
+INDENT: "    "
+BOOL: "True" | "False"
 %import common.ESCAPED_STRING -> STRING
 %import common.WS_INLINE
 %ignore WS_INLINE
@@ -125,6 +146,9 @@ def literal_eval(string):
 
 
 def load(filename, _):
+    if state.get("ctx") and state["ctx"].get("in"):
+        filename = state["ctx"]["active_file"]
+        
     return Image.open(filename)
 
 
@@ -162,6 +186,9 @@ def detect(classes, state):
 
     inference_classes = inference_results.names
 
+    if len(classes) == 0:
+        classes = inference_classes
+
     classes = [key for key, item in inference_classes.items() if item in classes]
 
     results = results[np.isin(results.class_id, classes)]
@@ -189,6 +216,39 @@ def classify(labels, state):
 
     return label_name
 
+def segment(text_prompt, state):
+    logging.disable(logging.CRITICAL)
+    model = FastSAM('./weights/FastSAM.pt')
+
+    DEVICE = 'cpu'
+    everything_results = model(state["last_loaded_image_name"], device=DEVICE, retina_masks=True, imgsz=1024, conf=0.4, iou=0.9,)
+    prompt_process = FastSAMPrompt(state["last_loaded_image_name"], everything_results, device=DEVICE)
+
+    # text prompt
+    ann = prompt_process.text_prompt(text=text_prompt)
+    logging.disable(logging.NOTSET)
+
+    results = []
+    class_ids = []
+
+    for mask in ann:
+        results.append(
+            sv.Detections(
+                mask=np.array([mask]),
+                xyxy=sv.mask_to_xyxy(np.array([mask])),
+                class_id=np.array([0]),
+                confidence=np.array([1]),
+            )
+        )
+        class_ids.append(0)
+
+    return sv.Detections(
+        mask=np.array([item.mask[0] for item in results]),
+        xyxy=np.array([item.xyxy[0] for item in results]),
+        class_id=np.array(class_ids),
+        confidence=np.array([1]),
+    )
+
 
 def countInRegion(x1, y1, x2, y2, state):
     detections = state["last"]
@@ -207,7 +267,7 @@ def countInRegion(x1, y1, x2, y2, state):
 
 
 def say(statement, state):
-    if state.get("last_function_type", None) == "detect":
+    if state.get("last_function_type", None) in ("detect", "segment"):
         last_args = state["last_function_args"]
         statement = "".join(
             [
@@ -219,19 +279,27 @@ def say(statement, state):
     print(statement)
 
 
-def replace(_, state):
+def replace(filename, state):
     detections = state["last"]
 
     # random iamge is black xyxy
     xyxy = detections.xyxy
 
-    random_img = np.zeros(
-        (int(xyxy[0][3] - xyxy[0][1]), int(xyxy[0][2] - xyxy[0][0]), 3), np.uint8
-    )
+    if filename is not None:
+        random_img = Image.open(filename)
+        # resize image
+        random_img = random_img.resize(
+            (int(xyxy[0][2] - xyxy[0][0]), int(xyxy[0][3] - xyxy[0][1]))
+        )
+    else:
+        random_img = np.zeros(
+            (int(xyxy[0][3] - xyxy[0][1]), int(xyxy[0][2] - xyxy[0][0]), 3), np.uint8
+        )
+        random_img = Image.fromarray(random_img)
 
     # paste image
     state["last_loaded_image"].paste(
-        Image.fromarray(random_img), (int(xyxy[0][0]), int(xyxy[0][1]))
+        random_img, (int(xyxy[0][0]), int(xyxy[0][1]))
     )
 
 
@@ -242,49 +310,119 @@ function_calls = {
     "size": lambda x, y: size(x, y),
     "say": lambda x, y: say(x, y),
     "detect": lambda x, y: detect(x, y),
+    "segment": lambda x, y: segment(x, y),
     "cutout": lambda x, y: cutout(x, y),
     "count": lambda x, y: count(x, y),
     "countinregion": lambda x, y: countInRegion(*x, y),
     "replace": lambda x, y: replace(x, y),
+    "in": lambda x, y: None,
+    "if": lambda x, y: None,
+    "var": lambda x, y: None,
 }
 
 if DEBUG:
-    print(tree.children)
+    print(tree.pretty())
 
-for node in tree.children:
-    node = node.children[0]
+def parse_tree(tree):
+    for node in tree.children:
+        # ignore EOLs, etc.
+        if node == "True":
+            return True
+        elif node == "False":
+            return False
+        elif hasattr(node, "type") and node.type == "INT":
+            return int(node.value)
+        elif not hasattr(node, "children") or len(node.children) == 0:
+            node = node
+        elif state.get("ctx") and (state["ctx"].get("in") or state["ctx"].get("if")):
+            node = node
+        else:
+            node = node.children[0]
+            
+        if not hasattr(node, "data"): 
+            continue
 
-    if not hasattr(node, "data"):
-        continue
+        token = node.data
 
-    # convert string to literal
+        if token.type == "BOOL":
+            return node.children[0].value == "True"
+        
+        if token.type == "EQUALITY":
+            return parse_tree(node.children[0]) == parse_tree(node.children[1])
 
-    token = node.data
+        if token == "var":
+            state[node.children[0].children[0].value] = parse_tree(node.children[1])
+            state["last"] = state[node.children[0].children[0].value]
+            continue
 
-    func = function_calls[token.value]
+        if token.value == "if":
+            statement = parse_tree(node.children[0])
 
-    if token.value == "say":
-        value = state["last"]
-    else:
-        # convert children to strings
-        for item in node.children:
-            if hasattr(item, "value"):
-                if item.value.startswith('"') and item.value.endswith('"'):
-                    item.value = literal_eval(item.value)
-                else:
-                    item.value = int(item.value)
+            if statement is not False:
+                context = node.children[3:]
+
+                state["ctx"] = {
+                    "if": True,
+                }
+
+                for item in context:
+                    parse_tree(item)
+
+                del state["ctx"]
+                continue
+            else:
+                continue
+
+        func = function_calls[token.value]
+
+        if token.value == "say":
+            value = state["last"]
+            func(value, state)
+            continue
+        else:
+            # convert children to strings
+            for item in node.children:
+                if hasattr(item, "value"):
+                    if item.value.startswith('"') and item.value.endswith('"'):
+                        item.value = literal_eval(item.value)
+                    elif item.type in ("EOL", "INDENT", "DEDENT"):
+                        continue
+                    elif item.type == "STRING":
+                        item.value = literal_eval(item.value)
+                    else:
+                        item.value = int(item.value)
+        
+        if token.value == "in":
+            state["ctx"] = {
+                "in": os.listdir(node.children[0].value),
+            }
+
+            for file_name in state["ctx"]["in"]:
+                state["ctx"]["active_file"] = os.path.join(literal_eval(node.children[0]), file_name)
+                # ignore first 2, then do rest
+                context = node.children[3:]
+
+                for item in context:
+                    parse_tree(item)
+
+            del state["ctx"]
+
+            continue
 
         if len(node.children) == 1:
             value = node.children[0].value
         else:
             value = [item.value for item in node.children]
 
-    result = func(value, state)
+        result = func(value, state)
 
-    state["last"] = result
-    state["last_function_type"] = token.value
-    state["last_function_args"] = [value]
+        state["last"] = result
+        state["last_function_type"] = token.value
+        state["last_function_args"] = [value]
 
-    # if load
-    if token.value == "load":
-        state["last_loaded_image"] = result
+        # if load
+        if token.value == "load":
+            state["last_loaded_image"] = result
+            state["last_loaded_image_name"] = value
+
+parse_tree(tree)

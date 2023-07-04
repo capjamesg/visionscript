@@ -1,1 +1,129 @@
-# visualscript
+# VisualScript
+
+VisualScript is an abstract programming language for doing common computer vision tasks, fast.
+
+VisualScript is built in Python, offering a simple syntax for running object detection, classification, and segmentation models.
+
+VisualScript provides abstract wrappers around:
+
+- [CLIP](https://github.com/openai/clip) by OpenAI
+- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics)
+- [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) by CASIA-IVA-Lab.
+
+## Quickstart
+
+### Load an image, segment out people, and say the coordinates of each person
+
+```
+Load["./photo.jpg"]
+Segment["person"]
+Say[]
+```
+
+### Find people in an image using object detection
+
+```
+Load["./photo.jpg"]
+Detect["person"]
+Say[]
+```
+
+### Replace people in a photo with an emoji
+
+```
+Load["./abbey.jpg"]
+Size[]
+Say[]
+Detect["person"]
+Replace["emoji.png"]
+Save["./abbey2.jpg"]
+```
+
+### Classify an image
+
+```
+Load["./photo.jpg"]
+Classify["apple", "banana"]
+```
+
+### Load an image, get its size
+
+```
+Load["./photo.jpg"]
+Size[]
+```
+
+## Installation
+
+To install VisualScript, clone this repository and run `pip install -r requirements.txt`.
+
+Then, make a file ending in `.vic` in which to write your VisualScript code.
+
+When you have written your code, run:
+
+```
+python3 lang.py --file ./your_file.vic
+```
+
+## Documentation
+
+- Load["./abbey.jpg"] -> Load the image
+- Size[] -> Get the size of the image
+- Say[] -> Say the result of the last function
+- Detect["person"] -> Detect the person
+- Replace["emoji.png"] -> Replace the person with black image
+- Cutout[] -> Cutout the last detections
+- Count[] -> Count the last detections
+- CountInRegion[0, 0, 500, 500] -> Count the last detections in the region (x1, y1, x2, y2)
+- Classify["cat", "dog"] -> Classify the image in the provided categories
+- Save["./abbey2.jpg"] -> Save the last image
+
+## Core Libraries Used
+
+- CLIP
+- YOLOv8
+- FastSAM
+- [supervision](https://github.com/roboflow/supervision)
+- PIL
+- Lark for lexing
+
+## Inspiration
+
+The inspiration behind this project was to build a simple way of doing one-off tasks.
+
+Consider a scenario where you want to run zero-shot classification on a folder of images. With VisualScript, you can do this in two lines of code:
+
+```
+In["./images"]
+    Classify["cat", "dog"]
+```
+
+VisualScript is not meant to be a full programming language for all vision tasks, rather an abstract way of doing common tasks.
+
+VisualScript is ideal if you are new to concepts like "classify" and "segment" and want to explore what they do to an image.
+
+### Syntax
+
+The syntax is inspired by both Python and the Wolfram Language. VisualScript is an interpreted language, run line-by-line like Python. Statements use the format:
+
+```
+Statement[argument1, argument2, ...]
+```
+
+This is the same format as the Wolfram Language.
+
+### Lexical Inference and Memory
+
+An (I think!) unique feature in VisualScript compared to other languages is lexical inference.
+
+You don't need to declare variables to store images, etc. Rather, you can let VisualScript do the work. Consider this example:
+
+```
+Load["./photo.jpg"]
+Size[]
+Say[]
+```
+
+Here, `Size[]` and `Say[]` do not have any arguments. Rather, they use the last input. Wolfram Alpha has a feature to get the last input using `%`. VisualScript uses the same concept, but with a twist.
+
+Indeed, `Size[]` and `Say[]` don't accept any arguments.
