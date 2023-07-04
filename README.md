@@ -28,6 +28,14 @@ Detect["person"]
 Say[]
 ```
 
+### Find people in all images in a folder using object detection
+
+```
+IN["./images"]
+    Detect["person"]
+    Say[]
+```
+
 ### Replace people in a photo with an emoji
 
 ```
@@ -67,16 +75,24 @@ python3 lang.py --file ./your_file.vic
 
 ## Documentation
 
-- Load["./abbey.jpg"] -> Load the image
-- Size[] -> Get the size of the image
-- Say[] -> Say the result of the last function
-- Detect["person"] -> Detect the person
-- Replace["emoji.png"] -> Replace the person with black image
-- Cutout[] -> Cutout the last detections
-- Count[] -> Count the last detections
-- CountInRegion[0, 0, 500, 500] -> Count the last detections in the region (x1, y1, x2, y2)
-- Classify["cat", "dog"] -> Classify the image in the provided categories
-- Save["./abbey2.jpg"] -> Save the last image
+- `Load["./abbey.jpg"]` -> Load the image
+- `Size[]` -> Get the size of the image
+- `Say[]` -> Say the result of the last function
+- `Detect["person"]` -> Detect the person
+- `Replace["emoji.png"]` -> Replace the person with black image
+- `Cutout[]` -> Cutout the last detections
+- `Count[]` -> Count the last detections
+- `CountInRegion[0, 0, 500, 500]` -> Count the last detections in the region (x1, y1, x2, y2)
+- `Classify["cat", "dog"]` -> Classify the image in the provided categories
+- `Save["./abbey2.jpg"]` -> Save the last image
+- `Show[]` -> Show the last image
+  - If you have run inference, this will plot inference results on the image with which you are working.
+- `x = 1` -> Set the variable x to 1
+- `True` and `False`: Booleans
+- `If[Statement]`: If the statement is true, run the next line (the only value that evaluates to `False` is `False` right now so this is not yet useful).
+- `x == y`: Test for equality. Check if x is equal to y.
+- `In["./images"]`: Load all images in the `./images` folder
+
 
 ## Core Libraries Used
 
