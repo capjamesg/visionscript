@@ -1,6 +1,3 @@
-# VisualScript
-
-# supress warnings
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -9,15 +6,13 @@ import logging
 import optparse
 import os
 
-import clip
 import cv2
 import numpy as np
 import supervision as sv
-import torch
-from lark import Lark
+from lark import Lark, UnexpectedToken, UnexpectedCharacters
+from spellchecker import SpellChecker
 from PIL import Image
-from ultralytics import YOLO
-from fastsam import FastSAM, FastSAMPrompt
+import sys
 
 
 # state will have "last"
@@ -28,6 +23,7 @@ state = {
     "last_loaded_image": None,
 }
 
+spell = SpellChecker()
 
 opt_parser = optparse.OptionParser()
 
@@ -35,6 +31,7 @@ opt_parser.add_option("--validate", action="store_true", dest="validate", defaul
 opt_parser.add_option("--ref", action="store_true", dest="ref", default=False)
 opt_parser.add_option("--debug", action="store_true", dest="debug", default=False)
 opt_parser.add_option("--file", action="store", dest="file", default=None)
+opt_parser.add_option("--repl", action="store_true", dest="repl", default=False)
 
 options, args = opt_parser.parse_args()
 
@@ -86,10 +83,29 @@ Detect["person"]
 Show[]
     """
 
+language_grammar_reference = [
+    "Load",
+    "Save",
+    "Size",
+    "Say",
+    "Detect",
+    "Replace",
+    "Cutout",
+    "Count",
+    "Segment",
+    "CountInRegion",
+    "Classify",
+    "Show",
+    "In",
+    "If",
+]
+
+lowercase_language_grammar_reference = [item.lower() for item in language_grammar_reference]
+
 grammar = """
 start: expr+
 
-expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | comment | show | INT
+expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | comment | show | exit | INT
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -100,6 +116,7 @@ size: "Size" "[" "]"
 show: "Show" "[" "]"
 cutout: "Cutout" "[" "]"
 count: "Count" "[" "]"
+exit: "Exit" "[" "]"
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
 detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" "]"
 segment: "Segment" "[" STRING "]"
@@ -122,8 +139,42 @@ parser = Lark(grammar)
 
 try:
     tree = parser.parse(code.strip())
-except Exception as e:
-    print(e)
+except UnexpectedCharacters as e:
+    # raise error if class doesn't exist
+    line = e.line
+    column = e.column
+
+    # check if function name in grammar
+    function_name = code.strip().split("\n")[line - 1].split("[")[0].strip()
+    
+    if function_name in language_grammar_reference:
+        print(f"Syntax error on line {line}, column {column}.")
+        print(f"Unexpected character: {e.char!r}")
+        exit(1)
+
+    spell.known(lowercase_language_grammar_reference)
+    spell.word_frequency.load_words(lowercase_language_grammar_reference)
+    
+    alternatives = spell.candidates(function_name)
+
+    if len(alternatives) == 0:
+        print(f"Function {function_name} does not exist.")
+        exit(1)
+    
+    print(f"Function '{function_name}' does not exist. Did you mean one of these?")
+    print("-" * 10)
+
+    for item in list(alternatives):
+        if item in lowercase_language_grammar_reference:
+            print(language_grammar_reference[lowercase_language_grammar_reference.index(item.lower())])
+
+    exit(1)
+except UnexpectedToken as e:
+    line = e.line
+    column = e.column
+
+    print(f"Syntax error on line {line}, column {column}.")
+    print(f"Unexpected token: {e.token!r}")
     exit(1)
 
 if options.validate:
@@ -166,6 +217,9 @@ def count(args, state):
 def detect(classes, state):
     logging.disable(logging.CRITICAL)
 
+    if "ultralytics" not in sys.modules:
+        from ultralytics import YOLO
+
     model = YOLO("yolov8n.pt")
     inference_results = model(state["last_loaded_image"])[0]
 
@@ -188,6 +242,10 @@ def detect(classes, state):
 
 def classify(labels, state):
     image = state["last"]
+
+    if "clip" not in sys.modules:
+        import clip
+        import torch
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model, preprocess = clip.load("ViT-B/32", device=device)
@@ -327,6 +385,7 @@ function_calls = {
     "comment": lambda x, y: None,
     "expr": lambda x, y: None,
     "show": lambda x, y: show(x, y),
+    "exit": lambda x, y: exit(0),
 }
 
 if DEBUG:
@@ -444,5 +503,12 @@ def parse_tree(tree):
         if token.value == "load":
             state["last_loaded_image"] = result
             state["last_loaded_image_name"] = value
+
+if options.repl:
+    while True:
+        code = input(">>> ")
+        tree = parser.parse(code.strip())
+
+        parse_tree(tree)
 
 parse_tree(tree)
