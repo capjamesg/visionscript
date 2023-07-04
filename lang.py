@@ -81,28 +81,15 @@ if options.file is not None:
         code = f.read()
 else:
     code = """
-a = 1
-Say[]
+Load["./abbey.jpg"]
+Detect["person"]
+Show[]
     """
-#     code = """
-# IF [True]
-#     Load["./abbey.jpg"]
-#     Segment["person"]
-#     Say[]
-# """
-    # code = """
-    # Load["./abbey.jpg"]
-    # Size[]
-    # Say[]
-    # Detect["person"]
-    # Replace["emoji.png"]
-    # Save["./abbey2.jpg"]
-    # """
 
 grammar = """
 start: expr+
 
-expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | INT
+expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | comment | show | INT
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -110,6 +97,7 @@ load: "Load" "[" STRING "]" | "Load" "[" "]"
 save: "Save" "[" STRING "]"
 say: "Say" "[" "]"
 size: "Size" "[" "]"
+show: "Show" "[" "]"
 cutout: "Cutout" "[" "]"
 count: "Count" "[" "]"
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
@@ -117,8 +105,10 @@ detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" "]"
 segment: "Segment" "[" STRING "]"
 in: "IN" "[" STRING "]" EOL (INDENT expr+)*
 if: "IF" "[" (expr+) "]" EOL (INDENT expr+)*
+OPERAND: "+" | "-" | "*" | "/"
 EQUALITY: "=="
 variable: /[a-zA-Z]+/
+comment: /#.*$/ (expr)*
 EOL: "\\n"
 INT: /-?\d+/
 INDENT: "    "
@@ -302,7 +292,23 @@ def replace(filename, state):
         random_img, (int(xyxy[0][0]), int(xyxy[0][1]))
     )
 
+def show(_, state):
+    # if detections
+    if state.get("last_function_type", None) == "detect":
+        annotator = sv.BoxAnnotator()
+    elif state.get("last_function_type", None) == "segment":
+        annotator = sv.BoxAnnotator()
+    else:
+        annotator = None
 
+    if annotator:
+        image = annotator.annotate(cv2.imread(state["last_loaded_image_name"]), state["last"])
+    else:
+        image = cv2.imread(state["last_loaded_image_name"])
+    
+    sv.plot_image(image, (8, 8))
+
+# if None, the logic is handled in the main parser
 function_calls = {
     "load": lambda x, y: load(x, y),
     "save": lambda x, y: save(x, y),
@@ -318,19 +324,26 @@ function_calls = {
     "in": lambda x, y: None,
     "if": lambda x, y: None,
     "var": lambda x, y: None,
+    "comment": lambda x, y: None,
+    "expr": lambda x, y: None,
+    "show": lambda x, y: show(x, y),
 }
 
 if DEBUG:
     print(tree.pretty())
 
 def parse_tree(tree):
+    if not hasattr(tree, "children"):
+        if (hasattr(tree, "value") and tree.value.isdigit()):
+            return int(tree.value)
+    
     for node in tree.children:
         # ignore EOLs, etc.
         if node == "True":
             return True
         elif node == "False":
             return False
-        elif hasattr(node, "type") and node.type == "INT":
+        elif (hasattr(node, "type") and node.type == "INT") or isinstance(node, int):
             return int(node.value)
         elif not hasattr(node, "children") or len(node.children) == 0:
             node = node
@@ -343,6 +356,13 @@ def parse_tree(tree):
             continue
 
         token = node.data
+
+        if token == "comment":
+            continue
+
+        if token == "expr":
+            parse_tree(node)
+            continue
 
         if token.type == "BOOL":
             return node.children[0].value == "True"
