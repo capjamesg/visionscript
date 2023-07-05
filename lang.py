@@ -645,7 +645,7 @@ if options.repl:
         parse_tree(tree)
 
 if __name__ == "__main__":
-    if options.file is None:
+    if options.file is not None:
         try:
             tree = parser.parse(code.strip())
         except UnexpectedCharacters as e:
