@@ -9,6 +9,7 @@ import os
 import random
 import string
 import sys
+import tempfile
 
 import cv2
 import numpy as np
@@ -17,12 +18,19 @@ from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from spellchecker import SpellChecker
 
-# state will have "last"
+from usage import (
+    USAGE,
+    language_grammar_reference,
+    lowercase_language_grammar_reference,
+)
+from grammar import grammar
+
 state = {
     "last": None,
     "last_function_type": None,
     "last_function_args": None,
     "last_loaded_image": None,
+    "history": [],
 }
 
 spell = SpellChecker()
@@ -37,35 +45,6 @@ opt_parser.add_option("--repl", action="store_true", dest="repl", default=False)
 
 options, args = opt_parser.parse_args()
 
-USAGE = """
-VisualScript (VIC) is a visual programming language for computer vision.
-
-VisualScript is a line-based language. Each line is a function call.
-
-Language Reference
-------------------
-Load["./abbey.jpg"] -> Load the image
-Size[] -> Get the size of the image
-Say[] -> Say the result of the last function
-Detect["person"] -> Detect the person
-Replace["emoji.png"] -> Replace the person with black image
-Cutout[] -> Cutout the last detections
-Count[] -> Count the last detections
-CountInRegion[0, 0, 500, 500] -> Count the last detections in the region (x1, y1, x2, y2)
-Classify["cat", "dog"] -> Classify the image in the provided categories
-Save["./abbey2.jpg"] -> Save the last image
-
-Example Program
----------------
-
-Find a church in the image and cut it out.
-
-Load["./abbey.jpg"]
-Detect["church"]
-Cutout[]
-Save["./abbey2.jpg"]
-"""
-
 if options.ref:
     print(USAGE.strip())
     exit(0)
@@ -78,73 +57,11 @@ else:
 if options.file is not None:
     with open(options.file, "r") as f:
         code = f.read()
-else:
-    code = """
-Load["./abbey.jpg"]
-Detect["person"]
-Show[]
-    """
-
-language_grammar_reference = {
-    "Load": "Load an image",
-    "Save": "Save an image",
-    "Size": "Get the size of the image (width, height)",
-    "Say": "Say the result of the last function",
-    "Detect": "Find objects in the image",
-    "Replace": "Replace the last detections with a random image",
-    "Cutout": "Cutout the last detections",
-    "Count": "Count the last detections",
-    "Segment": "Segment the image",
-    "CountInRegion": "Count the last detections in the region (x1, y1, x2, y2)",
-    "Classify": "Classify the image in the provided categories",
-    "Show": "Show the image",
-    "In": "Iterate over the files in a directory",
-    "If": "If statement",
-}
-
-lowercase_language_grammar_reference = [
-    item.lower() for item in language_grammar_reference
-]
-
-grammar = """
-start: expr+
-
-expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | comment | show | exit | help | INT
-classify: "Classify" "[" STRING ("," STRING)* "]"
-var: variable "=" expr
-replace: "Replace" "[" STRING "]"
-load: "Load" "[" STRING "]" | "Load" "[" "]"
-save: "Save" "[" STRING "]"
-say: "Say" "[" "]"
-size: "Size" "[" "]"
-show: "Show" "[" "]"
-cutout: "Cutout" "[" "]"
-count: "Count" "[" "]"
-exit: "Exit" "[" "]"
-help: "Help" "[" STRING "]"
-countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
-detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" "]"
-segment: "Segment" "[" STRING "]"
-in: "IN" "[" STRING "]" EOL (INDENT expr+)*
-if: "IF" "[" (expr+) "]" EOL (INDENT expr+)*
-OPERAND: "+" | "-" | "*" | "/"
-EQUALITY: "=="
-variable: /[a-zA-Z]+/
-comment: /#.*$/ (expr)*
-EOL: "\\n"
-INT: /-?\d+/
-INDENT: "    "
-BOOL: "True" | "False"
-%import common.ESCAPED_STRING -> STRING
-%import common.WS_INLINE
-%ignore WS_INLINE
-"""
 
 parser = Lark(grammar)
 
-try:
-    tree = parser.parse(code.strip())
-except UnexpectedCharacters as e:
+
+def handle_unexpected_characters(e):
     # raise error if class doesn't exist
     line = e.line
     column = e.column
@@ -174,19 +91,22 @@ except UnexpectedCharacters as e:
     for item in list(alternatives):
         if item in lowercase_language_grammar_reference:
             print(
-                language_grammar_reference[
+                list(language_grammar_reference.keys())[
                     lowercase_language_grammar_reference.index(item.lower())
                 ]
             )
 
     exit(1)
-except UnexpectedToken as e:
+
+
+def handle_unexpected_token(e):
     line = e.line
     column = e.column
 
     print(f"Syntax error on line {line}, column {column}.")
     print(f"Unexpected token: {e.token!r}")
     exit(1)
+
 
 if options.validate:
     print("Script is a valid VisualScript program.")
@@ -197,7 +117,7 @@ def literal_eval(string):
     return string[1:-1]
 
 
-def load(filename, _):
+def load(filename):
     if "requests" not in sys.modules:
         import requests
     if "validators" not in sys.modules:
@@ -221,8 +141,9 @@ def load(filename, _):
             + file_extension
         )
 
-        with open(filename, "wb") as f:
+        with tempfile.NamedTemporaryFile(delete=True) as f:
             f.write(response.content)
+            filename = f.name
 
     if state.get("ctx") and state["ctx"].get("in"):
         filename = state["ctx"]["active_file"]
@@ -232,28 +153,28 @@ def load(filename, _):
     return Image.open(filename)
 
 
-def size(_, state):
+def size(_):
     return state["last_loaded_image"].size
 
 
-def cutout(_, state):
+def cutout(_):
     x1, y1, x2, y2 = state["last"].xyxy[0]
     image = state["last_loaded_image"]
     state["last_loaded_image"] = image.crop((x1, y1, x2, y2))
 
 
-def save(filename, state):
+def save(filename):
     state["last_loaded_image"].save(filename)
 
 
-def count(args, state):
+def count(args):
     if len(args) == 0:
         return len(state["last"].xyxy)
     else:
         return len([item for item in state["last"].class_id if item == args[0]])
 
 
-def detect(classes, state):
+def detect(classes):
     logging.disable(logging.CRITICAL)
 
     if "ultralytics" not in sys.modules:
@@ -279,8 +200,24 @@ def detect(classes, state):
     return results
 
 
-def classify(labels, state):
+def classify(labels):
     image = state["last"]
+
+    if state.get("model") and state["model"].__class__.__name__ == "ViT":
+        model = state["model"]
+
+        results = model.predict(image).get_top_k(1)
+
+        if len(results.class_id) == 0:
+            return sv.Classifications.empty()
+
+        return results.class_id[0]
+    elif state.get("model") and state["model"].__class__.__name__ == "YOLOv8":
+        model = state["model"]
+
+        results = model.predict(image)
+
+        return results
 
     if "clip" not in sys.modules:
         import clip
@@ -304,7 +241,7 @@ def classify(labels, state):
     return label_name
 
 
-def segment(text_prompt, state):
+def segment(text_prompt):
     if "FastSAM" not in sys.modules:
         from fastsam import FastSAM, FastSAMPrompt
 
@@ -350,7 +287,7 @@ def segment(text_prompt, state):
     )
 
 
-def countInRegion(x1, y1, x2, y2, state):
+def countInRegion(x1, y1, x2, y2):
     detections = state["last"]
 
     xyxy = detections.xyxy
@@ -366,7 +303,7 @@ def countInRegion(x1, y1, x2, y2, state):
     return counter
 
 
-def say(statement, state):
+def say(statement):
     if state.get("last_function_type", None) in ("detect", "segment"):
         last_args = state["last_function_args"]
         statement = "".join(
@@ -379,7 +316,7 @@ def say(statement, state):
     print(statement)
 
 
-def replace(filename, state):
+def replace(filename):
     detections = state["last"]
 
     xyxy = detections.xyxy
@@ -400,14 +337,43 @@ def replace(filename, state):
     state["last_loaded_image"].paste(random_img, (int(xyxy[0][0]), int(xyxy[0][1])))
 
 
-def show(_, state):
-    # if detections
+def train(folder):
+    # if Detect or Classify run, train
+    if "Detect" in state["history"]:
+        if "autodistill_yolov8" not in sys.modules:
+            import autodistill_yolov8 as YOLOv8
+
+        base_model = YOLOv8("yolov8n.pt")
+
+        model = base_model.train(folder, "yolov8n.pt")
+
+    elif "Classify" in state["history"]:
+        if "autodistill_vit" not in sys.modules:
+            import autodistill_vit as ViT
+
+        base_model = ViT("ViT-B/32")
+
+        model = base_model.train(folder, "ViT-B/32")
+    else:
+        print("No training needed.")
+        return
+
+    state["model"] = model
+
+
+def show(_):
     if state.get("last_function_type", None) == "detect":
         annotator = sv.BoxAnnotator()
     elif state.get("last_function_type", None) == "segment":
         annotator = sv.BoxAnnotator()
     else:
         annotator = None
+
+    if state.get("last_loaded_image_name") is None or not os.path.exists(
+        state["last_loaded_image_name"]
+    ):
+        print("Image does not exist.")
+        return
 
     if annotator:
         image = annotator.annotate(
@@ -421,29 +387,27 @@ def show(_, state):
 
 # if None, the logic is handled in the main parser
 function_calls = {
-    "load": lambda x, y: load(x, y),
-    "save": lambda x, y: save(x, y),
-    "classify": lambda x, y: classify(x, y),
-    "size": lambda x, y: size(x, y),
-    "say": lambda x, y: say(x, y),
-    "detect": lambda x, y: detect(x, y),
-    "segment": lambda x, y: segment(x, y),
-    "cutout": lambda x, y: cutout(x, y),
-    "count": lambda x, y: count(x, y),
-    "countinregion": lambda x, y: countInRegion(*x, y),
-    "replace": lambda x, y: replace(x, y),
-    "in": lambda x, y: None,
-    "if": lambda x, y: None,
-    "var": lambda x, y: None,
-    "comment": lambda x, y: None,
-    "expr": lambda x, y: None,
-    "show": lambda x, y: show(x, y),
-    "exit": lambda x, y: exit(0),
-    "help": lambda x, y: print(language_grammar_reference[x]),
+    "load": lambda x: load(x),
+    "save": lambda x: save(x),
+    "classify": lambda x: classify(x),
+    "size": lambda x: size(x),
+    "say": lambda x: say(x),
+    "detect": lambda x: detect(x),
+    "segment": lambda x: segment(x),
+    "cutout": lambda x: cutout(x),
+    "count": lambda x: count(x),
+    "countinregion": lambda x: countInRegion(*x),
+    "replace": lambda x: replace(x),
+    "in": lambda x: None,
+    "if": lambda x: None,
+    "var": lambda x: None,
+    "comment": lambda x: None,
+    "expr": lambda x: None,
+    "show": lambda x: show(x),
+    "exit": lambda x: exit(0),
+    "help": lambda x: print(language_grammar_reference[x]),
+    "train": lambda x: train(x),
 }
-
-if DEBUG:
-    print(tree.pretty())
 
 
 def parse_tree(tree):
@@ -507,11 +471,16 @@ def parse_tree(tree):
             else:
                 continue
 
+        if token.value == None:
+            continue
+
         func = function_calls[token.value]
+
+        state["history"].append(token.value)
 
         if token.value == "say":
             value = state["last"]
-            func(value, state)
+            func(value)
             continue
         else:
             # convert children to strings
@@ -550,7 +519,7 @@ def parse_tree(tree):
         else:
             value = [item.value for item in node.children]
 
-        result = func(value, state)
+        result = func(value)
 
         state["last"] = result
         state["last_function_type"] = token.value
@@ -568,8 +537,26 @@ if options.repl:
     print("-" * 20)
     while True:
         code = input(">>> ")
-        tree = parser.parse(code.strip())
+
+        try:
+            tree = parser.parse(code.strip())
+        except UnexpectedCharacters as e:
+            handle_unexpected_characters(e)
+        except UnexpectedToken as e:
+            handle_unexpected_token(e)
 
         parse_tree(tree)
 
-parse_tree(tree)
+if __name__ == "__main__":
+    if options.file is None:
+        try:
+            tree = parser.parse(code.strip())
+        except UnexpectedCharacters as e:
+            handle_unexpected_characters(e)
+        except UnexpectedToken as e:
+            handle_unexpected_token(e)
+
+    if DEBUG:
+        print(tree.pretty())
+
+    parse_tree(tree)
