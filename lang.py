@@ -20,11 +20,8 @@ from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 
 from grammar import grammar
-from usage import (
-    USAGE,
-    language_grammar_reference,
-    lowercase_language_grammar_reference,
-)
+from usage import (USAGE, language_grammar_reference,
+                   lowercase_language_grammar_reference)
 
 # from spellchecker import SpellChecker
 
