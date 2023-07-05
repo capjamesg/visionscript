@@ -1,0 +1,6 @@
+Load["./abbey.jpg"]
+Size[]
+Say[]
+Detect["person"]
+Replace["emoji.png"]
+Save["./abbey2.jpg"]

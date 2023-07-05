@@ -1,0 +1,3 @@
+IN["./images"]
+    Detect["person"]
+    Say[]
