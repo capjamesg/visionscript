@@ -1,14 +1,8 @@
-# VisualScript
+# VisionScript
 
-VisualScript is an abstract programming language for doing common computer vision tasks, fast.
+VisionScript is an abstract programming language for doing common computer vision tasks, fast.
 
-VisualScript is built in Python, offering a simple syntax for running object detection, classification, and segmentation models.
-
-VisualScript provides abstract wrappers around:
-
-- [CLIP](https://github.com/openai/clip) by OpenAI
-- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics)
-- [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) by CASIA-IVA-Lab.
+VisionScript is built in Python, offering a simple syntax for running object detection, classification, and segmentation models.
 
 ## Quickstart
 
@@ -63,9 +57,9 @@ Size[]
 
 ## Installation
 
-To install VisualScript, clone this repository and run `pip install -r requirements.txt`.
+To install VisionScript, clone this repository and run `pip install -r requirements.txt`.
 
-Then, make a file ending in `.vic` in which to write your VisualScript code.
+Then, make a file ending in `.vic` in which to write your VisionScript code.
 
 When you have written your code, run:
 
@@ -81,7 +75,7 @@ Running in debug mode shows the full Abstract Syntax Tree (AST) of your code.
 python3 lang.py --file ./your_file.vic --debug
 ```
 
-Debug mode is useful for debugging code while adding new features to the VisualScript language.
+Debug mode is useful for debugging code while adding new features to the VisionScript language.
 
 ## Documentation
 
@@ -117,20 +111,20 @@ Debug mode is useful for debugging code while adding new features to the VisualS
 
 The inspiration behind this project was to build a simple way of doing one-off tasks.
 
-Consider a scenario where you want to run zero-shot classification on a folder of images. With VisualScript, you can do this in two lines of code:
+Consider a scenario where you want to run zero-shot classification on a folder of images. With VisionScript, you can do this in two lines of code:
 
 ```
 In["./images"]
     Classify["cat", "dog"]
 ```
 
-VisualScript is not meant to be a full programming language for all vision tasks, rather an abstract way of doing common tasks.
+VisionScript is not meant to be a full programming language for all vision tasks, rather an abstract way of doing common tasks.
 
-VisualScript is ideal if you are new to concepts like "classify" and "segment" and want to explore what they do to an image.
+VisionScript is ideal if you are new to concepts like "classify" and "segment" and want to explore what they do to an image.
 
 ### Syntax
 
-The syntax is inspired by both Python and the Wolfram Language. VisualScript is an interpreted language, run line-by-line like Python. Statements use the format:
+The syntax is inspired by both Python and the Wolfram Language. VisionScript is an interpreted language, run line-by-line like Python. Statements use the format:
 
 ```
 Statement[argument1, argument2, ...]
@@ -140,9 +134,9 @@ This is the same format as the Wolfram Language.
 
 ### Lexical Inference and Memory
 
-An (I think!) unique feature in VisualScript compared to other languages is lexical inference.
+An (I think!) unique feature in VisionScript compared to other languages is lexical inference.
 
-You don't need to declare variables to store images, etc. Rather, you can let VisualScript do the work. Consider this example:
+You don't need to declare variables to store images, etc. Rather, you can let VisionScript do the work. Consider this example:
 
 ```
 Load["./photo.jpg"]
@@ -150,6 +144,58 @@ Size[]
 Say[]
 ```
 
-Here, `Size[]` and `Say[]` do not have any arguments. Rather, they use the last input. Wolfram Alpha has a feature to get the last input using `%`. VisualScript uses the same concept, but with a twist.
+Here, `Size[]` and `Say[]` do not have any arguments. Rather, they use the last input. Wolfram Alpha has a feature to get the last input using `%`. VisionScript uses the same concept, but with a twist.
 
 Indeed, `Size[]` and `Say[]` don't accept any arguments.
+
+## Developer Setup
+
+If you want to add new features or fix bugs in the VisionScript language, you will need to set up a developer environment.
+
+To do so, clone the language repository:
+
+```bash
+git clone https://github.com/capjamesg/VisionScript
+```
+
+Then, install the required dependencies and VisionScript:
+
+```bash
+pip install -r requirements.txt
+pip install -e .
+```
+
+Now, you can run VisionScript using:
+
+```bash
+python3 lang.py
+```
+
+### Tests
+
+Tests are run to ensure programs execute in full. Tests do not verify the output of each statement, although this will be added.
+
+For now, you can run all test cases using the following command:
+
+```bash
+python3 test.py
+```
+
+### Code Organization
+
+- `lang.py`: Core language code.
+- `test.py`: Run tests.
+- `usage.py`: Variables referenced for usage instructions in `lang.py`.
+- `grammar.py`: The VisionScript grammar.
+- `tests/`: VisionScript tests.
+
+## Supported Models
+
+VisionScript provides abstract wrappers around:
+
+- [CLIP](https://github.com/openai/clip) by OpenAI (Classification)
+- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) (Object Detection Training, Segmentation Training)
+- [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) by CASIA-IVA-Lab. (Segmentation)
+- GroundedSAM (Object Detection, Segmentation)
+- BLIP (Caption Generation)
+- ViT (Classification Training)
