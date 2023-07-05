@@ -20,8 +20,11 @@ from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 
 from grammar import grammar
-from usage import (USAGE, language_grammar_reference,
-                   lowercase_language_grammar_reference)
+from usage import (
+    USAGE,
+    language_grammar_reference,
+    lowercase_language_grammar_reference,
+)
 
 # from spellchecker import SpellChecker
 
@@ -34,7 +37,7 @@ state = {
     "image_stack": [],
     "detections_stack": [],
     "history": [],
-    "current_active_model": None
+    "current_active_model": None,
 }
 
 # spell = SpellChecker()
@@ -126,8 +129,10 @@ if options.validate:
 def literal_eval(string):
     return string[1:-1]
 
+
 def set_state(key, value):
     state[key] = value
+
 
 def use(model_name):
     set_state("current_active_model", model_name)
@@ -373,7 +378,7 @@ def label(args):
     else:
         print("This model doesn't exist yet!")
         return
-    
+
     base_model.label(folder)
 
 
@@ -445,9 +450,11 @@ def show(_):
 
     sv.plot_image(image, (8, 8))
 
+
 def get_func(x):
     print(x)
     state["last"] = state["last"][x]
+
 
 # if None, the logic is handled in the main parser
 function_calls = {
@@ -476,7 +483,7 @@ function_calls = {
     "read": lambda x: read(x),
     "label": lambda x: label(x),
     "list": lambda x: None,
-    "get": lambda x: get_func(x)
+    "get": lambda x: get_func(x),
 }
 
 
