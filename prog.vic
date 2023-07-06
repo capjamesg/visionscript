@@ -1,3 +1,0 @@
-Load["./abbey.jpg"]
-Detect["person"]
-Save["./abbey2.jpg"]
