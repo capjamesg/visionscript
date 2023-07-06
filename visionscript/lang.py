@@ -103,7 +103,7 @@ else:
 
 if options.file is not None:
     with open(options.file, "r") as f:
-        code = f.read()
+        code = f.read() + "\n"
 
 # code = """
 # Make "tea" []
@@ -236,12 +236,12 @@ def import_(args):
     # execute code from a file
     # this will update state for the entire script
 
-    file_name = [letter for letter in args[0] if letter.isalpha() or letter == "-" or letter.isdigit()]
+    file_name = "".join([letter for letter in args if letter.isalpha() or letter == "-" or letter.isdigit()])
 
     with open(file_name + ".vic", "r") as f:
         code = f.read()
     
-    tree = parser.parse(code.strip())
+    tree = parser.parse(code.strip() + "\n")
 
     parse_tree(tree)
 
@@ -592,26 +592,27 @@ def show(_):
     else:
         image = cv2.imread(state["last_loaded_image_name"])
 
-    buffer = io.BytesIO()
-    import base64
+    if state.get("notebook"):
+        buffer = io.BytesIO()
+        import base64
 
-    import matplotlib
+        import matplotlib
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
 
-    # show image
-    fig = plt.figure(figsize=(8, 8))
-    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        # show image
+        fig = plt.figure(figsize=(8, 8))
+        plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
-    fig.savefig(buffer, format="png")
-    buffer.seek(0)
+        fig.savefig(buffer, format="png")
+        buffer.seek(0)
 
-    image = Image.open(buffer)
+        image = Image.open(buffer)
 
-    state["output"] = {"image": base64.b64encode(buffer.getvalue()).decode("utf-8")}
+        state["output"] = {"image": base64.b64encode(buffer.getvalue()).decode("utf-8")}
 
-    # sv.plot_image(image, (8, 8))
+    sv.plot_image(image, (8, 8))
 
 
 def get_func(x):
