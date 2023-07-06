@@ -1,7 +1,7 @@
 grammar = """
 start: (expr)*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | tutorial | make | run | isita | find | describe) (EOL | EOF | " ")
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | tutorial | make | run | isita | find | describe | import) (EOL | EOF | " ")
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -16,6 +16,7 @@ args: ((STRING | INT | expr) ("," (STRING | INT | expr))*) | (STRING | INT | exp
 make: "Make" STRING "[" args "]" EOL (INDENT expr+)*
 caption: "Caption" "[" "]"
 size: "Size" "[" "]"
+import: "Import" "[" STRING "]"
 run: "Run" "[" STRING "]"
 show: "Show" "[" "]"
 cutout: "Cutout" "[" "]"

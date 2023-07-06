@@ -77,6 +77,7 @@ function_calls = {
     "use": lambda x: set_state("current_active_model", x),
     "caption": lambda x: caption(x),
     "contains": lambda x: contains(x),
+    "import": lambda x: import_(x)
 }
 
 # spell = SpellChecker()
@@ -231,6 +232,18 @@ def load(filename):
 def size(_):
     return state["last_loaded_image"].size
 
+def import_(args):
+    # execute code from a file
+    # this will update state for the entire script
+
+    file_name = [letter for letter in args[0] if letter.isalpha() or letter == "-" or letter.isdigit()]
+
+    with open(file_name + ".vic", "r") as f:
+        code = f.read()
+    
+    tree = parser.parse(code.strip())
+
+    parse_tree(tree)
 
 def cutout(_):
     x1, y1, x2, y2 = state["last"].xyxy[0]
