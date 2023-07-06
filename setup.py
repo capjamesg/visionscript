@@ -10,6 +10,9 @@ with open("./__init__.py", 'r') as f:
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+with open("requirements.txt") as f:
+    reqs = f.read().splitlines()
+
 setuptools.setup(
     name="visualscript",
     version=version,
@@ -19,9 +22,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/capjamesg/visualscript",
-    install_requires=[
-      # list your requires
-    ],
+    install_requires=reqs,
     packages=find_packages(exclude=("tests",)),
     extras_require={
         "dev": ["flake8", "black==22.3.0", "isort", "twine", "pytest", "wheel"],

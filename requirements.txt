@@ -1,0 +1,12 @@
+lark
+pyspellchecker
+supervision
+numpy
+python-pillow
+requests
+ultralytics
+autodistill
+autodistill_yolov8
+autodistill_grounded_sam
+autodistill_blip
+autodistill_vit

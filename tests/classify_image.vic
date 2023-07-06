@@ -1,0 +1,2 @@
+Load["./photo.jpg"]
+Classify["apple", "banana"]
