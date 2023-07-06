@@ -16,14 +16,14 @@ with open("./requirements.txt", "r") as f:
 setuptools.setup(
     name="visionscript",
     version=version,
-    author="capjamesg",
+    author=["capjamesg","mahimairaja"],
     author_email="jamesg@jamesg.blog",
     description="VisionScript is an abstract programming language for doing common computer vision tasks, fast.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/capjamesg/visionscript",
     install_requires=reqs,
-    packages=find_packages(exclude=("tests",)),
+    packages=find_packages(exclude=("tests",), include=("visionscript",)),
     extras_require={
         "dev": ["flake8", "black==22.3.0", "isort", "twine", "pytest", "wheel"],
     },
@@ -32,5 +32,9 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+        entry_points="""
+        [console_scripts]
+        vscript=visionscript.lang:main
+    """,
     python_requires=">=3.7",
 )

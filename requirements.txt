@@ -1,8 +1,10 @@
 lark
+click
 pyspellchecker
 supervision
 numpy
-python-pillow
+pillow
+validators
 requests
 ultralytics
 autodistill

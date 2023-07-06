@@ -13,7 +13,7 @@ import random
 import string
 import sys
 import tempfile
-
+import click
 import cv2
 import numpy as np
 import supervision as sv
@@ -768,7 +768,7 @@ def activate_console(parser):
         code = input(">>> ")
 
         try:
-            tree = parser.parse(code.strip())
+            tree = parser.parse(code.lstrip())
         except UnexpectedCharacters as e:
             handle_unexpected_characters(e)
         except UnexpectedToken as e:
@@ -777,44 +777,41 @@ def activate_console(parser):
         parse_tree(tree)
 
 
-def main() -> None:
+@click.command()
+@click.option("--validate", default=False, help="")
+@click.option("--ref", default=False, help="Name of the file")
+@click.option("--debug", default=False, help="To debug")
+@click.option("--file", default=None, help="Name of the file")
+@click.option("--repl", default=None, help="To enter to vscript console")
+def main(validate, ref, debug, file, repl) -> None:
     global state, DEBUG
 
     state = init_state()
     
     parser = Lark(grammar)
     
-    opt_parser = optparse.OptionParser()
-    opt_parser.add_option("--validate", action="store_true", dest="validate", default=False)
-    opt_parser.add_option("--ref", action="store_true", dest="ref", default=False)
-    opt_parser.add_option("--debug", action="store_true", dest="debug", default=False)
-    opt_parser.add_option("--file", action="store", dest="file", default=None)
-    opt_parser.add_option("--repl", action="store_true", dest="repl", default=False)
-
-    options, args = opt_parser.parse_args()
-        
-    if options.validate:
+    if validate:
         print("Script is a valid VisionScript program.")
         exit(0)
     
-    if options.ref:
+    if ref:
         print(USAGE.strip())
     # exit(0)
 
-    if options.debug:
+    if debug:
         DEBUG = True
     else:
         DEBUG = False
 
-    if options.file is not None:
-        with open(options.file, "r") as f:
+    if file is not None:
+        with open(file, "r") as f:
             code = f.read() + "\n"
         
         tree = parser.parse(code.lstrip())
         parse_tree(tree, state=state)
     
     
-    if options.repl:
+    if repl == 'console':
         activate_console(parser)
     
 

@@ -1,3 +1,3 @@
-from lang import *
+from visionscript.lang import *
 
 __version__ = "0.0.1"
