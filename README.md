@@ -1,18 +1,48 @@
+![VisionScript banner](banner.png)
+
 # VisionScript
 
-VisionScript is an abstract programming language for doing common computer vision tasks, fast.
+[VisionScript](https://visionscript.dev) is an abstract programming language for doing common computer vision tasks, fast.
 
-VisionScript is built in Python, offering a simple syntax for running object detection, classification, and segmentation models.
+VisionScript is built in Python, offering a simple syntax for running object detection, classification, and segmentation models. [Read the documentation](https://visionscript.dev/docs/).
+
+## Get Started
+
+First, install VisionScript:
+
+```
+pip install visionscript
+```
+
+You can then run VisionScript using:
+
+```
+vscript
+```
+
+This will open a VisionScript REPL in which you can type commands.
+
+## Run a File
+
+To run a VisionScript file, use:
+
+```
+vscript ./your_file.vic
+```
+
+## Use VisionScript in a Notebook
+
+VisionScript offers an interactive web notebook through which you can run VisionScript code.
+
+To use the notebook, run:
+
+```
+vscript notebook
+```
+
+This will open a notebook in your browser. Notebooks are ephermal. You will need to copy your code to a file to save it.
 
 ## Quickstart
-
-### Load an image, segment out people, and say the coordinates of each person
-
-```
-Load["./photo.jpg"]
-Segment["person"]
-Say[]
-```
 
 ### Find people in an image using object detection
 
@@ -46,13 +76,6 @@ Save["./abbey2.jpg"]
 ```
 Load["./photo.jpg"]
 Classify["apple", "banana"]
-```
-
-### Load an image, get its size
-
-```
-Load["./photo.jpg"]
-Size[]
 ```
 
 ## Installation
