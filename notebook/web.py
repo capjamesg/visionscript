@@ -19,7 +19,6 @@ def init_notebook():
 def notebook():
     # generate random id, then redirect user
     if request.method == "POST":
-        # data is jjson
         data = request.json
         user_input = data["code"]
 

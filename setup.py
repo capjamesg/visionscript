@@ -23,9 +23,14 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/capjamesg/visionscript",
     install_requires=reqs,
-    packages=find_packages(exclude=("tests",)),
+    packages=find_packages(exclude=("tests",), include=("visionscript",)),
     extras_require={
         "dev": ["flake8", "black==22.3.0", "isort", "twine", "pytest", "wheel"],
+    },
+    entry_points={
+        "console_scripts": [
+            "visionscript=visionscript.lang:main",
+        ],
     },
     classifiers=[
         "Programming Language :: Python :: 3",

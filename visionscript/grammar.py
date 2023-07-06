@@ -1,7 +1,7 @@
 grammar = """
-start: (expr)*
+start: (expr)* (EOF | EOL | " ")
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | tutorial | make | run | isita | find | describe | import) (EOL | EOF | " ")
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | tutorial | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize) (EOL | EOF | " ")
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -9,7 +9,13 @@ use: "Use" "[" STRING "]"
 load: "Load" "[" STRING "]" | "Load" "[" "]"
 save: "Save" "[" STRING "]"
 say: "Say" "[" "]"
+get_text: "GetText" "[" "]"
+greyscale: "Greyscale" "[" "]"
 describe: "Describe" "[" "]"
+rotate: "Rotate" "[" INT "]"
+resize: "Resize" "[" INT "," INT "]"
+getcolors: "GetColors" "[" "]" | "GetColors" "[" INT "]"
+getcolours: "GetColours" "[" "]" | "GetColours" "[" INT "]"
 isita: "Is it a " (("," STRING)* | ("or" STRING)*)? EOL
 find: "Find" "[" STRING "]"
 args: ((STRING | INT | expr) ("," (STRING | INT | expr))*) | (STRING | INT | expr)?
@@ -19,6 +25,9 @@ size: "Size" "[" "]"
 import: "Import" "[" STRING "]"
 run: "Run" "[" STRING "]"
 show: "Show" "[" "]"
+select: "Select" "[" "]" | "Select" "[" INT "]"
+paste: "Paste" "[" INT "," INT "]"
+pasterandom: "PasteRandom" "[" "]"
 cutout: "Cutout" "[" "]"
 count: "Count" "[" "]"
 contains: "Contains" "[" STRING "]"

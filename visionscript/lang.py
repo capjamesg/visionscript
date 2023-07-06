@@ -12,17 +12,17 @@ import os
 import random
 import string
 import sys
+import click
 import tempfile
 
 import cv2
 import numpy as np
 import supervision as sv
+from visionscript.grammar import grammar
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from spellchecker import SpellChecker
-
-from grammar import grammar
-from usage import (USAGE, language_grammar_reference,
+from visionscript.usage import (USAGE, language_grammar_reference,
                    lowercase_language_grammar_reference)
 
 spell = SpellChecker()
@@ -77,51 +77,12 @@ function_calls = {
     "use": lambda x: set_state("current_active_model", x),
     "caption": lambda x: caption(x),
     "contains": lambda x: contains(x),
-    "import": lambda x: import_(x)
+    "import": lambda x: import_(x),
+    "rotate": lambda x: rotate(x),
+    "getcolours": lambda x: getcolours(x),
+    "get_text": lambda x: get_text(x),
+    "greyscale": lambda x: greyscale(x),
 }
-
-# spell = SpellChecker()
-
-opt_parser = optparse.OptionParser()
-
-opt_parser.add_option("--validate", action="store_true", dest="validate", default=False)
-opt_parser.add_option("--ref", action="store_true", dest="ref", default=False)
-opt_parser.add_option("--debug", action="store_true", dest="debug", default=False)
-opt_parser.add_option("--file", action="store", dest="file", default=None)
-opt_parser.add_option("--repl", action="store_true", dest="repl", default=False)
-
-options, args = opt_parser.parse_args()
-
-if options.ref:
-    print(USAGE.strip())
-    # exit(0)
-
-if options.debug:
-    DEBUG = True
-else:
-    DEBUG = False
-
-if options.file is not None:
-    with open(options.file, "r") as f:
-        code = f.read() + "\n"
-
-# code = """
-# Make "tea" []
-#     Say[]
-
-# Run["tea"]
-# """
-# code = """
-# Load["./folder/abbey.jpg"]
-# Use["yolov5"]
-# Detect["person"]
-# Read[]
-# IF[Contains["person"] ]
-#     Show[]
-# Else IF[Contains["perffson"] ]
-#     Show[]
-# End[]
-# """
 
 parser = Lark(grammar)
 
@@ -171,11 +132,6 @@ def handle_unexpected_token(e):
     print(f"Syntax error on line {line}, column {column}.")
     print(f"Unexpected token: {e.token!r}")
     exit(1)
-
-
-if options.validate:
-    print("Script is a valid VisionScript program.")
-    exit(0)
 
 
 def literal_eval(string):
@@ -232,18 +188,26 @@ def load(filename):
 def size(_):
     return state["last_loaded_image"].size
 
+
 def import_(args):
     # execute code from a file
     # this will update state for the entire script
 
-    file_name = "".join([letter for letter in args if letter.isalpha() or letter == "-" or letter.isdigit()])
+    file_name = "".join(
+        [
+            letter
+            for letter in args
+            if letter.isalpha() or letter == "-" or letter.isdigit()
+        ]
+    )
 
     with open(file_name + ".vic", "r") as f:
         code = f.read()
-    
+
     tree = parser.parse(code.strip() + "\n")
 
     parse_tree(tree)
+
 
 def cutout(_):
     x1, y1, x2, y2 = state["last"].xyxy[0]
@@ -251,6 +215,51 @@ def cutout(_):
     cropped_image = image.crop((x1, y1, x2, y2))
     state["image_stack"].append(cropped_image)
     state["last_loaded_image"] = cropped_image
+
+
+def select(args):
+    # if detect, select from detections
+    if state.get("last_function_type", None) in ("detect", "segment"):
+        detections = state["last"]
+
+        if len(args) == 0:
+            state["last"] = detections
+        else:
+            state["last"] = detections[args[0]]
+
+
+def paste(args):
+    x, y = args
+    state["last_loaded_image"].paste(state["image_stack"][-1], (x, y))
+
+
+def resize(args):
+    width, height = args
+    image = state["last_loaded_image"]
+    image = image.resize((width, height))
+    state["last_loaded_image"] = image
+
+
+def pasterandom(_):
+    x, y = []
+
+    while True:
+        x, y = random.randint(0, state["last_loaded_image"].size[0]), random.randint(
+            0, state["last_loaded_image"].size[1]
+        )
+
+        if len(state["last"].xyxy) == 0:
+            break
+
+        for bbox in state["last"].xyxy:
+            x1, y1, x2, y2 = bbox
+
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                continue
+
+        break
+
+    state["last_loaded_image"].paste(state["image_stack"][-1], (x, y))
 
 
 def save(filename):
@@ -262,6 +271,84 @@ def count(args):
         return len(state["last"].xyxy)
     else:
         return len([item for item in state["last"].class_id if item == args[0]])
+
+
+def greyscale(_):
+    image = state["last_loaded_image"]
+    image = image.convert("LA")
+    state["last_loaded_image"] = image
+
+
+def get_text(_):
+    import easyocr
+
+    reader = easyocr.Reader()
+    result = reader.readtext(state["last_loaded_image_name"])
+
+    return result
+
+
+def rotate(args):
+    image = state["last_loaded_image"]
+    image = image.rotate(args[0])
+
+    state["last_loaded_image"] = image
+
+
+def rotate(args):
+    image = state["last_loaded_image"]
+    image = image.rotate(args[0])
+
+    state["last_loaded_image"] = image
+
+
+def _get_colour_name(rgb_triplet):
+    import webcolors
+
+    min_colours = {}
+    for key, name in webcolors.CSS3_NAMES_TO_HEX.items():
+        r_c, g_c, b_c = webcolors.hex_to_rgb(name)
+        rd = (r_c - rgb_triplet[0]) ** 2
+        gd = (g_c - rgb_triplet[1]) ** 2
+        bd = (b_c - rgb_triplet[2]) ** 2
+        min_colours[(rd + gd + bd)] = key
+
+    return min_colours[min(min_colours.keys())]
+
+
+def getcolours(k):
+    if not k:
+        k = 1
+
+    from sklearn.cluster import KMeans
+
+    image = state["last_loaded_image"]
+
+    image = np.array(image)
+
+    image = image.reshape((image.shape[0] * image.shape[1], 3))
+
+    clt = KMeans(n_clusters=k)
+
+    clt.fit(image)
+
+    # map to human readable colour
+    centers = clt.cluster_centers_
+
+    human_readable_colours = []
+
+    for center in centers:
+        try:
+            human_readable_colours.append(
+                _get_colour_name((int(center[0]), int(center[1]), int(center[2])))
+            )
+        except ValueError as e:
+            print(e)
+            continue
+
+    state["last"] = human_readable_colours[:k]
+
+    return human_readable_colours[:k]
 
 
 def detect(classes):
@@ -311,18 +398,16 @@ aliased_functions = {
     "isita": "classify",
     "find": "detect",
     "describe": "caption",
+    "getcolors": "getcolours",
 }
 
 
 def map_alias_to_underlying_function(alias):
-    print(alias)
     return aliased_functions.get(alias, alias)
 
 
 def classify(labels):
     image = state["last"]
-
-    print(image)
 
     if state.get("model") and state["model"].__class__.__name__ == "ViT":
         model = state["model"]
@@ -452,6 +537,8 @@ def say(_):
                 for i in range(len(state["last"].xyxy))
             ]
         )
+    elif isinstance(state["last"], list):
+        statement = ", ".join([str(item) for item in state["last"]])
     else:
         statement = state["last"]
 
@@ -635,11 +722,7 @@ def parse_tree(tree, state=state):
             return literal_eval(tree)
 
     for node in tree.children:
-        # print('e')
         print(node)
-        if DEBUG:
-            print(node.pretty())
-
         # ignore EOLs, etc.
         # if node is a list, parse it
         # print all tree attrs
@@ -805,7 +888,7 @@ def parse_tree(tree, state=state):
             state["last_loaded_image"] = result
 
 
-if options.repl:
+def activate_console(parser):
     print("Welcome to VisionScript!")
     print("Type 'Exit[]' to exit.")
     print("Read the docs at https://visionscript.org/docs")
@@ -815,7 +898,7 @@ if options.repl:
         code = input(">>> ")
 
         try:
-            tree = parser.parse(code.strip())
+            tree = parser.parse(code.lstrip())
         except UnexpectedCharacters as e:
             handle_unexpected_characters(e)
         except UnexpectedToken as e:
@@ -823,19 +906,40 @@ if options.repl:
 
         parse_tree(tree)
 
-if __name__ == "__main__":
-    try:
+
+@click.command()
+@click.option("--validate", default=False, help="")
+@click.option("--ref", default=False, help="Name of the file")
+@click.option("--debug", default=False, help="To debug")
+@click.option("--file", default=None, help="Name of the file")
+@click.option("--repl", default=None, help="To enter to vscript console")
+def main(validate, ref, debug, file, repl) -> None:
+
+    parser = Lark(grammar)
+    
+    if validate:
+        print("Script is a valid VisionScript program.")
+        exit(0)
+    
+    if ref:
+        print(USAGE.strip())
+
+    if debug:
+        DEBUG = True
+    else:
+        DEBUG = False
+
+    if file is not None:
+        with open(file, "r") as f:
+            code = f.read() + "\n"
+        
         tree = parser.parse(code.lstrip())
-    except UnexpectedCharacters as e:
-        handle_unexpected_characters(e)
-    except UnexpectedToken as e:
-        handle_unexpected_token(e)
-
-    if DEBUG:
-        print(tree.pretty())
-        exit()
-
-    try:
-        parse_tree(tree)
-    except KeyboardInterrupt:
-        print("Exiting VisionScript.")
+        parse_tree(tree, state=state)
+    
+    
+    if repl == 'console':
+        activate_console(parser)
+    
+if __name__ == "__main__":
+    state = init_state()
+    main()

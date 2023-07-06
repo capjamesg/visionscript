@@ -2,7 +2,7 @@ lark
 pyspellchecker
 supervision
 numpy
-python-pillow
+Pillow
 requests
 ultralytics
 autodistill
