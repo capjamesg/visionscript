@@ -1,7 +1,7 @@
 grammar = """
-start: expr+
+start: (expr)*
 
-expr: classify | replace | load | save | say | detect | cutout | size | count | countinregion | in | if | segment | BOOL | EQUALITY | var | EOL | variable | comment | show | exit | help | train | compare | read | label | use | list | get | INT
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment) (EOL | EOF)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -9,6 +9,7 @@ use: "Use" "[" STRING "]"
 load: "Load" "[" STRING "]" | "Load" "[" "]"
 save: "Save" "[" STRING "]"
 say: "Say" "[" "]"
+caption: "Caption" "[" "]"
 size: "Size" "[" "]"
 show: "Show" "[" "]"
 cutout: "Cutout" "[" "]"
@@ -28,9 +29,10 @@ OPERAND: "+" | "-" | "*" | "/"
 EQUALITY: "=="
 train: "Train" "[" STRING "," STRING "]" | "Train" "[" STRING "]"
 label: "Label" "[" STRING "," STRING ("," STRING )*  "]" 
-variable: /[a-zA-Z]+/
-comment: /#.*$/ (expr)*
+variable: /[a-zA-Z_][a-zA-Z0-9_]*/
+comment: "#"
 EOL: "\\n"
+EOF: "\\Z"
 INT: /-?\d+/
 INDENT: "    "
 BOOL: "True" | "False"

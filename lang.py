@@ -26,16 +26,19 @@ from usage import (USAGE, language_grammar_reference,
 # from spellchecker import SpellChecker
 
 
-state = {
-    "last": None,
-    "last_function_type": None,
-    "last_function_args": None,
-    "last_loaded_image": None,
-    "image_stack": [],
-    "detections_stack": [],
-    "history": [],
-    "current_active_model": None,
-}
+def init_state():
+    return {
+        "last": None,
+        "last_function_type": None,
+        "last_function_args": None,
+        "last_loaded_image": None,
+        "image_stack": [],
+        "detections_stack": [],
+        "history": [],
+        "current_active_model": None,
+    }
+
+state = init_state()
 
 # spell = SpellChecker()
 
@@ -63,8 +66,8 @@ if options.file is not None:
         code = f.read()
 
 code = """
-x = ["Yay", "Yayyy!"]
-Get[1]
+Load["./abbey.jpg"]
+Caption[]
 Say[]
 """
 
@@ -131,10 +134,6 @@ def set_state(key, value):
     state[key] = value
 
 
-def use(model_name):
-    set_state("current_active_model", model_name)
-
-
 def load(filename):
     import requests
     import validators
@@ -144,7 +143,6 @@ def load(filename):
         file_extension = mimetypes.guess_extension(response.headers["content-type"])
 
         # if not image, error
-        print(file_extension)
         if file_extension not in (".png", ".jpg", ".jpeg"):
             print(f"File {filename} does not represent a png, jpg, or jpeg image.")
             exit(1)
@@ -364,8 +362,8 @@ def label(args):
     folder = args[0]
     model = args[1]
     items = args[2]
-    # if Detect or Classify run, train
-    if "Detect" in state["history"] or state["current_active_model"] == "Segment":
+
+    if "Detect" in state["history"] or state["current_active_model"] == "groundedsam":
         from autodistill.detection import CaptionOntology
         from autodistill_grounded_sam import GroundedSAM
 
@@ -373,10 +371,24 @@ def label(args):
 
         base_model = GroundedSAM(CaptionOntology(mapped_items))
     else:
-        print("This model doesn't exist yet!")
+        print("Please specify a model with which to label images.")
         return
 
     base_model.label(folder)
+
+def caption(_):
+    from transformers import BlipProcessor, BlipForConditionalGeneration
+
+    processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+    model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+
+    inputs = processor(state["last_loaded_image"], return_tensors="pt")
+
+    out = model.generate(**inputs)
+
+    state["last"] = processor.decode(out[0], skip_special_tokens=True)
+    
+    return processor.decode(out[0], skip_special_tokens=True)
 
 
 def train(args):
@@ -449,7 +461,6 @@ def show(_):
 
 
 def get_func(x):
-    print(x)
     state["last"] = state["last"][x]
 
 
@@ -481,6 +492,8 @@ function_calls = {
     "label": lambda x: label(x),
     "list": lambda x: None,
     "get": lambda x: get_func(x),
+    "use": lambda x: set_state("current_active_model", x),
+    "caption": lambda x: caption(x),
 }
 
 
@@ -493,7 +506,9 @@ def parse_tree(tree):
             return literal_eval(tree)
 
     for node in tree.children:
-        print(node)
+        if DEBUG:
+            print(node)
+
         # ignore EOLs, etc.
         # if node is a list, parse it
         # print all tree attrs
@@ -588,7 +603,7 @@ def parse_tree(tree):
                         continue
                     elif item.type == "STRING":
                         item.value = literal_eval(item.value)
-                    else:
+                    elif item.type == "INT":
                         item.value = int(item.value)
 
         if token.value == "in":
@@ -647,7 +662,7 @@ if options.repl:
 if __name__ == "__main__":
     if options.file is not None:
         try:
-            tree = parser.parse(code.strip())
+            tree = parser.parse(code.lstrip())
         except UnexpectedCharacters as e:
             handle_unexpected_characters(e)
         except UnexpectedToken as e:
@@ -660,5 +675,3 @@ if __name__ == "__main__":
         parse_tree(tree)
     except KeyboardInterrupt:
         print("Exiting VisionScript.")
-
-    print(state)
