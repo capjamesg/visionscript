@@ -21,8 +21,8 @@ from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from spellchecker import SpellChecker
 
-from grammar import grammar
-from usage import (USAGE, language_grammar_reference,
+from visionscript.grammar import grammar
+from visionscript.usage import (USAGE, language_grammar_reference,
                    lowercase_language_grammar_reference)
 
 spell = SpellChecker()
@@ -43,11 +43,10 @@ def init_state():
     }
 
 
-state = init_state()
 
 
-# if None, the logic is handled in the main parser
-function_calls = {
+def get_function_calls():
+    function_calls = {
     "load": lambda x: load(x),
     "save": lambda x: save(x),
     "classify": lambda x: classify(x),
@@ -78,53 +77,9 @@ function_calls = {
     "caption": lambda x: caption(x),
     "contains": lambda x: contains(x),
     "import": lambda x: import_(x)
-}
-
-# spell = SpellChecker()
-
-opt_parser = optparse.OptionParser()
-
-opt_parser.add_option("--validate", action="store_true", dest="validate", default=False)
-opt_parser.add_option("--ref", action="store_true", dest="ref", default=False)
-opt_parser.add_option("--debug", action="store_true", dest="debug", default=False)
-opt_parser.add_option("--file", action="store", dest="file", default=None)
-opt_parser.add_option("--repl", action="store_true", dest="repl", default=False)
-
-options, args = opt_parser.parse_args()
-
-if options.ref:
-    print(USAGE.strip())
-    # exit(0)
-
-if options.debug:
-    DEBUG = True
-else:
-    DEBUG = False
-
-if options.file is not None:
-    with open(options.file, "r") as f:
-        code = f.read() + "\n"
-
-# code = """
-# Make "tea" []
-#     Say[]
-
-# Run["tea"]
-# """
-# code = """
-# Load["./folder/abbey.jpg"]
-# Use["yolov5"]
-# Detect["person"]
-# Read[]
-# IF[Contains["person"] ]
-#     Show[]
-# Else IF[Contains["perffson"] ]
-#     Show[]
-# End[]
-# """
-
-parser = Lark(grammar)
-
+    }
+    return function_calls
+# if None, the logic is handled in the main parser
 
 def handle_unexpected_characters(e):
     # raise error if class doesn't exist
@@ -163,7 +118,6 @@ def handle_unexpected_characters(e):
 
     exit(1)
 
-
 def handle_unexpected_token(e):
     line = e.line
     column = e.column
@@ -172,31 +126,26 @@ def handle_unexpected_token(e):
     print(f"Unexpected token: {e.token!r}")
     exit(1)
 
-
-if options.validate:
-    print("Script is a valid VisionScript program.")
-    exit(0)
-
-
 def literal_eval(string):
     return string[1:-1] if string.startswith('"') and string.endswith('"') else string
 
-
 def set_state(key, value):
+    global state
     state[key] = value
 
-
 def make(args):
+    global state
     function_name = args[0]
 
     function_args = args[1:]
+    function_calls = get_function_calls()
 
     function_calls[function_name] = lambda x: None
 
     state["functions"][function_name] = function_args
 
-
 def load(filename):
+    global state
     import requests
     import validators
 
@@ -228,8 +177,8 @@ def load(filename):
 
     return np.array(Image.open(filename).convert("RGB"))[:, :, ::-1]
 
-
 def size(_):
+    global state
     return state["last_loaded_image"].size
 
 def import_(args):
@@ -246,25 +195,26 @@ def import_(args):
     parse_tree(tree)
 
 def cutout(_):
+    global state
     x1, y1, x2, y2 = state["last"].xyxy[0]
     image = state["last_loaded_image"]
     cropped_image = image.crop((x1, y1, x2, y2))
     state["image_stack"].append(cropped_image)
     state["last_loaded_image"] = cropped_image
 
-
 def save(filename):
+    global state
     state["last_loaded_image"].save(filename)
 
-
 def count(args):
+    global state
     if len(args) == 0:
         return len(state["last"].xyxy)
     else:
         return len([item for item in state["last"].class_id if item == args[0]])
 
-
 def detect(classes):
+    global state
     logging.disable(logging.CRITICAL)
 
     from ultralytics import YOLO
@@ -306,20 +256,21 @@ def detect(classes):
 
     return results
 
-
-aliased_functions = {
+def get_aliased_functions():
+    aliased_functions = {
     "isita": "classify",
     "find": "detect",
     "describe": "caption",
-}
-
+    }
+    return aliased_functions
 
 def map_alias_to_underlying_function(alias):
     print(alias)
+    aliased_functions = get_aliased_functions()
     return aliased_functions.get(alias, alias)
 
-
 def classify(labels):
+    global state
     image = state["last"]
 
     print(image)
@@ -365,8 +316,8 @@ def classify(labels):
 
     return label_name
 
-
 def segment(text_prompt):
+    global state
     if "FastSAM" not in sys.modules:
         from fastsam import FastSAM, FastSAMPrompt
 
@@ -411,8 +362,8 @@ def segment(text_prompt):
         confidence=np.array([1]),
     )
 
-
 def countInRegion(x1, y1, x2, y2):
+    global state
     detections = state["last"]
 
     xyxy = detections.xyxy
@@ -427,8 +378,8 @@ def countInRegion(x1, y1, x2, y2):
 
     return counter
 
-
 def read(_):
+    global state
     if state.get("last_function_type", None) in ("detect", "segment"):
         last_args = state["last_function_args"]
         statement = "".join(
@@ -442,8 +393,8 @@ def read(_):
 
     return state["last"]
 
-
 def say(_):
+    global state
     if state.get("last_function_type", None) in ("detect", "segment"):
         last_args = state["last_function_args"]
         statement = "".join(
@@ -460,8 +411,8 @@ def say(_):
 
     state["output"] = statement.strip()
 
-
 def replace(filename):
+    global state
     detections = state["last"]
 
     xyxy = detections.xyxy
@@ -481,8 +432,8 @@ def replace(filename):
     # paste image
     state["last_loaded_image"].paste(random_img, (int(xyxy[0][0]), int(xyxy[0][1])))
 
-
 def label(args):
+    global state
     folder = args[0]
     model = args[1]
     items = args[2]
@@ -500,8 +451,8 @@ def label(args):
 
     base_model.label(folder)
 
-
 def caption(_):
+    global state
     from transformers import BlipForConditionalGeneration, BlipProcessor
 
     processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
@@ -517,8 +468,8 @@ def caption(_):
 
     return processor.decode(out[0], skip_special_tokens=True)
 
-
 def train(args):
+    global state
     folder = args[0]
     model = args[1]
     # if Detect or Classify run, train
@@ -543,8 +494,8 @@ def train(args):
 
     state["model"] = model
 
-
 def show(_):
+    global state
     # get most recent Detect or Segment
     most_recent_detect_or_segment = None
 
@@ -614,19 +565,19 @@ def show(_):
 
     sv.plot_image(image, (8, 8))
 
-
 def get_func(x):
+    global state
     state["last"] = state["last"][x]
 
-
 def contains(statement):
+    global state
     if isinstance(state["last"], str):
         return statement in state["last"]
     else:
         return False
 
-
-def parse_tree(tree, state=state):
+def parse_tree(tree, state):
+    global DEBUG
     # print(tree)
     if not hasattr(tree, "children"):
         if hasattr(tree, "value") and tree.value.isdigit():
@@ -667,6 +618,8 @@ def parse_tree(tree, state=state):
             continue
 
         token = node.data
+        
+        aliased_functions = get_aliased_functions()
 
         if token.value in aliased_functions:
             token.value = map_alias_to_underlying_function(token.value)
@@ -739,6 +692,7 @@ def parse_tree(tree, state=state):
                 parse_tree(item)
 
             continue
+        function_calls = get_function_calls()
 
         func = function_calls[token.value]
 
@@ -804,8 +758,7 @@ def parse_tree(tree, state=state):
             state["image_stack"].append(result)
             state["last_loaded_image"] = result
 
-
-if options.repl:
+def activate_console(parser):
     print("Welcome to VisionScript!")
     print("Type 'Exit[]' to exit.")
     print("Read the docs at https://visionscript.org/docs")
@@ -823,19 +776,64 @@ if options.repl:
 
         parse_tree(tree)
 
-if __name__ == "__main__":
-    try:
+
+def main() -> None:
+    global state, DEBUG
+
+    state = init_state()
+    
+    parser = Lark(grammar)
+    
+    opt_parser = optparse.OptionParser()
+    opt_parser.add_option("--validate", action="store_true", dest="validate", default=False)
+    opt_parser.add_option("--ref", action="store_true", dest="ref", default=False)
+    opt_parser.add_option("--debug", action="store_true", dest="debug", default=False)
+    opt_parser.add_option("--file", action="store", dest="file", default=None)
+    opt_parser.add_option("--repl", action="store_true", dest="repl", default=False)
+
+    options, args = opt_parser.parse_args()
+        
+    if options.validate:
+        print("Script is a valid VisionScript program.")
+        exit(0)
+    
+    if options.ref:
+        print(USAGE.strip())
+    # exit(0)
+
+    if options.debug:
+        DEBUG = True
+    else:
+        DEBUG = False
+
+    if options.file is not None:
+        with open(options.file, "r") as f:
+            code = f.read() + "\n"
+        
         tree = parser.parse(code.lstrip())
-    except UnexpectedCharacters as e:
-        handle_unexpected_characters(e)
-    except UnexpectedToken as e:
-        handle_unexpected_token(e)
+        parse_tree(tree, state=state)
+    
+    
+    if options.repl:
+        activate_console(parser)
+    
 
-    if DEBUG:
-        print(tree.pretty())
-        exit()
 
-    try:
-        parse_tree(tree)
-    except KeyboardInterrupt:
-        print("Exiting VisionScript.")
+if __name__ == "__main__":
+    state = init_state()
+    main()
+    # try:
+    #     tree = parser.parse(code.lstrip())
+    # except UnexpectedCharacters as e:
+    #     handle_unexpected_characters(e)
+    # except UnexpectedToken as e:
+    #     handle_unexpected_token(e)
+
+    # if DEBUG:
+    #     print(tree.pretty())
+    #     exit()
+
+    # try:
+    #     parse_tree(tree)
+    # except KeyboardInterrupt:
+    #     print("Exiting VisionScript.")
