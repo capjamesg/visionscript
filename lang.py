@@ -641,6 +641,7 @@ def parse_tree(tree):
             state["last_loaded_image"] = result
 
 
+
 if options.repl:
     print("Welcome to VisionScript!")
     print("Type 'Exit[]' to exit.")
