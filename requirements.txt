@@ -10,3 +10,5 @@ autodistill_yolov8
 autodistill_grounded_sam
 autodistill_blip
 autodistill_vit
+click
+validators
