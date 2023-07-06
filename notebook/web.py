@@ -1,18 +1,17 @@
 import random
 
+import lang
 from flask import Flask, jsonify, render_template, request
+from lang import parser
 
 app = Flask(__name__)
-
-import lang
-from lang import init_state, parse_tree, parser
 
 notebooks = {}
 
 
 def init_notebook():
-    # cells have a state and an output
-    return {"state": init_state(), "cells": []}
+    # cells have a session that contains state and an output
+    return {"session": None, "cells": []}
 
 
 @app.route("/notebook", methods=["GET", "POST"])
@@ -22,25 +21,24 @@ def notebook():
         data = request.json
         user_input = data["code"]
 
-        state_id = data["state_id"]
+        session_id = data["state_id"]
 
-        state = notebooks[int(state_id)]["state"]
+        if session_id not in notebooks:
+            session = lang.VisionScript()
 
-        lang.state = state
+            notebooks[session_id]["session"] = session
+
+        session = notebooks[session_id]["session"]
 
         try:
-            print(user_input.strip())
-            parse_tree(parser.parse(user_input.strip() + "\n"), state)
-            print(lang.state)
+            session.parse(parser.parse(user_input.strip() + "\n"))
         except Exception as e:
             raise e
             return jsonify({"error": str(e)})
 
         notebooks[int(state_id)]["cells"].append(user_input)
 
-        notebooks[int(state_id)]["state"] = lang.state
-
-        return jsonify({"output": state["output"]})
+        return jsonify({"output": session.output})
 
     state_id = random.randint(1, 100000)
     notebooks[state_id] = init_notebook()
