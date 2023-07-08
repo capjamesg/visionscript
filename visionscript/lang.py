@@ -12,15 +12,16 @@ import random
 import string
 import sys
 import tempfile
-import lark
 
 import click
 import cv2
+import lark
 import numpy as np
 import supervision as sv
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from spellchecker import SpellChecker
+
 from visionscript.grammar import grammar
 from visionscript.usage import (USAGE, language_grammar_reference,
                                 lowercase_language_grammar_reference)
@@ -119,6 +120,7 @@ aliased_functions = {
 def map_alias_to_underlying_function(alias):
     return aliased_functions.get(alias, alias)
 
+
 def init_state():
     return {
         "functions": {},
@@ -133,8 +135,10 @@ def init_state():
         "search_index_stack": [],
         # "current_active_model": None,
         "output": None,
-        "input_variables": None,
+        "input_variables": {},
+        "last_classes": [],
     }
+
 
 class VisionScript:
     def __init__(self, notebook=False):
@@ -233,6 +237,7 @@ class VisionScript:
             self.state["last_loaded_image"] = filename
             # save file
             import uuid
+
             name = str(uuid.uuid4()) + ".png"
             cv2.imwrite(name, filename)
 
@@ -243,8 +248,6 @@ class VisionScript:
         # if is dir, load all images
         if filename and os.path.isdir(filename):
             image_filenames = [filename + "/" + item for item in os.listdir(filename)]
-
-            print(image_filenames)
 
             for image_filename in image_filenames:
                 self.load(image_filename)
@@ -311,7 +314,11 @@ class VisionScript:
 
     def select(self, args):
         # if detect, select from detections
-        if self.state.get("last_function_type", None) in ("detect", "segment", "classify"):
+        if self.state.get("last_function_type", None) in (
+            "detect",
+            "segment",
+            "classify",
+        ):
             detections = self.state["last"]
 
             if len(args) == 0:
@@ -355,6 +362,10 @@ class VisionScript:
             # if label is a filename, load image
             if label.startswith("./") and os.path.exists(label):
                 comparator = self.load(label)
+
+                comparator = preprocess(comparator).unsqueeze(0).to(device)
+
+                comparator = model.encode_image(comparator)
             else:
                 comparator = clip.tokenize([label]).to(device)
 
@@ -422,7 +433,7 @@ class VisionScript:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         self.state["image_stack"].append(image)
         # save to test.png
-        
+
         self.state["last_loaded_image"] = image
         self.state["output"] = image
 
@@ -507,15 +518,18 @@ class VisionScript:
     def detect(self, classes):
         logging.disable(logging.CRITICAL)
 
-        if self.state.get("current_active_model") and self.state["current_active_model"].lower() == "groundingdino":
-            from autodistill_grounding_dino import GroundingDINO
+        if (
+            self.state.get("current_active_model")
+            and self.state["current_active_model"].lower() == "groundingdino"
+        ):
             from autodistill.detection import CaptionOntology
+            from autodistill_grounding_dino import GroundingDINO
 
             mapped_items = {item: item for item in classes}
 
             base_model = GroundingDINO(CaptionOntology(mapped_items))
 
-            inference_results = base_model.predict(self.state["last_loaded_image"])
+            inference_results = base_model.predict(self.state["last_loaded_image_name"])
         else:
             from ultralytics import YOLO
 
@@ -531,7 +545,10 @@ class VisionScript:
                 ]
             )
 
-            if self.state.get("model") and self.state["current_active_model"].lower() == "yolo":
+            if (
+                self.state.get("model")
+                and self.state["current_active_model"].lower() == "yolo"
+            ):
                 model = model
             else:
                 model = YOLO(model_name + ".pt")
@@ -553,6 +570,7 @@ class VisionScript:
         results = results[np.isin(results.class_id, classes)]
 
         self.state["detections_stack"].append(results)
+        self.state["last_classes"] = [inference_classes[item] for item in classes]
 
         return results
 
@@ -830,7 +848,7 @@ class VisionScript:
         self.state["model"] = model
 
     def show(self, _):
-        print(self.state["last"])
+        print(self.state["last_classes"])
         # get most recent Detect or Segment
         most_recent_detect_or_segment = None
 
@@ -862,7 +880,11 @@ class VisionScript:
                     self.state["last"], self.state["detections_stack"]
                 ):
                     if annotator and detections:
-                        image = annotator.annotate(np.array(image), detections)
+                        image = annotator.annotate(
+                            np.array(image),
+                            detections,
+                            labels=self.state["last_classes"],
+                        )
                     else:
                         image = np.array(image)
 
@@ -873,11 +895,13 @@ class VisionScript:
 
             if not self.notebook:
                 sv.plot_images_grid(
-                    images=np.array(images), grid_size=(grid_size, grid_size), size=(12, 12)
+                    images=np.array(images),
+                    grid_size=(grid_size, grid_size),
+                    size=(12, 12),
                 )
 
                 return
-        
+
             image = images[0]
 
         elif self.state.get("history", [])[-1] == "compare":
@@ -891,27 +915,35 @@ class VisionScript:
                 self.state["image_stack"], self.state["detections_stack"]
             ):
                 if annotator and detections:
-                    image = annotator.annotate(np.array(image), detections)
+                    image = annotator.annotate(
+                        np.array(image), detections, labels=self.state["last_classes"]
+                    )
                 else:
                     image = np.array(image)
 
                 images.append(image)
-            
+
             if not self.notebook:
                 sv.plot_images_grid(
-                    images=np.array(images), grid_size=(grid_size, grid_size), size=(12, 12)
+                    images=np.array(images),
+                    grid_size=(grid_size, grid_size),
+                    size=(12, 12),
                 )
 
                 return
-            
+
             image = images[0]
 
         if annotator:
             image = annotator.annotate(
                 cv2.imread(self.state["last_loaded_image_name"]),
                 self.state["detections_stack"][-1],
+                labels=self.state["last_classes"],
             )
-        elif self.state.get("last_loaded_image") is not None and not self.state.get("history", [])[-1] == "compare":
+        elif (
+            self.state.get("last_loaded_image") is not None
+            and not self.state.get("history", [])[-1] == "compare"
+        ):
             image = self.state["last_loaded_image"]
         elif self.notebook is False:
             image = cv2.imread(self.state["last_loaded_image_name"])
@@ -1021,17 +1053,18 @@ class VisionScript:
                 return int(tree.value)
             elif isinstance(tree, str):
                 return literal_eval(tree)
-        
+
         if hasattr(tree, "children") and tree.data == "input":
             return self.input_(tree.children[0].value)
 
-        print(tree.pretty())
         for node in tree.children:
+            print(node)
             if node == "True":
                 return True
             elif node == "False":
                 return False
             # if equality, check if equal
+            # if rule is input
             elif hasattr(node, "data") and node.data == "equality":
                 return self.parse_tree(node.children[0]) == self.parse_tree(
                     node.children[1]
@@ -1063,7 +1096,7 @@ class VisionScript:
 
             if token.value in aliased_functions:
                 token.value = map_alias_to_underlying_function(token.value)
-            
+
             if token.type == "equality":
                 return self.parse_tree(node.children[0]) == self.parse_tree(
                     node.children[1]
@@ -1163,6 +1196,7 @@ class VisionScript:
             else:
                 # convert children to strings
                 for item in node.children:
+                    print(item, "eeee")
                     if hasattr(item, "value"):
                         if item.value.startswith('"') and item.value.endswith('"'):
                             item.value = literal_eval(item.value)
@@ -1172,6 +1206,8 @@ class VisionScript:
                             item.value = literal_eval(item.value)
                         elif item.type == "INT":
                             item.value = int(item.value)
+                        elif item.type == "input":
+                            item.value = self.parse_tree(item.value)
 
             if token.value == "in":
                 self.state["ctx"] = {
@@ -1248,8 +1284,11 @@ def activate_console(parser):
 @click.option("--debug", default=False, help="To debug")
 @click.option("--file", default=None, help="Name of the file")
 @click.option("--repl", default=None, help="To enter to vscript console")
-@click.option("--notebook/--no-notebook", help="To enter to vscript console")
-def main(validate, ref, debug, file, repl, notebook) -> None:
+@click.option("--notebook/--no-notebook", help="Start a notebook environment")
+@click.option(
+    "--cloud/--no-cloud", default=5000, help="Start a cloud deployment environment"
+)
+def main(validate, ref, debug, file, repl, notebook, cloud) -> None:
     if validate:
         print("Script is a valid VisionScript program.")
         exit(0)
@@ -1260,11 +1299,21 @@ def main(validate, ref, debug, file, repl, notebook) -> None:
     if notebook:
         print("Starting notebook...")
         import webbrowser
+
         from visionscript.notebook import app
 
         # webbrowser.open("http://localhost:5000/notebook?" + str(uuid.uuid4()))
 
         app.run(debug=True)
+
+        return
+
+    if cloud:
+        print("Starting cloud deployment environment...")
+
+        from visionscript.cloud import app
+
+        app.run(debug=True, port=9007)
 
     if file is not None:
         with open(file, "r") as f:

@@ -1,11 +1,13 @@
-import visionscript.lang as lang
-from flask import Flask, jsonify, render_template, request, redirect, url_for
-from visionscript.lang import parser
-import os
-import json
 import copy
-import uuid
+import json
+import os
 import time
+import uuid
+
+from flask import Flask, jsonify, redirect, render_template, request, url_for
+
+import visionscript.lang as lang
+from visionscript.lang import parser
 
 app = Flask(__name__)
 
@@ -16,9 +18,11 @@ def init_notebook():
     # cells have a session that contains state and an output
     return {"session": None, "cells": [], "output": []}
 
+
 @app.route("/")
 def home():
     return redirect(url_for("notebook"))
+
 
 @app.route("/notebook", methods=["GET", "POST"])
 def notebook():
@@ -29,7 +33,10 @@ def notebook():
 
         user_input = data["code"]
 
-        if notebooks.get(session_id) is None or notebooks[session_id].get("session") is None:
+        if (
+            notebooks.get(session_id) is None
+            or notebooks[session_id].get("session") is None
+        ):
             session = lang.VisionScript()
 
             session.notebook = True
@@ -45,7 +52,7 @@ def notebook():
         except Exception as e:
             raise e
             return jsonify({"error": str(e)})
-        
+
         end_time = time.time()
 
         run_time = round(end_time - start_time, 1)
@@ -64,6 +71,7 @@ def notebook():
 
     return render_template("notebook.html", state_id=state_id)
 
+
 @app.route("/notebook/upload", methods=["POST"])
 def upload():
     session_id = request.args.get("state_id")
@@ -71,7 +79,7 @@ def upload():
 
     if session_id and notebooks.get(session_id) is None:
         return jsonify({"error": "No session found"})
-    
+
     # save as tmp file
     file_name = file.filename
     # remove special chars
@@ -104,10 +112,11 @@ def upload():
             result = []
             for cell, output in zip(notebook["cells"], notebook["output"]):
                 result.append({"cell": cell, "output": output})
-            
+
             return jsonify({"cells": result})
 
     return jsonify({"file_name": os.path.join("tmp", file_name)})
+
 
 # save
 @app.route("/notebook/save", methods=["POST"])
@@ -120,7 +129,7 @@ def save():
 
     if file_name is None:
         return jsonify({"error": "No file name provided"})
-    
+
     notebook = copy.deepcopy(notebooks[session_id])
 
     # delete session
@@ -130,6 +139,7 @@ def save():
         json.dump(notebook, f)
 
     return jsonify({"file": notebook})
+
 
 @app.route("/quit")
 def quit():

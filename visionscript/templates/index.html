@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionScript Notebook</title>
+    <style>
+        * {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            box-sizing: border-box;
+            padding: 0;
+            margin: 0;
+        }
+        html {
+            background-color: #f7f7f7;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #cells, .cell {
+            max-width: 40em;
+        }
+        .cell {
+            background-color: #eee;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        textarea {
+            width: 100%;
+            border: 1px solid #ccc;
+            resize: none;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            display: block;
+        }
+        input[type="submit"] {
+            margin-top: 0.5rem;
+            background-color: darkgreen;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            resize: none;
+            overflow: hidden;
+        }
+        img {
+            max-width: 100%;
+        }
+        nav {
+            background-color: darkgreen;
+            color: white;
+            width: 100%;
+            padding: 1rem;
+            text-align: center;
+        }
+        main {
+            padding: 1rem;
+            max-width: 40em;
+            margin: 0 auto;
+        }
+        #current_count {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        select {
+            margin-bottom: 1rem;
+            display: block;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }
+        .small_links a {
+            color: grey;
+            font-size: 12px;
+        }
+        .small_links li {
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        #export_vic, #export_vicnb {
+            color: grey;
+            font-size: 12px;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        #files li {
+            border: 1px solid lightgrey;
+            display: inline-block;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        #files_section {
+            display: none;
+            margin-bottom: 10px;
+        }
+        pre {
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .time {
+            font-size: 12px;
+            color: grey;
+            margin-bottom: 0.5rem;
+        }
+        main {
+            min-height: 100vh;
+        }
+        .cell_run {
+            background-color: #eee;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+        }
+        .cell_run:focus {
+            outline: none;
+        }
+        label {
+            margin-top: 10px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            display: block;
+        }
+        input {
+            margin-bottom: 10px;
+            display: block;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }
+        form {
+            margin-top: 10px;
+            border: 1px solid lightgrey;
+            padding: 10px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            {{ title }} - VisionScript Deploy
+        </ul>
+    </nav>
+    <main>
+        <h1>{{ title }}</h1>
+        <form method="POST" action="/{{ id }}" enctype="multipart/form-data">
+            {% for input in image_inputs %}
+                <label for="{{ input[1] }}">{{ input[1] }}</label>
+                <input type="file" name="{{ input[1] }}" id="{{ input[1] }}" />
+            {% endfor %}
+            {% for input in text_inputs %}
+                <label for="{{ input[1] }}">{{ input[1] }}</label>
+                <input type="text" name="{{ input[1] }}" id="{{ input[1] }}" />
+            {% endfor %}
+            <input type="submit" value="Submit" />
+        </form>
+    </main>
+</body>
+</html>

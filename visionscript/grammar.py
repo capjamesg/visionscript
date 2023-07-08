@@ -46,7 +46,7 @@ list: "[" ((STRING | INT | expr) "," | (STRING | INT | expr) )* "]" EOL
 help: "Help" "[" STRING "]"
 end: "End" ("[" "]")?
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
-detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" ("[" "]")?
+detect: "Detect" "[" input "]" | "Detect" "[" STRING ("," STRING)* "]" | "Detect" ("[" "]")?
 segment: "Segment" "[" STRING "]"
 else: "Else"
 in: "In" "[" STRING "]" EOL (INDENT expr+)* EOL
