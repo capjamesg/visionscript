@@ -164,3 +164,7 @@ cython_debug/
 folder
 *.pt
 *.vic
+*.json
+tmp/*
+runs/*
+*.svg

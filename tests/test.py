@@ -1,10 +1,17 @@
 import visionscript as lang
 import os
+import tqdm
 
-TEST_DIR = "./tests/"
+TEST_DIR = "./"
 
-for file in os.listdir(TEST_DIR):
+tests = os.listdir(TEST_DIR)
+
+passed = 0
+test_count = len(tests)
+
+for file in tqdm.tqdm(os.listdir(TEST_DIR)): 
     session = lang.VisionScript()
+
     if file.endswith(".vic"):
         print(f"Testing {file}...")
         
@@ -16,4 +23,6 @@ for file in os.listdir(TEST_DIR):
             print(e)
             continue
 
-        print(f"Test {file} passed!")
+    passed += 1
+
+print(f"{passed}/{test_count} tests passed!")

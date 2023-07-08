@@ -1,54 +1,63 @@
 grammar = """
-start: (expr)* (EOF | EOL | " ")
+start: (expr | EOL | EOF | " ")*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | tutorial | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize) (EOL | EOF | " ")
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input) (EOL | EOF | " ")
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
 use: "Use" "[" STRING "]"
-load: "Load" "[" STRING "]" | "Load" "[" "]"
+load: "Load" "[" (STRING | input) "]" | "Load" ("[" "]")?
 save: "Save" "[" STRING "]"
-say: "Say" "[" "]"
-get_text: "GetText" "[" "]"
-greyscale: "Greyscale" "[" "]"
-describe: "Describe" "[" "]"
+say: "Say" "[" STRING "]" | "Say" ("[" "]")?
+get_text: "GetText" ("[" "]")?
+greyscale: "Greyscale" ("[" "]")?
+search: "Search" "[" STRING "]"
+describe: "Describe" ("[" "]")?
+readqr: "ReadQR" ("[" "]")?
 rotate: "Rotate" "[" INT "]"
 resize: "Resize" "[" INT "," INT "]"
-getcolors: "GetColors" "[" "]" | "GetColors" "[" INT "]"
-getcolours: "GetColours" "[" "]" | "GetColours" "[" INT "]"
+getcolors: "GetColors" ("[" "]")? | "GetColors" "[" INT "]"
+getcolours: "GetColours" ("[" "]")? | "GetColours" "[" INT "]"
 isita: "Is it a " (("," STRING)* | ("or" STRING)*)? EOL
 find: "Find" "[" STRING "]"
 args: ((STRING | INT | expr) ("," (STRING | INT | expr))*) | (STRING | INT | expr)?
-make: "Make" STRING "[" args "]" EOL (INDENT expr+)*
-caption: "Caption" "[" "]"
-size: "Size" "[" "]"
+make: "Make" literal ("[" args "]")? EOL (INDENT expr+)* EOL
+caption: "Caption" ("[" "]")?
+size: "Size" ("[" "]")?
 import: "Import" "[" STRING "]"
 run: "Run" "[" STRING "]"
-show: "Show" "[" "]"
-select: "Select" "[" "]" | "Select" "[" INT "]"
+show: "Show" ("[" "]")?
+select: "Select" ("[" "]")? | "Select" "[" INT "]"
 paste: "Paste" "[" INT "," INT "]"
-pasterandom: "PasteRandom" "[" "]"
-cutout: "Cutout" "[" "]"
-count: "Count" "[" "]"
+pasterandom: "PasteRandom" ("[" "]")?
+cutout: "Cutout" ("[" "]")?
+count: "Count" ("[" "]")?
+input: "Input" ("[" STRING "]")?
 contains: "Contains" "[" STRING "]"
-compare: "Compare" "[" "]"
-read: "Read" "[" "]"
-exit: "Exit" "[" "]"
+compare: "Compare" ("[" "]")?
+setbrightness: "SetBrightness" "[" INT "]"
+read: "Read" ("[" "]")?
+exit: "Exit" ("[" "]")?
+blur: "Blur" ("[" "]")?
+similarity: "Similarity" ("[" INT "]")?
 get: "Get" "[" INT "]" EOL
 list: "[" ((STRING | INT | expr) "," | (STRING | INT | expr) )* "]" EOL
 help: "Help" "[" STRING "]"
-end: "End" "[" "]"
+end: "End" ("[" "]")?
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
-detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" "]"
+detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" ("[" "]")?
 segment: "Segment" "[" STRING "]"
 else: "Else"
 in: "IN" "[" STRING "]" EOL (INDENT expr+)*
 if: "IF" "[" (expr+)* "]" EOL (INDENT expr+)* (EOL | EOF | " ") (else EOL (INDENT expr+)* (EOL | EOF | " "))?
-tutorial: "Tutorial" "[" STRING "]"
+reset: "Reset" ("[" "]")?
+negate: "Not" "[" expr "]"
 OPERAND: "+" | "-" | "*" | "/"
-EQUALITY: "=="
+equality: (INT | STRING | expr) "==" (INT | STRING | expr)
+not_equality: (INT | STRING | expr) "!=" (INT | STRING | expr)
 train: "Train" "[" STRING "," STRING "]" | "Train" "[" STRING "]"
-label: "Label" "[" STRING "," STRING ("," STRING )*  "]" 
+label: "Label" "[" STRING "," STRING ("," STRING )*  "]"
+literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | expr) ("," (STRING | INT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"
 variable: /[a-zA-Z_][a-zA-Z0-9_]*/
 comment: "#"
 EOL: "\\n"

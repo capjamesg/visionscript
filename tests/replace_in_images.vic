@@ -1,4 +1,4 @@
-Load["./abbey.jpg"]
+Load["./images/bus.jpg"]
 Size[]
 Say[]
 Detect["person"]

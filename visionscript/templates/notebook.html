@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionScript Notebook</title>
+    <style>
+        * {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            box-sizing: border-box;
+            padding: 0;
+            margin: 0;
+        }
+        html {
+            background-color: #f7f7f7;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #cells, .cell {
+            max-width: 40em;
+        }
+        .cell {
+            background-color: #eee;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        textarea {
+            width: 100%;
+            border: 1px solid #ccc;
+            resize: none;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            display: block;
+        }
+        input[type="submit"] {
+            margin-top: 0.5rem;
+            background-color: darkgreen;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            resize: none;
+            overflow: hidden;
+        }
+        img {
+            max-width: 100%;
+        }
+        nav {
+            background-color: darkgreen;
+            color: white;
+            width: 100%;
+            padding: 1rem;
+            text-align: center;
+        }
+        main {
+            padding: 1rem;
+            max-width: 40em;
+            margin: 0 auto;
+        }
+        #current_count {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        select {
+            margin-bottom: 1rem;
+            display: block;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }
+        .small_links a {
+            color: grey;
+            font-size: 12px;
+        }
+        .small_links li {
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        #export_vic, #export_vicnb {
+            color: grey;
+            font-size: 12px;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        #files li {
+            border: 1px solid lightgrey;
+            display: inline-block;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        #files_section {
+            display: none;
+            margin-bottom: 10px;
+        }
+        pre {
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .time {
+            font-size: 12px;
+            color: grey;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            VisionScript Notebook
+        </ul>
+    </nav>
+    <main>
+        <h2>Examples</h2>
+        <select>
+            <option value="Classify an image">Classify an image</option>
+            <option value="Detect objects in an image">Detect objects in an image</option>
+        </select>
+        <h2>Learning Resources</h2>
+        <ul class="small_links">
+            <li><a href="https://visionscript.dev/quickstart" target="_blank">Quickstart</a></li>
+            <li><a href="https://visionscript.dev/docs" target="_blank">Reference</a></li>
+        </ul>
+        <div id="files_section">
+            <h2>Files</h2>
+            <ul id="files"></ul>
+        </div>
+        <h2>Notebook</h2>
+        <ul id="cells">
+        </ul>
+        <form class="cell" id="new">
+            <p id="current_count">#1</p>
+            <textarea name="jscode" id="jscode" rows="3">
+Load["./folder/abbey.jpg"]
+Detect["person"]
+Say[]</textarea>
+            <input type="submit" value="Submit">
+        </form>
+        <p><a id="export_vic">Export notebook to <code>.vic</code></a></p>
+        <p><a id="export_vicnb">Export notebook to <code>.vicnb</code></a></p>
+    </main>
+    <script>
+        var cells = document.getElementById("cells");
+
+        function executeCode (code) {
+            // make loading wheel
+            cells.innerHTML += `
+                <li class="cell" id="loading">Loading</li>
+            `;
+
+            var timer = setInterval(function () {
+                var loading = document.getElementById("loading");
+                if (loading.innerText == "Loading") {
+                    loading.innerText = "Loading.";
+                } else if (loading.innerText == "Loading.") {
+                    loading.innerText = "Loading..";
+                } else if (loading.innerText == "Loading..") {
+                    loading.innerText = "Loading...";
+                } else if (loading.innerText == "Loading...") {
+                    loading.innerText = "Loading";
+                }
+            }, 500);
+
+            fetch('http://localhost:5000/notebook', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({code:
+                    code,
+                    state_id: "{{ state_id }}"
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                if (data.output == null) {
+                    data.output = "";
+                }
+                if (data.output.image) {
+                    data.output = `<img src="data:image/png;base64,${data.output.image}">`;
+                }
+                var time = data.time;
+                // delete loading cell
+                cells.removeChild(loading);
+                clearInterval(timer);
+
+                cells.innerHTML += `
+                    <li class="cell">
+                        <p class="time">#${cells.children.length + 1} (${time}s)</p>
+                        <textarea rows="3" disabled>${code}</textarea>
+                        <pre ${data.error ? 'class="error_cell"' : ''}>${data.error ? data.error : data.output}</pre>
+                    </li>
+                `;
+                
+                console.log(cells.children.length);
+                document.getElementById("current_count").innerHTML = `#${cells.children.length + 1}`;
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+
+        var form = document.getElementById("new");
+
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            var data = new FormData(form);
+            var code = data.get("jscode");
+            executeCode(code);
+        });
+        
+        // auto-expand textarea
+        var textarea = document.getElementById("jscode");
+
+        textarea.addEventListener("input", function (event) {
+            textarea.style.height = "auto";
+            textarea.style.height = textarea.scrollHeight + "px";
+        });
+
+        var export_vic = document.getElementById("export_vic");
+
+        export_vic.addEventListener("click", function (event) {
+            event.preventDefault();
+            var data = new FormData(form);
+            var code = data.get("jscode");
+            var blob = new Blob([code], {type: "text/plain;charset=utf-8"});
+            // download
+            var a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "notebook.vic";
+            a.click();
+        });
+
+        var dropzone = document.getElementsByTagName("body")[0];
+
+        dropzone.addEventListener("dragover", function (event) {
+            event.preventDefault();
+            dropzone.style.backgroundColor = "lightgrey";
+        });
+
+        dropzone.addEventListener("dragleave", function (event) {
+            event.preventDefault();
+            dropzone.style.backgroundColor = "white";
+        });
+
+        dropzone.addEventListener("drop", function (event) {
+            event.preventDefault();
+            dropzone.style.backgroundColor = "white";
+            var file = event.dataTransfer.files[0];
+            var body = new FormData();
+            body.append("file", file)
+            body.append("state_id", "{{ state_id }}");
+            // base64 file
+            var reader = new FileReader();
+            // read file
+            reader.readAsDataURL(file);
+
+            // post to /notebook/upload with state id
+            fetch('http://localhost:5000/notebook/upload?state_id={{ state_id }}', {
+                method: 'POST',
+                body: body
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                if (data.cells) {
+                    data.cells.forEach(function (cell) {
+                        var code = cell.cell;
+                        var output = cell.output;
+                        if (output == null) {
+                            output = "";
+                        }
+                        if (output.image) {
+                            output = `<img src="data:image/png;base64,${output.image}">`;
+                        }
+                        cells.innerHTML += `
+                            <li class="cell">
+                                <p>#${cells.children.length + 1}</p>
+                                <textarea rows="3" disabled>${code}</textarea>
+                                <pre>${output}</pre>
+                            </li>
+                        `;
+                    });
+                    return;
+                }
+                var file_name = data.file_name;
+                var files = document.getElementById("files");
+                var files_section = document.getElementById("files_section");
+
+                files_section.style.display = "block";
+
+                var base64 = reader.result;
+                files.innerHTML += `
+                    <li><img src="${base64}" alt="${file_name}" height=100 width=100><br>${file_name}</li>
+                `;
+            })
+            .catch(err => {
+                console.log(err);
+            });
+        });
+
+        var export_vicnb = document.getElementById("export_vicnb");
+
+        export_vicnb.addEventListener("click", function (event) {
+            console.log("exporting");
+            event.preventDefault();
+            fetch('http://localhost:5000/notebook/save?state_id={{ state_id }}', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                var blob = new Blob([JSON.stringify(data.file)], {type: "text/plain;charset=utf-8"});
+                var a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = "notebook.vicnb";
+                a.click();
+            })
+            .catch(err => {
+                console.log(err);
+            });
+        });
+    </script>
+</body>
+</html>
