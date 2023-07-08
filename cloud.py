@@ -22,7 +22,7 @@ for script in scripts:
     scripts[script]["session"] = lang.VisionScript()
 
 @app.route("/")
-def home():
+def index_page():
     return redirect("https://visionscript.dev")
 
 @app.route("/<id>", methods=["GET", "POST"])

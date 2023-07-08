@@ -37,7 +37,7 @@ VisionScript offers an interactive web notebook through which you can run Vision
 To use the notebook, run:
 
 ```
-vscript notebook
+vscript --notebook
 ```
 
 This will open a notebook in your browser. Notebooks are ephermal. You will need to copy your code to a file to save it.

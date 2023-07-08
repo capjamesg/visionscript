@@ -1,6 +1,6 @@
-import lang
+import visionscript.lang as lang
 from flask import Flask, jsonify, render_template, request, redirect, url_for
-from lang import parser
+from visionscript.lang import parser
 import os
 import json
 import copy
@@ -130,3 +130,7 @@ def save():
         json.dump(notebook, f)
 
     return jsonify({"file": notebook})
+
+@app.route("/quit")
+def quit():
+    exit()

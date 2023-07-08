@@ -12,6 +12,7 @@ import random
 import string
 import sys
 import tempfile
+import lark
 
 import click
 import cv2
@@ -42,7 +43,7 @@ SUPPORTED_TRAIN_MODELS = {
 }
 
 
-def handle_unexpected_characters(e):
+def handle_unexpected_characters(e, code):
     # raise error if class doesn't exist
     line = e.line
     column = e.column
@@ -132,12 +133,14 @@ def init_state():
         "search_index_stack": [],
         # "current_active_model": None,
         "output": None,
+        "input_variables": None,
     }
 
 class VisionScript:
     def __init__(self, notebook=False):
         self.state = init_state()
         self.notebook = notebook
+        self.code = ""
 
         self.function_calls = {
             "load": lambda x: self.load(x),
@@ -193,6 +196,7 @@ class VisionScript:
         }
 
     def input_(self, key):
+        self.state["input_variables"][key] = "image"
         if self.state.get(literal_eval(key)) is not None:
             return self.state[literal_eval(key)]
         else:
@@ -215,10 +219,7 @@ class VisionScript:
         print(args, "args")
         function_name = args[0].children[0].value.strip()
 
-        import lark
-
         function_body = lark.Tree("expr", args[1:])
-        print(function_body)
 
         self.state["functions"][function_name] = function_body
 
@@ -425,11 +426,30 @@ class VisionScript:
         self.state["last_loaded_image"] = image
         self.state["output"] = image
 
+    def deploy(self, _):
+        # make POST to http://localhost:6999/create
+        import requests
+
+        response = requests.post(
+            "http://localhost:6999/create",
+            json={
+                "api_key": "test",
+                "title": "app",
+                "script": self.code,
+                "variables": self.state["input_variables"],
+            },
+        )
+
+        if response.ok:
+            return "Deployed successfully to http://localhost:6999/app"
+
+        return "Error deploying."
+
     def get_text(self, _):
         import easyocr
 
         reader = easyocr.Reader(["en"])
-        result = reader.readtext(self.state["last_loaded_image_name"])
+        result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
 
         return result
 
@@ -810,6 +830,7 @@ class VisionScript:
         self.state["model"] = model
 
     def show(self, _):
+        print(self.state["last"])
         # get most recent Detect or Segment
         most_recent_detect_or_segment = None
 
@@ -850,11 +871,14 @@ class VisionScript:
                 for image in self.state["last"]:
                     images.append(np.array(image))
 
-            sv.plot_images_grid(
-                images=np.array(images), grid_size=(grid_size, grid_size), size=(12, 12)
-            )
+            if not self.notebook:
+                sv.plot_images_grid(
+                    images=np.array(images), grid_size=(grid_size, grid_size), size=(12, 12)
+                )
 
-            return
+                return
+        
+            image = images[0]
 
         elif self.state.get("history", [])[-1] == "compare":
             images = []
@@ -872,21 +896,24 @@ class VisionScript:
                     image = np.array(image)
 
                 images.append(image)
+            
+            if not self.notebook:
+                sv.plot_images_grid(
+                    images=np.array(images), grid_size=(grid_size, grid_size), size=(12, 12)
+                )
 
-            sv.plot_images_grid(
-                images=np.array(images), grid_size=(grid_size, grid_size), size=(12, 12)
-            )
-
-            return
+                return
+            
+            image = images[0]
 
         if annotator:
             image = annotator.annotate(
                 cv2.imread(self.state["last_loaded_image_name"]),
                 self.state["detections_stack"][-1],
             )
-        elif self.state.get("last_loaded_image") is not None:
+        elif self.state.get("last_loaded_image") is not None and not self.state.get("history", [])[-1] == "compare":
             image = self.state["last_loaded_image"]
-        else:
+        elif self.notebook is False:
             image = cv2.imread(self.state["last_loaded_image_name"])
 
         if self.notebook:
@@ -998,6 +1025,7 @@ class VisionScript:
         if hasattr(tree, "children") and tree.data == "input":
             return self.input_(tree.children[0].value)
 
+        print(tree.pretty())
         for node in tree.children:
             if node == "True":
                 return True
@@ -1157,6 +1185,8 @@ class VisionScript:
                     # ignore first 2, then do rest
                     context = node.children[3:]
 
+                    # print(context)
+
                     for item in context:
                         self.parse_tree(item)
 
@@ -1205,7 +1235,7 @@ def activate_console(parser):
         try:
             tree = parser.parse(code.lstrip())
         except UnexpectedCharacters as e:
-            handle_unexpected_characters(e)
+            handle_unexpected_characters(e, code.lstrip())
         except UnexpectedToken as e:
             handle_unexpected_token(e)
 
@@ -1230,8 +1260,7 @@ def main(validate, ref, debug, file, repl, notebook) -> None:
     if notebook:
         print("Starting notebook...")
         import webbrowser
-        from notebook import app
-        import uuid
+        from visionscript.notebook import app
 
         # webbrowser.open("http://localhost:5000/notebook?" + str(uuid.uuid4()))
 

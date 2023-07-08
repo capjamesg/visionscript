@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL | EOF | " ")*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input) (EOL | EOF | " ")
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy) (EOL | EOF | " ")
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -12,6 +12,7 @@ say: "Say" "[" STRING "]" | "Say" ("[" "]")?
 get_text: "GetText" ("[" "]")?
 greyscale: "Greyscale" ("[" "]")?
 search: "Search" "[" STRING "]"
+deploy: "Deploy" ("[" "]")?
 describe: "Describe" ("[" "]")?
 readqr: "ReadQR" ("[" "]")?
 rotate: "Rotate" "[" INT "]"
@@ -48,8 +49,8 @@ countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
 detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" ("[" "]")?
 segment: "Segment" "[" STRING "]"
 else: "Else"
-in: "IN" "[" STRING "]" EOL (INDENT expr+)*
-if: "IF" "[" (expr+)* "]" EOL (INDENT expr+)* (EOL | EOF | " ") (else EOL (INDENT expr+)* (EOL | EOF | " "))?
+in: "In" "[" STRING "]" EOL (INDENT expr+)* EOL
+if: "If" "[" (expr+)* "]" EOL (INDENT expr+)* (EOL | EOF | " ") (else EOL (INDENT expr+)* (EOL | EOF | " "))?
 reset: "Reset" ("[" "]")?
 negate: "Not" "[" expr "]"
 OPERAND: "+" | "-" | "*" | "/"

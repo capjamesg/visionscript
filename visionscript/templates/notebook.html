@@ -112,6 +112,19 @@
             color: grey;
             margin-bottom: 0.5rem;
         }
+        main {
+            min-height: 100vh;
+        }
+        .cell_run {
+            background-color: #eee;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+        }
+        .cell_run:focus {
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -122,9 +135,11 @@
     </nav>
     <main>
         <h2>Examples</h2>
-        <select>
+        <select id="examples">
             <option value="Classify an image">Classify an image</option>
             <option value="Detect objects in an image">Detect objects in an image</option>
+            <option value="Build a search engine">Build a search engine</option>
+            <option value="Rotate and greyscale an image">Rotate and greyscale an image</option>
         </select>
         <h2>Learning Resources</h2>
         <ul class="small_links">
@@ -195,16 +210,30 @@ Say[]</textarea>
                 cells.removeChild(loading);
                 clearInterval(timer);
 
+                var row_count = (code.match(/\n/g) || []).length + 1;
+
                 cells.innerHTML += `
                     <li class="cell">
                         <p class="time">#${cells.children.length + 1} (${time}s)</p>
-                        <textarea rows="3" disabled>${code}</textarea>
+                        <textarea rows="${row_count}" readonly class="cell_run">${code}</textarea>
                         <pre ${data.error ? 'class="error_cell"' : ''}>${data.error ? data.error : data.output}</pre>
                     </li>
                 `;
                 
                 console.log(cells.children.length);
                 document.getElementById("current_count").innerHTML = `#${cells.children.length + 1}`;
+
+                // click to copy to clipboard
+                for (var i = 0; i < cells.children.length; i++) {
+                    var cell = cells.children[i];
+                    var textarea = cell.getElementsByTagName("textarea")[0];
+                    textarea.addEventListener("click", function (event) {
+                        event.preventDefault();
+                        var text = event.target.value;
+                        navigator.clipboard.writeText(text);
+                        alert("Copied to clipboard");
+                    });
+                }
             })
             .catch((error) => {
                 console.error('Error:', error);
@@ -329,6 +358,30 @@ Say[]</textarea>
             .catch(err => {
                 console.log(err);
             });
+        });
+
+        var examples = {
+            "Classify an image": `Load["./folder/abbey.jpg"]
+Classify["person", "cookie"]
+Say[]`,
+            "Detect objects in an image": `Load["./folder/abbey.jpg"]
+Detect["person"]
+Say[]`,
+            "Build a search engine": `Load["./folder/abbey.jpg"]
+Detect["person"]
+Say[]`,
+            "Rotate and greyscale an image": `Load["./folder/abbey.jpg"]
+Rotate[90]
+Greyscale[]
+Say[]`
+        };
+
+        var examples_select = document.getElementById("examples");
+
+        examples_select.addEventListener("change", function (event) {
+            var example = examples_select.value;
+            var code = examples[example];
+            textarea.value = code;
         });
     </script>
 </body>
