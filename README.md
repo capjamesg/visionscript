@@ -176,10 +176,12 @@ python3 test.py
 
 ### Code Organization
 
-- `lang.py`: Core language code.
-- `test.py`: Run tests.
-- `usage.py`: Variables referenced for usage instructions in `lang.py`.
-- `grammar.py`: The VisionScript grammar.
+- `visionscript/lang.py`: Core language code.
+- `test/test.py`: Run tests.
+- `visionscript/usage.py`: Variables referenced for usage instructions in `lang.py`.
+- `visionscript/grammar.py`: The VisionScript grammar.
+- `visionscript/notebook.py`: The VisionScript notebook environment code.
+- `visionscript/cloud.py`: The VisionScript cloud environment code.
 - `tests/`: VisionScript tests.
 
 ## Supported Models 📚
@@ -189,9 +191,9 @@ VisionScript provides abstract wrappers around:
 - [CLIP](https://github.com/openai/clip) by OpenAI (Classification)
 - [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) (Object Detection Training, Segmentation Training)
 - [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) by CASIA-IVA-Lab. (Segmentation)
-- GroundedSAM (Object Detection, Segmentation)
-- BLIP (Caption Generation)
-- ViT (Classification Training)
+- [GroundedSAM](https://docs.autodistill.com/base_models/groundedsam/) (Object Detection, Segmentation)
+- [BLIP](https://github.com/salesforce/BLIP) (Caption Generation)
+- [ViT](https://github.com/autodistill/autodistill-vit) (Classification Training)
 
 ## License 📝
 
