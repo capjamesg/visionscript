@@ -6,7 +6,7 @@
 
 VisionScript is built in Python, offering a simple syntax for running object detection, classification, and segmentation models. [Read the documentation](https://visionscript.dev/docs/).
 
-## Get Started
+## Get Started 🚀
 
 First, install VisionScript:
 
@@ -17,12 +17,12 @@ pip install visionscript
 You can then run VisionScript using:
 
 ```
-vscript
+vscript --repl
 ```
 
 This will open a VisionScript REPL in which you can type commands.
 
-## Run a File
+### Run a File 📁
 
 To run a VisionScript file, use:
 
@@ -30,7 +30,7 @@ To run a VisionScript file, use:
 vscript ./your_file.vic
 ```
 
-## Use VisionScript in a Notebook
+### Use VisionScript in a Notebook 📓
 
 VisionScript offers an interactive web notebook through which you can run VisionScript code.
 
@@ -42,7 +42,7 @@ vscript --notebook
 
 This will open a notebook in your browser. Notebooks are ephermal. You will need to copy your code to a file to save it.
 
-## Quickstart
+## Quickstart 🚀
 
 ### Find people in an image using object detection
 
@@ -78,7 +78,7 @@ Load["./photo.jpg"]
 Classify["apple", "banana"]
 ```
 
-## Installation
+## Installation 👷
 
 To install VisionScript, clone this repository and run `pip install -r requirements.txt`.
 
@@ -100,37 +100,7 @@ python3 lang.py --file ./your_file.vic --debug
 
 Debug mode is useful for debugging code while adding new features to the VisionScript language.
 
-## Documentation
-
-- `Load["./abbey.jpg"]` -> Load the image
-- `Size[]` -> Get the size of the image
-- `Say[]` -> Say the result of the last function
-- `Detect["person"]` -> Detect the person
-- `Replace["emoji.png"]` -> Replace the person with black image
-- `Cutout[]` -> Cutout the last detections
-- `Count[]` -> Count the last detections
-- `CountInRegion[0, 0, 500, 500]` -> Count the last detections in the region (x1, y1, x2, y2)
-- `Classify["cat", "dog"]` -> Classify the image in the provided categories
-- `Save["./abbey2.jpg"]` -> Save the last image
-- `Show[]` -> Show the last image
-  - If you have run inference, this will plot inference results on the image with which you are working.
-- `x = 1` -> Set the variable x to 1
-- `True` and `False`: Booleans
-- `If[Statement]`: If the statement is true, run the next line (the only value that evaluates to `False` is `False` right now so this is not yet useful).
-- `x == y`: Test for equality. Check if x is equal to y.
-- `In["./images"]`: Load all images in the `./images` folder
-
-
-## Core Libraries Used
-
-- CLIP
-- YOLOv8
-- FastSAM
-- [supervision](https://github.com/roboflow/supervision)
-- PIL
-- Lark for lexing
-
-## Inspiration
+## Inspiration 🌟
 
 The inspiration behind this project was to build a simple way of doing one-off tasks.
 
@@ -171,7 +141,7 @@ Here, `Size[]` and `Say[]` do not have any arguments. Rather, they use the last 
 
 Indeed, `Size[]` and `Say[]` don't accept any arguments.
 
-## Developer Setup
+## Developer Setup 🛠
 
 If you want to add new features or fix bugs in the VisionScript language, you will need to set up a developer environment.
 
@@ -212,7 +182,7 @@ python3 test.py
 - `grammar.py`: The VisionScript grammar.
 - `tests/`: VisionScript tests.
 
-## Supported Models
+## Supported Models 📚
 
 VisionScript provides abstract wrappers around:
 
@@ -222,3 +192,7 @@ VisionScript provides abstract wrappers around:
 - GroundedSAM (Object Detection, Segmentation)
 - BLIP (Caption Generation)
 - ViT (Classification Training)
+
+## License 📝
+
+This project is licensed under an [MIT license](LICENSE).
