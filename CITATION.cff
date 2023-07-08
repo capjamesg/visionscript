@@ -1,0 +1,7 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - given-names: James (capjamesg)
+title: "VisionScript"
+version: 0.0.02
+date-released: 2023-07-08
