@@ -443,8 +443,9 @@ class VisionScript:
 
     def deploy(self, app_name):
         # make POST to http://localhost:6999/create
-        import requests
         import string
+
+        import requests
 
         app_slug = app_name.translate(
             str.maketrans("", "", string.punctuation.replace("-", ""))
@@ -1031,7 +1032,7 @@ class VisionScript:
 
         # cast tensor to float
         as_float = similarity.item()
-        
+
         self.state["last"] = as_float
 
         return as_float

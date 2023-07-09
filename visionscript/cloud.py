@@ -9,7 +9,7 @@ from visionscript import lang, parser
 
 app = Flask(__name__)
 
-API_KEY = "test" #uuid.uuid4().hex
+API_KEY = "test"  # uuid.uuid4().hex
 
 with open("scripts.json", "r") as f:
     scripts = json.load(f)
@@ -28,7 +28,7 @@ def home(id):
     if request.method == "POST":
         if scripts.get(id) is None:
             return jsonify({"error": "Invalid ID"})
-        
+
         # if no session for the script, make it
         if scripts[id].get("session") is None:
             scripts[id]["session"] = lang.VisionScript()

@@ -90,13 +90,15 @@ def upload():
 
     if file_name == "":
         return jsonify({"error": "No file provided"})
-    
+
     if mimetypes.guess_type(file_name)[0]:
-        if not mimetypes.guess_type(file_name)[0].startswith("text") and not mimetypes.guess_type(file_name)[0].startswith("image"):
+        if not mimetypes.guess_type(file_name)[0].startswith(
+            "text"
+        ) and not mimetypes.guess_type(file_name)[0].startswith("image"):
             return jsonify({"error": "File type not allowed"})
     elif not file_name.endswith(".vicnb"):
         return jsonify({"error": "File type not allowed"})
-    
+
     # remove special chars
     file_name = "".join([c for c in file_name if c.isalnum() or c == "." or c == "_"])
 
