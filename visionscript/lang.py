@@ -197,6 +197,7 @@ class VisionScript:
             "equality": lambda x: self.equality(x),
             "not_equality": lambda x: not self.equality(x),
             "input": lambda x: self.input_(x),
+            "deploy": lambda x: self.deploy(x),
         }
 
     def input_(self, key):
@@ -446,6 +447,7 @@ class VisionScript:
             json={
                 "api_key": "test",
                 "title": "app",
+                "slug": "app",
                 "script": self.code,
                 "variables": self.state["input_variables"],
             },
@@ -1004,7 +1006,15 @@ class VisionScript:
         # get similarity
         similarity = torch.cosine_similarity(embeddings[0], embeddings[1])
 
-        self.state["last"] = similarity
+        # cast tensor to float
+
+        as_float = similarity.item()
+
+        print(f"Similarity: {as_float}")
+        
+        self.state["last"] = as_float
+
+        return as_float
 
     def read_qr(self, _):
         image = self.state["last_loaded_image"]
@@ -1032,6 +1042,7 @@ class VisionScript:
         image = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
 
         self.state["last_loaded_image"] = image
+        self.state["output"] = image
 
     def contains(self, statement):
         if isinstance(self.state["last"], str):
@@ -1303,7 +1314,7 @@ def main(validate, ref, debug, file, repl, notebook, cloud) -> None:
 
         from visionscript.cloud import app
 
-        app.run(debug=True, port=9007)
+        app.run(debug=True, port=6999)
 
     if file is not None:
         with open(file, "r") as f:

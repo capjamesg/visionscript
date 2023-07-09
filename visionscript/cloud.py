@@ -9,7 +9,7 @@ from visionscript import lang, parser
 
 app = Flask(__name__)
 
-API_KEY = uuid.uuid4().hex
+API_KEY = "test" #uuid.uuid4().hex
 
 with open("scripts.json", "r") as f:
     scripts = json.load(f)
@@ -26,6 +26,13 @@ def index_page():
 @app.route("/<id>", methods=["GET", "POST"])
 def home(id):
     if request.method == "POST":
+        if scripts.get(id) is None:
+            return jsonify({"error": "Invalid ID"})
+        
+        # if no session for the script, make it
+        if scripts[id].get("session") is None:
+            scripts[id]["session"] = lang.VisionScript()
+
         data = request.form
         files = request.files
 
@@ -92,19 +99,27 @@ def create():
     data = request.json
 
     if data.get("api_key") != API_KEY:
-        return jsonify({"error": "Invalid API key"})
+        return jsonify({"error": "Invalid API key"}), 401
 
-    id = uuid.uuid4().hex
+    id = data["slug"]
 
-    scripts[id] = {
+    scripts[data["slug"]] = {
         "title": data["title"],
         "script": data["script"],
         "variables": data["variables"],
     }
 
+    new_script = scripts[id].copy()
+
     scripts[id]["session"] = lang.VisionScript()
 
+    # append to scripts.json
+    with open("scripts.json", "r") as f:
+        scripts_json = json.load(f)
+
+    scripts_json[data["slug"]] = new_script
+
     with open("scripts.json", "w") as f:
-        json.dump(scripts, f, indent=4)
+        json.dump(scripts_json, f, indent=4)
 
     return jsonify({"id": id})
