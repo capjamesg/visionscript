@@ -198,6 +198,7 @@ class VisionScript:
             "not_equality": lambda x: not self.equality(x),
             "input": lambda x: self.input_(x),
             "deploy": lambda x: self.deploy(x),
+            "getedges": lambda x: self.get_edges(x),
         }
 
     def input_(self, key):
@@ -352,6 +353,7 @@ class VisionScript:
         index.add(image)
 
     def search(self, label):
+        print(label)
         # embed
         import clip
         import torch
@@ -361,10 +363,8 @@ class VisionScript:
 
         with torch.no_grad():
             # if label is a filename, load image
-            if label.startswith("./") and os.path.exists(label):
-                comparator = self.load(label)
-
-                comparator = preprocess(comparator).unsqueeze(0).to(device)
+            if os.path.exists(label):
+                comparator = preprocess(Image.open(label)).unsqueeze(0).to(device)
 
                 comparator = model.encode_image(comparator)
             else:
@@ -392,6 +392,9 @@ class VisionScript:
 
         for result in results[1][0]:
             image_names.append(self.state["image_stack"][result])
+
+        if len(self.state["image_stack"]) < 5:
+            image_names = image_names[: len(self.state["image_stack"])]
 
         return image_names
 
@@ -438,16 +441,21 @@ class VisionScript:
         self.state["last_loaded_image"] = image
         self.state["output"] = image
 
-    def deploy(self, _):
+    def deploy(self, app_name):
         # make POST to http://localhost:6999/create
         import requests
+        import string
+
+        app_slug = app_name.translate(
+            str.maketrans("", "", string.punctuation.replace("-", ""))
+        )
 
         response = requests.post(
             "http://localhost:6999/create",
             json={
                 "api_key": "test",
-                "title": "app",
-                "slug": "app",
+                "title": app_name,
+                "slug": app_slug,
                 "script": self.code,
                 "variables": self.state["input_variables"],
             },
@@ -844,6 +852,17 @@ class VisionScript:
 
         self.state["model"] = model
 
+    def get_edges(self, _):
+        # convert to greyscale first
+        self.greyscale(_)
+
+        image = self.state["last_loaded_image"]
+
+        sobelxy = cv2.Sobel(image, cv2.CV_64F, 1, 1, ksize=5)
+
+        self.state["last_loaded_image"] = sobelxy
+        self.state["output"] = sobelxy
+
     def show(self, _):
         # get most recent Detect or Segment
         most_recent_detect_or_segment = None
@@ -955,7 +974,11 @@ class VisionScript:
 
             # show image
             fig = plt.figure(figsize=(8, 8))
-            plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            # if grey, show in grey
+            if len(image.shape) == 2:
+                plt.imshow(image, cmap="gray")
+            else:
+                plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
             fig.savefig(buffer, format="png")
             buffer.seek(0)
@@ -1007,10 +1030,7 @@ class VisionScript:
         similarity = torch.cosine_similarity(embeddings[0], embeddings[1])
 
         # cast tensor to float
-
         as_float = similarity.item()
-
-        print(f"Similarity: {as_float}")
         
         self.state["last"] = as_float
 

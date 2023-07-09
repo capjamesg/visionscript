@@ -47,8 +47,10 @@ def notebook():
 
         start_time = time.time()
 
+        code = parser.parse(user_input.strip() + "\n")
+
         try:
-            session.parse_tree(parser.parse(user_input.strip() + "\n"))
+            session.parse_tree(code)
         except Exception as e:
             raise e
             return jsonify({"error": str(e)})
@@ -88,8 +90,6 @@ def upload():
 
     if file_name == "":
         return jsonify({"error": "No file provided"})
-    
-    print(mimetypes.guess_type(file_name)[0])
     
     if mimetypes.guess_type(file_name)[0]:
         if not mimetypes.guess_type(file_name)[0].startswith("text") and not mimetypes.guess_type(file_name)[0].startswith("image"):

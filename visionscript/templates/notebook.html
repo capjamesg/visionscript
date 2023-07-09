@@ -372,6 +372,12 @@
                             "description": "Get the size of an image",
                             "example": "Size[]",
                             "supports_arguments": false
+                        },
+                        "Contrast": {
+                            "args": ["amount"],
+                            "description": "Adjust the contrast of an image",
+                            "example": "Contrast[1.5]",
+                            "supports_arguments": true
                         }
                     },
                     "find": {
@@ -397,9 +403,9 @@
                             "argument_default": "\"\""
                         },
                         "Search": {
-                            "args": ["object"],
+                            "args": ["file"],
                             "description": "Build a search engine with loaded images",
-                            "example": "Search[]",
+                            "example": "Search[\"./image.png\"]",
                             "supports_arguments": true,
                             "argument_default": "\"\""
                         },
@@ -440,6 +446,18 @@
                             "example": "Similarity[]",
                             "supports_arguments": false,
                         },
+                        "GetColours": {
+                            "args": [],
+                            "description": "Get the most common colours in an image",
+                            "example": "GetColours[]",
+                            "supports_arguments": false
+                        },
+                        "GetEdges": {
+                            "args": [],
+                            "description": "Get the edges in an image",
+                            "example": "GetEdges[]",
+                            "supports_arguments": false
+                        }
                     },
                     "output": {
                         "Say": {
