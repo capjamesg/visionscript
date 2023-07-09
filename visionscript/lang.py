@@ -596,9 +596,8 @@ class VisionScript:
 
             return results
 
-        if "clip" not in sys.modules:
-            import clip
-            import torch
+        import clip
+        import torch
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model, preprocess = clip.load("ViT-B/32", device=device)
@@ -704,7 +703,7 @@ class VisionScript:
             self.show(None)
             return
 
-        if isinstance(self.state["last"], list):
+        if isinstance(self.state["last"], (list, tuple)):
             self.state["output"] = ""
             for item in self.state["last"]:
                 print(item)
@@ -753,6 +752,8 @@ class VisionScript:
 
         xyxy = detections.xyxy
 
+        print(color)
+
         if color is not None:
             import webcolors
 
@@ -762,26 +763,20 @@ class VisionScript:
                 print(f"Color {color} does not exist.")
                 return
 
-            random_img = np.ones(
-                (int(xyxy[0][2] - xyxy[0][0]), int(xyxy[0][3] - xyxy[0][1]), 3),
-                dtype=np.uint8,
-            )
+            color_to_rgb = np.array(color_to_rgb)
 
-            random_img[:, :] = color_to_rgb
+            print(color_to_rgb, xyxy)
 
-            random_img = Image.fromarray(random_img)
-        else:
-            random_img = np.zeros(
-                (int(xyxy[0][2] - xyxy[0][0]), int(xyxy[0][3] - xyxy[0][1]), 3),
-                dtype=np.uint8,
-            )
+            # convert to bgr
+            color_to_rgb = color_to_rgb[::-1]
 
-            random_img = Image.fromarray(random_img)
+            for i in range(len(xyxy)):
+                x1, y1, x2, y2 = xyxy[i]
 
-        # paste image
-        self.state["last_loaded_image"].paste(
-            random_img, (int(xyxy[0][0]), int(xyxy[0][1]))
-        )
+                # cast all to int
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+
+                self.state["last_loaded_image"][y1:y2, x1:x2] = color_to_rgb
 
     def label(self, args):
         folder = args[0]
@@ -848,14 +843,11 @@ class VisionScript:
         self.state["model"] = model
 
     def show(self, _):
-        print(self.state["last_classes"])
         # get most recent Detect or Segment
         most_recent_detect_or_segment = None
 
-        for i in range(len(self.state["history"]) - 1, -1, -1):
-            if self.state["history"][i] in ("detect", "segment"):
-                most_recent_detect_or_segment = self.state["history"][i]
-                break
+        if self.state["history"][-1] in ("detect", "segment"):
+            most_recent_detect_or_segment = self.state["history"][i]
 
         if most_recent_detect_or_segment == "detect":
             annotator = sv.BoxAnnotator()
@@ -932,7 +924,7 @@ class VisionScript:
 
                 return
 
-            image = images[0]
+            # image = images[0]
 
         if annotator:
             image = annotator.annotate(
@@ -945,8 +937,10 @@ class VisionScript:
             and not self.state.get("history", [])[-1] == "compare"
         ):
             image = self.state["last_loaded_image"]
-        elif self.notebook is False:
-            image = cv2.imread(self.state["last_loaded_image_name"])
+        else:
+            image = self.state["last_loaded_image"]
+        # elif self.notebook is False:
+        #     image = cv2.imread(self.state["last_loaded_image_name"])
 
         if self.notebook:
             buffer = io.BytesIO()
@@ -1013,13 +1007,11 @@ class VisionScript:
         self.state["last"] = similarity
 
     def read_qr(self, _):
-        import pyzbar.pyzbar as pyzbar
-
         image = self.state["last_loaded_image"]
 
-        decoded_objects = pyzbar.decode(image)
+        data, _, _ = cv2.QRCodeDetector().detectAndDecode(image)
 
-        return decoded_objects
+        return data
 
     def set_brightness(self, brightness):
         # brightness is between -100 and 100
@@ -1285,9 +1277,7 @@ def activate_console(parser):
 @click.option("--file", default=None, help="Name of the file")
 @click.option("--repl", default=None, help="To enter to vscript console")
 @click.option("--notebook/--no-notebook", help="Start a notebook environment")
-@click.option(
-    "--cloud/--no-cloud", default=5000, help="Start a cloud deployment environment"
-)
+@click.option("--cloud/--no-cloud", help="Start a cloud deployment environment")
 def main(validate, ref, debug, file, repl, notebook, cloud) -> None:
     if validate:
         print("Script is a valid VisionScript program.")

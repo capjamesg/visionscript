@@ -141,6 +141,11 @@ def save():
     return jsonify({"file": notebook})
 
 
+@app.route("/static/<path:path>")
+def static_files(path):
+    return app.send_static_file(path)
+
+
 @app.route("/quit")
 def quit():
     exit()

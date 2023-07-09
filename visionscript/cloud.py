@@ -11,12 +11,6 @@ app = Flask(__name__)
 
 API_KEY = uuid.uuid4().hex
 
-script = """
-Load[Input["img"] ]
-GetText[]
-Say[]
-"""
-
 with open("scripts.json", "r") as f:
     scripts = json.load(f)
 
@@ -83,8 +77,6 @@ def home(id):
 
     image_inputs = [[v, k] for k, v in scripts[id]["variables"].items() if v == "image"]
     text_inputs = [[v, k] for k, v in scripts[id]["variables"].items() if v == "text"]
-
-    print(text_inputs)
 
     return render_template(
         "index.html",

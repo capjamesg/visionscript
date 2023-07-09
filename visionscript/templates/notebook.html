@@ -56,15 +56,27 @@
             padding: 1rem;
             text-align: center;
         }
-        main {
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        section {
             padding: 1rem;
-            max-width: 40em;
+            max-width: 50em;
             margin: 0 auto;
+            flex: 1;
         }
         #current_count {
             font-size: 1rem;
             font-weight: bold;
             margin-bottom: 0.5rem;
+        }
+        main {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
         }
         select {
             margin-bottom: 1rem;
@@ -125,7 +137,114 @@
         .cell_run:focus {
             outline: none;
         }
+        footer {
+            margin-top: 20px;
+        }
     </style>
+    <style>
+        #drag_drop_notebook {
+            border: 1px solid lightgrey;
+            min-height: 400px;
+            border-radius: 0.5rem;
+            background-image: url("/static/drag_and_drop.png");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 100%;
+        }
+        #function_box {
+            width: 20em;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 0 0 0 1rem;
+            overflow-y: scroll;
+            max-height: 100vh;
+            border: 1px solid lightgrey;
+        }
+        #function_box h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        #function_box h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        #function_box p {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        #function_box .function {
+            margin-bottom: 1rem;
+            cursor: grab;
+            border: 1px solid lightgrey;
+            padding: 5px;
+            border-radius: 7.5px;
+            padding-top: 7.5px;
+        }
+        #drag_drop_notebook {
+            width: 100%;
+            margin: 0 auto;
+            margin-top: 15px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+        #drag_drop_notebook .cell {
+            padding: 10px;
+            border-radius: 5px;
+            height: 100%;
+            display: table;
+            margin: 10px;
+        }
+        #drag_drop_notebook .cell p {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 14px;
+        }
+        #drag_drop_notebook .cell p:focus {
+            outline: none;
+        }
+        #code_mode {
+            display: none;
+        }
+        .argument_block {
+            background: white;
+            padding: 7.5px;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        #error {
+            display: none;
+            background-color: lightcoral;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        #run input {
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+        #output {
+            margin-top: 10px;
+            border: 1px solid darkgreen;
+            border-radius: 5px;
+            padding: 10px;
+        }
+    </style>
+    <script>
+        var mode = "interactive";
+
+        function switch_mode () {
+            if (mode == "interactive") {
+                document.getElementById("interactive_mode").style.display = "none";
+                document.getElementById("code_mode").style.display = "block";
+                mode = "code";
+            } else {
+                document.getElementById("interactive_mode").style.display = "block";
+                document.getElementById("code_mode").style.display = "none";
+                mode = "interactive";
+            }
+        }
+    </script>
 </head>
 <body>
     <nav>
@@ -134,35 +253,574 @@
         </ul>
     </nav>
     <main>
-        <h2>Examples</h2>
-        <select id="examples">
-            <option value="Classify an image">Classify an image</option>
-            <option value="Detect objects in an image">Detect objects in an image</option>
-            <option value="Build a search engine">Build a search engine</option>
-            <option value="Rotate and greyscale an image">Rotate and greyscale an image</option>
-        </select>
-        <h2>Learning Resources</h2>
-        <ul class="small_links">
-            <li><a href="https://visionscript.dev/quickstart" target="_blank">Quickstart</a></li>
-            <li><a href="https://visionscript.dev/docs" target="_blank">Reference</a></li>
-        </ul>
-        <div id="files_section">
-            <h2>Files</h2>
-            <ul id="files"></ul>
-        </div>
-        <h2>Notebook</h2>
-        <ul id="cells">
-        </ul>
-        <form class="cell" id="new">
-            <p id="current_count">#1</p>
-            <textarea name="jscode" id="jscode" rows="3">
-Load["./folder/abbey.jpg"]
-Detect["person"]
-Say[]</textarea>
-            <input type="submit" value="Submit">
-        </form>
-        <p><a id="export_vic">Export notebook to <code>.vic</code></a></p>
-        <p><a id="export_vicnb">Export notebook to <code>.vicnb</code></a></p>
+        <aside id="function_box">
+            <h2 style="font-size: 24px;">Code Blocks</h2>
+            <input type="text" id="search" name="search" placeholder="Search functions" style="width: 100%; padding: 10px; border: 1px solid lightgrey; border-radius: 5px; margin-bottom: 10px;" onkeyup="processSearch()" />
+        </aside>
+        <section id="interactive_mode">
+            <a style="font-size: 12px; color: grey;" onclick="switch_mode()">Switch to code mode</a>
+            <h2>Interactive Mode</h2>
+            <p>Drag and drop functions to the box below to build your program.</p>
+            <p class="error" id="error"></p>
+            <div id="drag_drop_notebook"></div>
+            <div id="output"></div>
+            <form id="run">
+                <input type="submit" value="Run ✅" style="width: 100%;" />
+            </form>
+            <div id="files_section">
+                <h2>Files</h2>
+                <ul id="files"></ul>
+            </div>
+            <script>
+                const FUNCTIONS = {
+                    "input": {
+                        "Load": {
+                            "args": ["file"],
+                            "description": "Load an image from a file",
+                            "example": "Load[\"./folder/abbey.jpg\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                    },
+                    "process": {
+                        "Greyscale": {
+                            "args": [],
+                            "description": "Convert an image to greyscale",
+                            "example": "Greyscale[]",
+                            "supports_arguments": false
+                        },
+                        "Rotate": {
+                            "args": ["angle"],
+                            "description": "Rotate an image",
+                            "example": "Rotate[90]",
+                            "supports_arguments": true
+                        },
+                        "Resize": {
+                            "args": ["width", "height"],
+                            "description": "Resize an image",
+                            "example": "Resize[100, 100]",
+                            "supports_arguments": true
+                        },
+                        "Crop": {
+                            "args": ["x", "y", "width", "height"],
+                            "description": "Crop an image",
+                            "example": "Crop[0, 0, 100, 100]",
+                            "supports_arguments": true,
+                            "argument_default": "0, 0, 0, 0"
+                        },
+                        "Blur": {
+                            "args": [],
+                            "description": "Blur an image",
+                            "example": "Blur[]",
+                            "supports_arguments": false
+                        },
+                        "Brightness": {
+                            "args": ["amount"],
+                            "description": "Adjust the brightness of an image",
+                            "example": "Brightness[50]",
+                            "supports_arguments": true
+                        },
+                        "Replace": {
+                            "args": ["color"],
+                            "description": "Replace part of an image",
+                            "example": "Replace[\"red\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                        "Cutout": {
+                            "args": ["x", "y", "width", "height"],
+                            "description": "Cut out part of an image",
+                            "example": "Cutout[0, 0, 100, 100]",
+                            "supports_arguments": true,
+                            "argument_default": "0, 0, 0, 0"
+                        },
+                        "Size": {
+                            "args": [],
+                            "description": "Get the size of an image",
+                            "example": "Size[]",
+                            "supports_arguments": false
+                        }
+                    },
+                    "find": {
+                        "Classify": {
+                            "args": ["object"],
+                            "description": "Classify an image",
+                            "example": "Classify[\"person\", \"cat\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\", \"\""
+                        },
+                        "Detect": {
+                            "args": ["object"],
+                            "description": "Detect objects in an image",
+                            "example": "Detect[\"person\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                        "Segment": {
+                            "args": ["object"],
+                            "description": "Segment objects in an image",
+                            "example": "Segment[\"person\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                        "Search": {
+                            "args": ["object"],
+                            "description": "Build a search engine with loaded images",
+                            "example": "Search[]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                        "Caption": {
+                            "args": [],
+                            "description": "Caption an image",
+                            "example": "Caption[]",
+                            "supports_arguments": false
+                        },
+                        "Count": {
+                            "args": ["object"],
+                            "description": "Count objects in an image",
+                            "example": "Count[]",
+                            "supports_arguments": false
+                        },
+                        "CountInRegion": {
+                            "args": ["object", "x", "y", "width", "height"],
+                            "description": "Count objects in a region of an image",
+                            "example": "CountInRegion[\"person\", 0, 0, 100, 100]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\", 0, 0, 0, 0"
+                        },
+                        "ReadQR": {
+                            "args": [],
+                            "description": "Read a QR code in an image",
+                            "example": "ReadQR[]",
+                            "supports_arguments": false
+                        },
+                        "Similarity": {
+                            "args": ["file"],
+                            "description": "Find the similarity between two images",
+                            "example": "Similarity[\"./folder/abbey.jpg\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                    },
+                    "output": {
+                        "Say": {
+                            "args": [],
+                            "description": "Output the result of the previous function",
+                            "example": "Say[]",
+                            "supports_arguments": false
+                        },
+                        "Show": {
+                            "args": [],
+                            "description": "Show the result of the previous function",
+                            "example": "Show[]",
+                            "supports_arguments": false
+                        },
+                        "Compare": {
+                            "args": ["file"],
+                            "description": "Compare two or more images",
+                            "example": "Compare[]",
+                            "supports_arguments": false
+                        },
+                        "Save": {
+                            "args": ["file"],
+                            "description": "Save the result of the previous function to a file",
+                            "example": "Save[\"./folder/abbey.jpg\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                    },
+                    "logic": {
+                        "If": {
+                            "args": ["condition"],
+                            "description": "If a condition is true, run the next function",
+                            "example": "If[\"person\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                        "In": {
+                            "args": [],
+                            "description": "Iterate over a folder of images",
+                            "example": "In[\"./folder\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                        "Use": {
+                            "args": ["file"],
+                            "description": "Specify a model for use",
+                            "example": "Use[\"groundingdino\"]",
+                            "supports_arguments": true,
+                            "argument_default": "\"\""
+                        },
+                        "Reset": {
+                            "args": [],
+                            "description": "Reset the state of the program",
+                            "example": "Reset[]",
+                            "supports_arguments": false
+                        }
+                    }
+                };
+        
+                var mapped_functions = {};
+        
+                for (var category in FUNCTIONS) {
+                    var functions = FUNCTIONS[category];
+                    for (var name in functions) {
+                        mapped_functions[name] = functions[name];
+                    }
+                }
+                
+                var search = document.getElementById("search");
+
+                console.log(search);
+
+                // search functions
+                function processSearch() {
+                    var search = document.getElementById("search");
+                    var query = search.value.toLowerCase();
+                    var functions = document.getElementsByClassName("function");
+                    for (var i = 0; i < functions.length; i++) {
+                        var function_element = functions[i];
+                        var function_name = function_element.id.toLowerCase();
+                        if (function_name.includes(query)) {
+                            function_element.style.display = "block";
+                        } else {
+                            function_element.style.display = "none";
+                        }
+                    }
+                }
+
+                var colors = {
+                    "input": "#a2d2ff",
+                    "process": "#cdb4db",
+                    "find": "#ccd5ae",
+                    "output": "lavender",
+                    "logic": "#ffdf6b"
+                };
+        
+                for (var category in FUNCTIONS) {
+                    var functions = FUNCTIONS[category];
+                    var function_box = document.getElementById("function_box");
+                    function_box.innerHTML += `
+                        <h2>${category}</h2>
+                    `;
+                    for (var name in functions) {
+                        var args = functions[name].args;
+                        var description = functions[name].description;
+                        var example = functions[name].example;
+                        function_box.innerHTML += `
+                            <div class="function" draggable="true" id="${name}">
+                                <p style="color: ${colors[category]}">${name}[${args.join(", ")}]</p>
+                                <p>${description}</p>
+                            </div>
+                        `;
+                        functions[name].element = document.getElementById(name);
+                    }
+                }
+        
+                // ecah function is draggable
+                var functions = document.getElementsByClassName("function");
+        
+                for (var i = 0; i < functions.length; i++) {
+                    var function_element = functions[i];
+                    function_element.addEventListener("dragstart", function (event) {
+                        event.dataTransfer.setData("text/plain", event.target.id);
+                    });
+                }
+        
+                var notebook = document.getElementById("drag_drop_notebook");
+        
+                notebook.addEventListener("dragover", function (event) {
+                    event.preventDefault();
+                });
+        
+                notebook.addEventListener("dragleave", function (event) {
+                    event.preventDefault();
+                    notebook.style.backgroundColor = "white";
+                });
+        
+                notebook.addEventListener("drop", function (event) {
+                    // remove drag_drop_notebook background
+                    notebook.style.background = "none";
+                    event.preventDefault();
+                    // if hovered over another element, add a 20px margin
+                    var cells = document.getElementById("drag_drop_notebook");
+                    // if cell has an argumetn_block, don't do anything
+                    // if hovered outside of drag_drop_notebook, delete
+                    if (cells.children.length > 0) {
+                        if (cells.children[cells.children.length - 1].id == "argument_block") {
+                            return;
+                        }
+                    }
+                    // get "text/plain" cata
+                    var function_name = event.dataTransfer.getData("text/plain");
+                    var function_element = document.getElementById(function_name);
+
+                    // if is cell, don't do anything
+                    if (function_element.classList.contains("cell")) {
+                        console.log("is cell");
+                        // move cell in list
+                        var cell = function_element;
+                        var cell_index = Array.prototype.indexOf.call(cells.children, cell);
+                        var cell_count = cells.children.length;
+                        // move under closest cell
+                        var closest_cell = null;
+                        var closest_cell_index = null;
+                        var closest_cell_distance = null;
+
+                        for (var i = 0; i < cell_count; i++) {
+                            var other_cell = cells.children[i];
+                            if (other_cell == cell) {
+                                continue;
+                            }
+                            var other_cell_rect = other_cell.getBoundingClientRect();
+                            var notebook_rect = notebook.getBoundingClientRect();
+                            var distance = Math.abs(event.clientY - other_cell_rect.top);
+                            if (closest_cell == null) {
+                                closest_cell = other_cell;
+                                closest_cell_index = i;
+                                closest_cell_distance = distance;
+                            } else {
+                                if (distance < closest_cell_distance) {
+                                    closest_cell = other_cell;
+                                    closest_cell_index = i;
+                                    closest_cell_distance = distance;
+                                }
+                            }
+                        }
+
+                        if (closest_cell == null) {
+                            return;
+                        }
+
+                        if (closest_cell_index > cell_index) {
+                            // move cell down
+                            cells.insertBefore(cell, closest_cell.nextSibling);
+                        } else {
+                            // move cell up
+                            cells.insertBefore(cell, closest_cell);
+                        }
+                        return;
+                    }
+                    // last cell
+                    var margin = 20;
+                    var nested = false;
+                    // con
+                    if (cells.children.length > 0) {
+                        // if last cell function was an If or In
+                        if (cells.children[cells.children.length - 1].id.includes("If") || cells.children[cells.children.length - 1].id.includes("In")) {
+                            var last_cell = cells.children[cells.children.length - 1];
+                            var last_cell_rect = last_cell.getBoundingClientRect();
+                            var notebook_rect = notebook.getBoundingClientRect();
+                            console.log(event.clientY);
+                            if (event.clientY > last_cell_rect.top && event.clientY < last_cell_rect.bottom) {
+                                margin = 40;
+                                nested = true;
+                            }
+                        }
+                    }
+
+                    // if target cell is an If statement, don't add input
+                    console.log(event.target.id);
+                    if (event.target.id.includes("If")) {
+                        var function_name = event.dataTransfer.getData("text/plain");
+                        var function_element = document.getElementById(function_name);
+                        var code = function_name + "[]";
+                        var color = function_element.firstElementChild.style.color;
+
+                        var html = "";
+
+                        var cell_count = cells.children.length + 1;
+
+                        html = `
+                            <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: ${margin}px;">
+                                <p>${function_name} <div class="argument_block">[]</div></p>
+                            </div>
+                        `;
+            
+                        notebook.appendChild(document.createRange().createContextualFragment(html));
+                        return;
+                    }
+                    
+                    var function_name = event.dataTransfer.getData("text/plain");
+                    var function_element = document.getElementById(function_name);
+                    var code = function_name + "[]";
+                    var color = function_element.firstElementChild.style.color;
+
+                    var html = "";
+
+                    var cell_count = cells.children.length + 1;
+
+                    if (mapped_functions[function_name].supports_arguments) {
+                        // if it is an if statement, don't add input
+                        if (function_name != "If") {
+                            html = `
+                                <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: ${margin}px;">
+                                    <p>${function_name}[<input type="text" class="argument_block" id="cell_${cell_count}" />]</p>
+                                </div>
+                            `;
+                        } else {
+                            html = `
+                                <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: ${margin}px;">
+                                    <p>${function_name} <div class="argument_block">[]</div></p>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        html = `
+                            <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: ${margin}px;">
+                                <p>${function_name}[]</p>
+                            </div>
+                        `;
+                    }
+        
+                    notebook.appendChild(document.createRange().createContextualFragment(html));
+
+                    if (nested) {
+                        console.log("nested", function_name, cell_count);
+                        var cell = document.getElementById(`${function_name}_${cell_count}`);
+                        cell.dataset.nested = true;
+                    }
+
+                    var cell = document.getElementById(`${function_name}_${cell_count}`);
+                    cell.addEventListener("dragstart", function (event) {
+                        event.dataTransfer.setData("text/plain", event.target.id);
+                    });
+
+                    // if supports arguments, allow drag and drop in box to nest
+                    // if (mapped_functions[function_name].supports_arguments) {
+                    //     var argument_block = document.getElementsByClassName("argument_block");
+                    //     var argument_block = argument_block[argument_block.length - 1];
+                    //     argument_block.addEventListener("dragover", function (event) {
+                    //         event.preventDefault();
+                    //     });
+                    //     argument_block.addEventListener("dragleave", function (event) {
+                    //         event.preventDefault();
+                    //         argument_block.style.backgroundColor = "white";
+                    //     });
+                    //     argument_block.addEventListener("drop", function (event) {
+                    //         event.preventDefault();
+                    //         argument_block.style.backgroundColor = "white";
+                    //         var function_name = event.dataTransfer.getData("text/plain");
+                    //         var function_element = document.getElementById(function_name);
+                    //         var color = function_element.firstElementChild.style.color;
+                    //         var html = "";
+                    //         if (mapped_functions[function_name].supports_arguments) {
+                    //             html = `
+                    //                 <div class="cell" draggable="true" id="${function_name}" style="background-color: ${color}; margin-left: 20px;">
+                    //                     <p>${function_name}<div class="argument_block">[]</div></p>
+                    //                 </div>
+                    //             `;
+                    //         } else {
+                    //             html = `
+                    //                 <div class="cell" draggable="true" id="${function_name}" style="background-color: ${color}; margin-left: 20px;">
+                    //                     <p>${function_name}[]</p>
+                    //                 </div>
+                    //             `;
+                    //         }
+                    //         argument_block.innerHTML = html;
+                    //     });
+                    // }
+                });
+
+                var run = document.getElementById("run");
+
+                run.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    var code = "";
+                    var functions = document.getElementsByClassName("cell");
+
+                    var in_nested_context = false;
+                    for (var i = 0; i < functions.length; i++) {
+                        var function_element = functions[i];
+                        var function_name = function_element.id.split("_")[0];
+
+                        // this is the form to create new elements
+                        if (function_name == "new") {
+                            continue;
+                        }
+
+                        var argument_block = function_element.getElementsByClassName("argument_block");
+
+                        if (argument_block.length > 0) {
+                            var argument_block = argument_block[0];
+                            var argument = argument_block.value;
+                            // surround args in quotes
+
+                            // if data-filename, replace with file name
+                            if (argument_block.dataset.filename) {
+                                argument = argument_block.dataset.filename;
+                            }
+
+                            if (argument == "") {
+                                argument = mapped_functions[function_name].argument_default;
+                            }
+
+                            // add "" between commas
+                            var args = argument.split(",");
+
+                            for (var j = 0; j < args.length; j++) {
+                                var arg = args[j];
+                                if (arg == "") {
+                                    continue;
+                                }
+                                args[j] = "\"" + arg + "\"";
+                            }
+
+                            argument = args.join(", ");
+
+                            argument = argument.replace(/\"\"/g, "");
+
+                            // if nested, start w/ indent
+                            if (function_element.dataset.nested) {
+                                code += "    ";
+                                in_nested_context = true;
+                            }
+
+                            code += function_name + "[" + argument + " ]" + "\n";
+                        } else {
+                            code += function_name + "[]" + "\n";
+                        }
+                    }
+
+                    executeCode(code);
+                });
+            </script>
+        </section>
+        <section id="code_mode">
+            <a style="font-size: 12px; color: grey;" onclick="switch_mode()">Switch to interactive mode</a>
+            <h2>Examples</h2>
+            <select id="examples">
+                <option value="Classify an image">Classify an image</option>
+                <option value="Detect objects in an image">Detect objects in an image</option>
+                <option value="Build a search engine">Build a search engine</option>
+                <option value="Rotate and greyscale an image">Rotate and greyscale an image</option>
+            </select>
+            <h2>Learning Resources</h2>
+            <ul class="small_links">
+                <li><a href="https://visionscript.dev/quickstart" target="_blank">Quickstart</a></li>
+                <li><a href="https://visionscript.dev/docs" target="_blank">Reference</a></li>
+            </ul>
+            <div id="files_section">
+                <h2>Files</h2>
+                <ul id="files"></ul>
+            </div>
+            <h2>Notebook</h2>
+            <ul id="cells">
+            </ul>
+            <form class="cell" id="new">
+                <p id="current_count">#1</p>
+                <textarea name="jscode" id="jscode" rows="3">
+    Load["./folder/abbey.jpg"]
+    Detect["person"]
+    Say[]</textarea>
+                <input type="submit" value="Submit">
+            </form>
+            <footer>
+                <p><a id="export_vic">Export notebook to <code>.vic</code></a></p>
+                <p><a id="export_vicnb">Export notebook to <code>.vicnb</code></a></p>
+            </footer>
+        </section>
     </main>
     <script>
         var cells = document.getElementById("cells");
@@ -172,6 +830,9 @@ Say[]</textarea>
             cells.innerHTML += `
                 <li class="cell" id="loading">Loading</li>
             `;
+            var error_cell = document.getElementById("error");
+            error_cell.innerText = "";
+            error_cell.style.display = "none";
 
             var timer = setInterval(function () {
                 var loading = document.getElementById("loading");
@@ -212,6 +873,13 @@ Say[]</textarea>
 
                 var row_count = (code.match(/\n/g) || []).length + 1;
 
+                // if interactive mode, show in #output
+                if (mode == "interactive") {
+                    var output = document.getElementById("output");
+                    output.innerHTML = data.output;
+                    return;
+                }
+
                 cells.innerHTML += `
                     <li class="cell">
                         <p class="time">#${cells.children.length + 1} (${time}s)</p>
@@ -236,7 +904,9 @@ Say[]</textarea>
                 }
             })
             .catch((error) => {
-                console.error('Error:', error);
+                var error_cell = document.getElementById("error");
+                error_cell.innerText = "Your code could not run."
+                error_cell.style.display = "block";
             });
         }
 
@@ -275,7 +945,6 @@ Say[]</textarea>
 
         dropzone.addEventListener("dragover", function (event) {
             event.preventDefault();
-            dropzone.style.backgroundColor = "lightgrey";
         });
 
         dropzone.addEventListener("dragleave", function (event) {
@@ -283,7 +952,21 @@ Say[]</textarea>
             dropzone.style.backgroundColor = "white";
         });
 
+        // function process_image_drop (event)
+
         dropzone.addEventListener("drop", function (event) {
+            if (event.target.id == "drag_drop_notebook") {
+                return;
+            }
+            // if function box, delete the function box
+            // read data channel
+            var readData = event.dataTransfer.getData("text/plain");
+            if (readData) {
+                // delete element
+                var element = document.getElementById(readData);
+                element.parentNode.removeChild(element);
+                return;
+            }
             event.preventDefault();
             dropzone.style.backgroundColor = "white";
             var file = event.dataTransfer.files[0];
@@ -331,8 +1014,23 @@ Say[]</textarea>
 
                 var base64 = reader.result;
                 files.innerHTML += `
-                    <li><img src="${base64}" alt="${file_name}" height=100 width=100><br>${file_name}</li>
+                    <li><img src="${base64}" alt="${file_name}" height=100 width=100 data-filename="${file_name}"></li>
                 `;
+                // if dragged over an Load statement, add iamge to the argument block
+                console.log(event.target.class)
+                if (event.target.classList.contains("argument_block")) {
+                    // replace argument block
+                    var argument_block = event.target;
+                    var new_element = `
+                        <img src="${base64}" alt="${file_name}" height=100 width=100 class="argument_block" data-filename="${file_name}">
+                    `;
+
+                    // add before argument block
+                    argument_block.insertAdjacentHTML("beforebegin", new_element);
+
+                    // remove argument block
+                    argument_block.parentNode.removeChild(argument_block);
+                }
             })
             .catch(err => {
                 console.log(err);
@@ -342,7 +1040,6 @@ Say[]</textarea>
         var export_vicnb = document.getElementById("export_vicnb");
 
         export_vicnb.addEventListener("click", function (event) {
-            console.log("exporting");
             event.preventDefault();
             fetch('http://localhost:5000/notebook/save?state_id={{ state_id }}', {
                 method: 'POST'

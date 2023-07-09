@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL | EOF | " ")*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy) (EOL | EOF | " ")
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -15,7 +15,7 @@ search: "Search" "[" STRING "]"
 deploy: "Deploy" ("[" "]")?
 describe: "Describe" ("[" "]")?
 readqr: "ReadQR" ("[" "]")?
-rotate: "Rotate" "[" INT "]"
+rotate: "Rotate" "[" (INT | STRING) "]"
 resize: "Resize" "[" INT "," INT "]"
 getcolors: "GetColors" ("[" "]")? | "GetColors" "[" INT "]"
 getcolours: "GetColours" ("[" "]")? | "GetColours" "[" INT "]"
@@ -49,8 +49,8 @@ countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
 detect: "Detect" "[" input "]" | "Detect" "[" STRING ("," STRING)* "]" | "Detect" ("[" "]")?
 segment: "Segment" "[" STRING "]"
 else: "Else"
-in: "In" "[" STRING "]" EOL (INDENT expr+)* EOL
-if: "If" "[" (expr+)* "]" EOL (INDENT expr+)* (EOL | EOF | " ") (else EOL (INDENT expr+)* (EOL | EOF | " "))?
+in: "In" "[" STRING "]" EOL (INDENT expr+)* EOL 
+if: "If" "[" (expr+)* "]" EOL (INDENT expr+)* (EOL | EOF) (else EOL (INDENT expr+)* (EOL | EOF | " "))?
 reset: "Reset" ("[" "]")?
 negate: "Not" "[" expr "]"
 OPERAND: "+" | "-" | "*" | "/"
@@ -64,7 +64,7 @@ comment: "#"
 EOL: "\\n"
 EOF: "\\Z"
 INT: /-?\d+/
-INDENT: "    "
+INDENT: "    " | "\\t"
 BOOL: "True" | "False"
 %import common.ESCAPED_STRING -> STRING
 %import common.WS_INLINE
