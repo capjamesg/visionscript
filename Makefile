@@ -12,3 +12,6 @@ clean:
 	rm -rf dist
 	rm -rf build
 	rm -rf *.egg-info
+lint:
+	black visionscript/*
+	isort visionscript/*

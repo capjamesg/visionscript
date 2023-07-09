@@ -36,8 +36,6 @@ def home(id):
         data = request.form
         files = request.files
 
-        print(data, files)
-
         results = {}
 
         for variable in scripts[id]["variables"]:
@@ -109,17 +107,27 @@ def create():
         "variables": data["variables"],
     }
 
-    new_script = scripts[id].copy()
+    # make POST to http://localhost:6999/create
+    import string
 
-    scripts[id]["session"] = lang.VisionScript()
+    import requests
 
-    # append to scripts.json
-    with open("scripts.json", "r") as f:
-        scripts_json = json.load(f)
+    app_slug = data["title"].translate(
+        str.maketrans("", "", string.punctuation.replace("-", ""))
+    )
 
-    scripts_json[data["slug"]] = new_script
+    response = requests.post(
+        "http://localhost:6999/create",
+        json={
+            "api_key": "test",
+            "title": data["title"],
+            "slug": app_slug,
+            "script": data["script"],
+            "variables": data["variables"],
+        },
+    )
 
-    with open("scripts.json", "w") as f:
-        json.dump(scripts_json, f, indent=4)
+    if response.status_code != 200:
+        return jsonify({"error": "Error creating app"}), 500
 
     return jsonify({"id": id})

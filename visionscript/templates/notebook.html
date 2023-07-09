@@ -18,9 +18,6 @@
             list-style-type: none;
             padding: 0;
         }
-        #cells, .cell {
-            max-width: 40em;
-        }
         .cell {
             background-color: #eee;
             padding: 1rem;
@@ -54,7 +51,6 @@
             color: white;
             width: 100%;
             padding: 1rem;
-            text-align: center;
         }
         h2 {
             font-size: 2rem;
@@ -102,21 +98,13 @@
             font-size: 18px;
             margin-bottom: 10px;
         }
-        #export_vic, #export_vicnb {
-            color: grey;
-            font-size: 12px;
-            text-decoration: underline;
-            cursor: pointer;
-        }
         #files li {
             border: 1px solid lightgrey;
             display: inline-block;
             padding: 10px;
             border-radius: 10px;
-        }
-        #files_section {
-            display: none;
-            margin-bottom: 10px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         pre {
             margin-top: 0.5rem;
@@ -155,7 +143,7 @@
             background-position: center;
             background-size: 100%;
         }
-        #function_box {
+        #function_box, #files_section {
             width: 20em;
             padding: 1rem;
             background-color: white;
@@ -163,6 +151,8 @@
             overflow-y: scroll;
             max-height: 100vh;
             border: 1px solid lightgrey;
+            min-height: 100em;
+            line-height: 1.5em;
         }
         #function_box h2 {
             font-size: 18px;
@@ -257,6 +247,17 @@
             resize: none;
             overflow: hidden;
             margin-top: 10px;
+            width: 100%;
+        }
+        dialog input {
+            margin-top: 20px;
+            width: 100%;
+            border: 1px solid #ccc;
+            resize: none;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            display: block;
+            margin-bottom: 10px;
         }
     </style>
     <script>
@@ -264,21 +265,66 @@
 
         function switch_mode () {
             if (mode == "interactive") {
-                document.getElementById("interactive_mode").style.display = "none";
-                document.getElementById("code_mode").style.display = "block";
+                document.getElementById("mode_switch").innerText = "Use Interactive Mode 📝";
                 mode = "code";
             } else {
-                document.getElementById("interactive_mode").style.display = "block";
-                document.getElementById("code_mode").style.display = "none";
+                document.getElementById("mode_switch").innerText = "Use Code Mode 📝";
                 mode = "interactive";
+            }
+            var interactive_mode = document.getElementById("interactive_mode");
+            var code_mode = document.getElementById("code_mode");
+            if (mode == "interactive") {
+                interactive_mode.style.display = "block";
+                code_mode.style.display = "none";
+            } else {
+                interactive_mode.style.display = "none";
+                code_mode.style.display = "block";
             }
         }
     </script>
+    <style>
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav ul {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav ul li {
+            margin-right: 25px;
+            background-color: white;
+            color: darkgreen;
+            border-radius: 5px;
+            padding: 7.5px;
+            cursor: pointer
+        }
+        nav ul li a {
+            color: darkgreen;
+            text-decoration: none;
+        }
+        nav ul li:last-child {
+            margin-right: 0;
+        }
+        #files {
+            min-height: 50vh;
+        }
+    </style>
 </head>
 <body>
     <nav>
-        <ul>
+        <p>
             VisionScript Notebook
+        </p>
+        <ul>
+            <li onclick="switch_mode()"><a id="mode_switch">Use Code Mode 📝</a></li>
+            <li><a href="https://visionscript.dev/docs" target="_blank">Docs 📚</a></li>
+            <li><a id="export_vic">Export 💾</a></li>
+            <li onclick="deploy()"><a>Use as Web App ☁️</a></li>
+            <li id="reset"><a>Reset 🔄</a></li>
+            <li id="run"><a>Run All 🟢</a></li>
         </ul>
     </nav>
     <main>
@@ -287,23 +333,11 @@
             <input type="text" id="search" name="search" placeholder="Search functions" style="width: 100%; padding: 10px; border: 1px solid lightgrey; border-radius: 5px; margin-bottom: 10px;" onkeyup="processSearch()" />
         </aside>
         <section id="interactive_mode">
-            <a style="font-size: 12px; color: grey; cursor: pointer; background-color: lightgreen; border-radius: 7.5px; padding: 5px; margin-bottom: 15px; display: inline-block;" onclick="switch_mode()">Switch to code mode</a>
-            <h2>Interactive Mode</h2>
+            <h2>Make something cool</h2>
             <p>Drag and drop functions to the box below to build your program.</p>
-            <p class="error" id="error"></p>
             <div id="drag_drop_notebook"></div>
-            <div id="output"></div>
-            <form id="run">
-                <input type="submit" value="Run ✅" style="width: 100%;" />
-            </form>
-            <div id="files_section">
-                <h2>Files</h2>
-                <ul id="files"></ul>
-            </div>
-            <footer>
-                <p><a id="export_vic">Export notebook to <code>.vic</code></a></p>
-                <p><a id="export_vicnb">Export notebook to <code>.vicnb</code></a></p>
-            </footer>
+            <p class="error" id="error"></p>
+            <div id="output">Output</div>
             <script>
                 const FUNCTIONS = {
                     "input": {
@@ -347,10 +381,10 @@
                             "example": "Blur[]",
                             "supports_arguments": false
                         },
-                        "Brightness": {
+                        "SetBrightness": {
                             "args": ["amount"],
                             "description": "Adjust the brightness of an image",
-                            "example": "Brightness[50]",
+                            "example": "SetBrightness[50]",
                             "supports_arguments": true
                         },
                         "Replace": {
@@ -522,12 +556,6 @@
                         }
                     },
                     "deploy": {
-                        "Deploy": {
-                            "args": [],
-                            "description": "Deploy a model",
-                            "example": "Deploy[]",
-                            "supports_arguments": false
-                        },
                         "Input": {
                             "args": [],
                             "description": "Specify a custom field users can input with a deployed model",
@@ -563,6 +591,40 @@
                         }
                     }
                 }
+
+                // if user hits enter, take top result
+                // listen for key
+                document.addEventListener("keydown", function (event) {
+                    var search = document.getElementById("search");
+
+                    if (search != document.activeElement) {
+                        return;
+                    }
+
+                    console.log(event.key);
+
+                    if (event.key == "Enter") {
+                        // set background color
+                        document.getElementById("drag_drop_notebook").style.background = "white";
+                        var functions = document.getElementsByClassName("function");
+                        var function_element = functions[0];
+                        var function_name = function_element.id;
+                        var code = function_name + "[]";
+                        var color = function_element.firstElementChild.style.color;
+
+                        var html = "";
+
+                        var cell_count = cells.children.length + 1;
+
+                        html = `
+                            <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color};">
+                                <p>${function_name}[]</p>
+                            </div>
+                        `;
+            
+                        notebook.appendChild(document.createRange().createContextualFragment(html));
+                    }
+                });
 
                 function importNotebookToInteractiveCode (notebook) {
 
@@ -886,6 +948,11 @@
                         }
                     }
 
+                    // if code doesn't end with Say[], add it
+                    if (!code.endsWith("Say[]\n")) {
+                        code += "Say[]\n";
+                    }
+
                     return code;
                 }
 
@@ -893,31 +960,15 @@
 
                 run.addEventListener("click", function (event) {
                     event.preventDefault();
+                    var output = document.getElementById("output");
                     var code = getCodeFromInteractiveEnvironment();
                     executeCode(code);
                 });
             </script>
         </section>
         <section id="code_mode">
-            <a style="font-size: 12px; color: grey; cursor: pointer; background-color: lightgreen; border-radius: 7.5px; padding: 5px; margin-bottom: 15px; display: inline-block;" onclick="switch_mode()">Switch to interactive mode</a>
-            <h2>Code Mode</h2>
-            <h3>Examples</h3>
-            <select id="examples">
-                <option value="Classify an image">Classify an image</option>
-                <option value="Detect objects in an image">Detect objects in an image</option>
-                <option value="Build a search engine">Build a search engine</option>
-                <option value="Rotate and greyscale an image">Rotate and greyscale an image</option>
-            </select>
-            <h3>Learning Resources</h3>
-            <ul class="small_links">
-                <li><a href="https://visionscript.dev/quickstart" target="_blank">Quickstart</a></li>
-                <li><a href="https://visionscript.dev/docs" target="_blank">Reference</a></li>
-            </ul>
-            <div id="files_section">
-                <h2>Files</h2>
-                <ul id="files"></ul>
-            </div>
             <h2>Notebook</h2>
+            <p style="margin-bottom: 20px;">Write your program in the boxes below.</p>
             <ul id="cells">
             </ul>
             <form class="cell" id="new">
@@ -928,12 +979,20 @@
     Say[]</textarea>
                 <input type="submit" value="Submit">
             </form>
-            <footer>
-                <p><a id="export_vic">Export notebook to <code>.vic</code></a></p>
-                <p><a id="export_vicnb">Export notebook to <code>.vicnb</code></a></p>
-                <p><a onclick="resetNotebook()">Reset notebook</a></p>
-            </footer>
         </section>
+        <aside id="files_section">
+            <h2>Files</h2>
+            <p style="margin-bottom: 20px;">Drag and drop files here to load them.</p>
+            <p>If you are using a file in your program, drag it to the appropriate box in your code.</p>
+            <ul id="files"></ul>
+            <h2>Examples</h2>
+            <select id="examples">
+                <option value="Classify an image">Classify an image</option>
+                <option value="Detect objects in an image">Detect objects in an image</option>
+                <option value="Build a search engine">Build a search engine</option>
+                <option value="Rotate and greyscale an image">Rotate and greyscale an image</option>
+            </select>
+        </aside>
         <dialog id="dialog">
             <section>
                 <h2>Message</h2>
@@ -941,8 +1000,46 @@
                 <button onclick="this.parentNode.parentNode.close()">Close</button>
             </section>
         </dialog>
+        <dialog id="deploy">
+            <section>
+                <h2>Deploy your app</h2>
+                <p>You can run your code as a local web app that people can use.</p>
+                <p>Choose a name for your app and click "Deploy".</p>
+                <form id="deploy_form">
+                    <input type="text" name="name" id="name" placeholder="Name" />
+                    <input type="submit" value="Deploy" />
+                </form>
+                <p id="deploy_message"></p>
+            </section>
+        </dialog>
     </main>
     <script>
+        function deploy () {
+            var deploy = document.getElementById("deploy");
+            deploy.showModal();
+            var deploy_form = document.getElementById("deploy_form");
+            deploy_form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var data = new FormData(deploy_form);
+                var name = data.get("name");
+                fetch('http://localhost:5000/deploy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({name: name})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    var deploy_message = document.getElementById("deploy_message");
+                    deploy_message.innerText = data.message;
+                })
+                .catch((error) => {
+                    var deploy_message = document.getElementById("deploy_message");
+                    deploy_message.innerText = "Your app could not be deployed. Please make sure your app code is valid.";
+                });
+            });
+        }
         var cells = document.getElementById("cells");
 
         function startLoading(loading) {
@@ -955,23 +1052,30 @@
                     loading.innerText = "Loading...";
                 } else if (loading.innerText == "Loading...") {
                     loading.innerText = "Loading";
-                };
+                } else {
+                    loading.innerText = "Loading";
+                }
             }, 500);
             return timer;
         }
 
         function executeCode (code) {
             // make loading wheel
+
             cells.innerHTML += `
                 <li class="cell" id="loading">Loading</li>
             `;
+            var loading = document.getElementById("loading");
+            var output = document.getElementById("output");
+            // show output
+            output.style.display = "block";
+            var timer = startLoading(loading);
+            var output_timer = startLoading(output);
+
             var error_cell = document.getElementById("error");
+            
             error_cell.innerText = "";
             error_cell.style.display = "none";
-
-            var timer = startLoading(document.getElementById("loading"));
-            var timer = startLoading(document.getElementById("output"));
-
 
             fetch('http://localhost:5000/notebook', {
                 method: 'POST',
@@ -996,6 +1100,7 @@
                 // delete loading cell
                 cells.removeChild(loading);
                 clearInterval(timer);
+                clearInterval(output_timer);
 
                 var row_count = (code.match(/\n/g) || []).length + 1;
 
@@ -1030,9 +1135,14 @@
                 }
             })
             .catch((error) => {
+                clearInterval(timer);
+                clearInterval(output_timer);
+                
                 var error_cell = document.getElementById("error");
-                error_cell.innerText = "Your code could not run."
+                error_cell.innerText = "There was an error running your code. Please make sure your code is valid.";
                 error_cell.style.display = "block";
+                // hide output
+                output.style.display = "none";
             });
         }
 
@@ -1181,6 +1291,8 @@
                                 }
                                 interactive_notebook.appendChild(document.createRange().createContextualFragment(html));
                             }
+                        }).catch((error) => {
+                            return;
                         });
                     }
                 }
@@ -1191,11 +1303,23 @@
                 files_section.style.display = "block";
 
                 var base64 = reader.result;
+
+                // if already exists, don't add
+                var file_names = document.getElementsByClassName("file_name");
+
+                for (var i = 0; i < file_names.length; i++) {
+                    var file_name_element = file_names[i];
+                    console.log(file_name_element.innerText, file_name);
+                    if (file_name_element.innerText == file_name) {
+                        return;
+                    }
+                }
+
                 files.innerHTML += `
-                    <li><img src="${base64}" alt="${file_name}" height=100 width=100 data-filename="${file_name}"></li>
+                    <li><img src="${base64}" alt="${file_name}" height=100 width=100 data-filename="${file_name}" style="display: block;">${file_name}</li>
                 `;
                 // if dragged over an Load statement, add iamge to the argument block
-                console.log(event.target.class)
+                
                 if (event.target.classList.contains("argument_block")) {
                     // replace argument block
                     var argument_block = event.target;

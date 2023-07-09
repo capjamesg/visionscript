@@ -236,7 +236,7 @@ class VisionScript:
         import validators
 
         if isinstance(filename, np.ndarray):
-            self.state["last_loaded_image"] = filename
+            self.state["image_stack"].append(filename)
             # save file
             import uuid
 
@@ -286,7 +286,7 @@ class VisionScript:
         return np.array(Image.open(filename).convert("RGB"))[:, :, ::-1]
 
     def size(self, _):
-        return self.state["last_loaded_image"].size
+        return self.state["image_stack"][-1].shape[:2]
 
     def import_(self, args):
         # execute code from a file
@@ -309,10 +309,9 @@ class VisionScript:
 
     def cutout(self, _):
         x1, y1, x2, y2 = self.state["last"].xyxy[0]
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
         cropped_image = image.crop((x1, y1, x2, y2))
         self.state["image_stack"].append(cropped_image)
-        self.state["last_loaded_image"] = cropped_image
 
     def select(self, args):
         # if detect, select from detections
@@ -330,13 +329,13 @@ class VisionScript:
 
     def paste(self, args):
         x, y = args
-        self.state["last_loaded_image"].paste(self.state["image_stack"][-1], (x, y))
+        self.state["image_stack"].append(self.state["image_stack"][-2].paste(self.state["image_stack"][-1], (x, y)))
 
     def resize(self, args):
         width, height = args
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"]
         image = image.resize((width, height))
-        self.state["last_loaded_image"] = image
+        self.state["image_stack"].append(image)
 
     def _create_index(self):
         import faiss
@@ -403,8 +402,8 @@ class VisionScript:
 
         while True:
             x, y = random.randint(
-                0, self.state["last_loaded_image"].size[0]
-            ), random.randint(0, self.state["last_loaded_image"].size[1])
+                0, self.state["image_stack"].size[0]
+            ), random.randint(0, self.state["image_stack"].size[1])
 
             if len(self.state["last"].xyxy) == 0:
                 break
@@ -417,10 +416,12 @@ class VisionScript:
 
             break
 
-        self.state["last_loaded_image"].paste(self.state["image_stack"][-1], (x, y))
+        self.state["image_stack"][-1] = self.state["image_stack"][-2].paste(
+            self.state["image_stack"][-1], (x, y)
+        )
 
     def save(self, filename):
-        self.state["last_loaded_image"].save(filename)
+        self.state["image_stack"].save(filename)
 
     def count(self, args):
         if len(args) == 0:
@@ -431,14 +432,14 @@ class VisionScript:
             )
 
     def greyscale(self, _):
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
         # turn to bgr
         image = image[:, :, ::-1].copy()
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         self.state["image_stack"].append(image)
         # save to test.png
 
-        self.state["last_loaded_image"] = image
+        self.state["image_stack"].append(image)
         self.state["output"] = image
 
     def deploy(self, app_name):
@@ -476,7 +477,7 @@ class VisionScript:
         return result
 
     def rotate(self, args):
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
         # load into cv2
         args = int(args)
         if args == 90:
@@ -488,7 +489,6 @@ class VisionScript:
         else:
             image = image
 
-        self.state["last_loaded_image"] = image
         self.state["output"] = image
         self.state["image_stack"].append(image)
 
@@ -498,7 +498,7 @@ class VisionScript:
 
         from sklearn.cluster import KMeans
 
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
 
         image = np.array(image)
 
@@ -564,7 +564,7 @@ class VisionScript:
             else:
                 model = YOLO(model_name + ".pt")
 
-            inference_results = model(self.state["last_loaded_image"])[0]
+            inference_results = model(self.state["image_stack"][-1])[0]
 
             logging.disable(logging.NOTSET)
 
@@ -752,11 +752,11 @@ class VisionScript:
         self.state["output"] = statement
 
     def blur(self, args):
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
 
         image = cv2.blur(image, (args[0], args[0]))
 
-        self.state["last_loaded_image"] = image
+        self.state["image_stack"].append(image)
 
     def replace(self, color):
         detections = self.state["last"]
@@ -787,7 +787,9 @@ class VisionScript:
                 # cast all to int
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
-                self.state["last_loaded_image"][y1:y2, x1:x2] = color_to_rgb
+                new_image = self.state["image_stack"][-1][y1:y2, x1:x2] = color_to_rgb
+
+                
 
     def label(self, args):
         folder = args[0]
@@ -820,7 +822,7 @@ class VisionScript:
             "Salesforce/blip-image-captioning-base"
         )
 
-        inputs = processor(self.state["last_loaded_image"], return_tensors="pt")
+        inputs = processor(self.state["image_stack"][-1], return_tensors="pt")
 
         out = model.generate(**inputs)
 
@@ -857,11 +859,11 @@ class VisionScript:
         # convert to greyscale first
         self.greyscale(_)
 
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
 
         sobelxy = cv2.Sobel(image, cv2.CV_64F, 1, 1, ksize=5)
 
-        self.state["last_loaded_image"] = sobelxy
+        self.state["image_stack"].append(sobelxy)
         self.state["output"] = sobelxy
 
     def show(self, _):
@@ -958,9 +960,9 @@ class VisionScript:
             self.state.get("last_loaded_image") is not None
             and not self.state.get("history", [])[-1] == "compare"
         ):
-            image = self.state["last_loaded_image"]
+            image = self.state["image_stack"][-1]
         else:
-            image = self.state["last_loaded_image"]
+            image = self.state["image_stack"][-1]
         # elif self.notebook is False:
         #     image = cv2.imread(self.state["last_loaded_image_name"])
 
@@ -1038,7 +1040,7 @@ class VisionScript:
         return as_float
 
     def read_qr(self, _):
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
 
         data, _, _ = cv2.QRCodeDetector().detectAndDecode(image)
 
@@ -1046,7 +1048,7 @@ class VisionScript:
 
     def set_brightness(self, brightness):
         # brightness is between -100 and 100
-        image = self.state["last_loaded_image"]
+        image = self.state["image_stack"][-1]
 
         # use cv2
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -1062,7 +1064,7 @@ class VisionScript:
 
         image = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
 
-        self.state["last_loaded_image"] = image
+        self.state["image_stack"].append(image)
         self.state["output"] = image
 
     def contains(self, statement):
@@ -1278,7 +1280,6 @@ class VisionScript:
 
             if token.value == "load":
                 self.state["image_stack"].append(result)
-                self.state["last_loaded_image"] = result
 
 
 def activate_console(parser):

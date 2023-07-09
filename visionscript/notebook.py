@@ -76,11 +76,21 @@ def notebook():
 
 @app.route("/notebook/upload", methods=["POST"])
 def upload():
+    from werkzeug.utils import secure_filename
+
     session_id = request.args.get("state_id")
     file = request.files["file"]
 
+    file.filename = secure_filename(file.filename)
+
     if session_id and notebooks.get(session_id) is None:
-        return jsonify({"error": "No session found"})
+        return jsonify({"error": "No session found"}), 404
+    
+    # if file is taken
+    if os.path.exists(os.path.join("tmp", file.filename)):
+        # add unique id
+        while os.path.exists(os.path.join("tmp", file.filename)):
+            file.filename = uuid.uuid4().hex[:4] + file.filename
 
     # save as tmp file
     file_name = file.filename
@@ -95,9 +105,9 @@ def upload():
         if not mimetypes.guess_type(file_name)[0].startswith(
             "text"
         ) and not mimetypes.guess_type(file_name)[0].startswith("image"):
-            return jsonify({"error": "File type not allowed"})
+            return jsonify({"error": "File type not allowed"}), 415
     elif not file_name.endswith(".vicnb"):
-        return jsonify({"error": "File type not allowed"})
+        return jsonify({"error": "File type not allowed"}), 415
 
     # remove special chars
     file_name = "".join([c for c in file_name if c.isalnum() or c == "." or c == "_"])
