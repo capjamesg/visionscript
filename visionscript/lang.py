@@ -976,20 +976,30 @@ class VisionScript:
             import matplotlib.pyplot as plt
 
             # show image
-            fig = plt.figure(figsize=(8, 8))
-            # if grey, show in grey
-            if len(image.shape) == 2:
-                plt.imshow(image, cmap="gray")
+            if annotator:
+                fig = plt.figure(figsize=(8, 8))
+                # if grey, show in grey
+                if len(image.shape) == 2:
+                    plt.imshow(image, cmap="gray")
+                else:
+                    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+                fig.savefig(buffer, format="png")
+                buffer.seek(0)
+
+                image = Image.open(buffer)
+
+                img_str = {
+                    "image": base64.b64encode(buffer.getvalue()).decode("utf-8")
+                }
             else:
-                plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-
-            fig.savefig(buffer, format="png")
-            buffer.seek(0)
-
-            image = Image.open(buffer)
-
+                # PIL to base64
+                buffered = io.BytesIO()
+                image.save(buffered, format="PNG")
+                img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                
             self.state["output"] = {
-                "image": base64.b64encode(buffer.getvalue()).decode("utf-8")
+                "image": img_str
             }
 
             return

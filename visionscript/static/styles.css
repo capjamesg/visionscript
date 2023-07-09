@@ -278,3 +278,11 @@ nav ul li:last-child {
 #files {
     min-height: 50vh;
 }
+@media screen and (max-width: 800px) {
+    nav ul {
+        display: none;
+    }
+    aside {
+        display: none;
+    }
+}

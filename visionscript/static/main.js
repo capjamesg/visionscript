@@ -55,6 +55,15 @@ document.addEventListener("keydown", function (event) {
         return;
     }
 
+
+    //  Command + Enter should run
+    console.log(event.key);
+    if (event.key == "Enter" && event.metaKey) {
+        var code = getCodeFromInteractiveEnvironment();
+        executeCode(code);
+        return;
+    }
+
     console.log(event.key);
 
     if (event.key == "Enter") {
