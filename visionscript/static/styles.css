@@ -1,0 +1,280 @@
+* {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+}
+html {
+    background-color: #f7f7f7;
+}
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+.cell {
+    background-color: #eee;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+textarea {
+    width: 100%;
+    border: 1px solid #ccc;
+    resize: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    display: block;
+}
+input[type="submit"] {
+    margin-top: 0.5rem;
+    background-color: darkgreen;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    resize: none;
+    overflow: hidden;
+}
+img {
+    max-width: 100%;
+}
+nav {
+    background-color: darkgreen;
+    color: white;
+    width: 100%;
+    padding: 1rem;
+}
+h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+h3 {
+    font-size: 14px;
+    margin-bottom: 0.5rem;
+}
+section {
+    padding: 1rem;
+    max-width: 50em;
+    margin: 0 auto;
+    flex: 1;
+}
+#current_count {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+main {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+select {
+    margin-bottom: 1rem;
+    display: block;
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+.small_links a {
+    color: grey;
+    font-size: 12px;
+}
+.small_links li {
+    display: inline-block;
+    margin-bottom: 10px;
+}
+h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+#files li {
+    border: 1px solid lightgrey;
+    display: inline-block;
+    padding: 10px;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+pre {
+    margin-top: 0.5rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.time {
+    font-size: 12px;
+    color: grey;
+    margin-bottom: 0.5rem;
+}
+main {
+    min-height: 100vh;
+}
+.cell_run {
+    background-color: #eee;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+}
+.cell_run:focus {
+    outline: none;
+}
+footer {
+    margin-top: 20px;
+}
+#drag_drop_notebook {
+    border: 1px solid lightgrey;
+    min-height: 400px;
+    border-radius: 0.5rem;
+    background-image: url("/static/drag_and_drop.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100%;
+}
+#function_box, #files_section {
+    width: 20em;
+    padding: 1rem;
+    background-color: white;
+    border-radius: 0 0 0 1rem;
+    overflow-y: scroll;
+    max-height: 100vh;
+    border: 1px solid lightgrey;
+    min-height: 100em;
+    line-height: 1.5em;
+}
+#function_box h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+#function_box h3 {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+#function_box p {
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+#function_box .function {
+    margin-bottom: 1rem;
+    cursor: grab;
+    border: 1px solid lightgrey;
+    padding: 5px;
+    border-radius: 7.5px;
+    padding-top: 7.5px;
+}
+#drag_drop_notebook {
+    width: 100%;
+    margin: 0 auto;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+}
+#drag_drop_notebook .cell {
+    padding: 10px;
+    border-radius: 5px;
+    height: 100%;
+    display: table;
+    margin: 10px;
+}
+#drag_drop_notebook .cell p {
+    display: table-cell;
+    vertical-align: middle;
+    text-align: center;
+    font-size: 14px;
+}
+#drag_drop_notebook .cell p:focus {
+    outline: none;
+}
+#code_mode {
+    display: none;
+}
+.argument_block {
+    background: white;
+    padding: 7.5px;
+    border-radius: 5px;
+    margin-left: 10px;
+}
+#error {
+    display: none;
+    background-color: lightcoral;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 10px;
+}
+#run input {
+    font-size: 1.1em;
+    margin-top: 10px;
+}
+#output {
+    margin-top: 10px;
+    border: 1px solid darkgreen;
+    border-radius: 5px;
+    padding: 10px;
+}
+dialog {
+    border-radius: 5px;
+    padding: 10px;
+    background-color: white;
+    margin: auto;
+}
+dialog h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+dialog section {
+    margin: auto;
+    width: 35em;
+}
+dialog button {
+    background-color: darkgreen;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    resize: none;
+    overflow: hidden;
+    margin-top: 10px;
+    width: 100%;
+}
+dialog input {
+    margin-top: 20px;
+    width: 100%;
+    border: 1px solid #ccc;
+    resize: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    display: block;
+    margin-bottom: 10px;
+}
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+nav ul {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+nav ul li {
+    margin-right: 25px;
+    background-color: white;
+    color: darkgreen;
+    border-radius: 5px;
+    padding: 7.5px;
+    cursor: pointer
+}
+nav ul li a {
+    color: darkgreen;
+    text-decoration: none;
+}
+nav ul li:last-child {
+    margin-right: 0;
+}
+#files {
+    min-height: 50vh;
+}
