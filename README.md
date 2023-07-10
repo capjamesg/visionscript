@@ -1,4 +1,4 @@
-![VisionScript banner](banner.png)
+![A VisionScript Notebook counting people in an image](https://raw.githubusercontent.com/capjamesg/visionscript/main/notebook.png)
 
 # VisionScript
 
@@ -10,14 +10,14 @@ VisionScript is built in Python, offering a simple syntax for running object det
 
 First, install VisionScript:
 
-```
+```bash
 pip install visionscript
 ```
 
 You can then run VisionScript using:
 
-```
-vscript --repl
+```bash
+visionscript --repl
 ```
 
 This will open a VisionScript REPL in which you can type commands.
@@ -26,8 +26,8 @@ This will open a VisionScript REPL in which you can type commands.
 
 To run a VisionScript file, use:
 
-```
-vscript ./your_file.vic
+```bash
+visionscript ./your_file.vic
 ```
 
 ### Use VisionScript in a Notebook 📓
@@ -36,8 +36,8 @@ VisionScript offers an interactive web notebook through which you can run Vision
 
 To use the notebook, run:
 
-```
-vscript --notebook
+```bash
+visionscript --notebook
 ```
 
 This will open a notebook in your browser. Notebooks are ephermal. You will need to copy your code to a file to save it.
@@ -55,7 +55,7 @@ Say[]
 ### Find people in all images in a folder using object detection
 
 ```
-IN["./images"]
+In["./images"]
     Detect["person"]
     Say[]
 ```
@@ -86,7 +86,7 @@ Then, make a file ending in `.vic` in which to write your VisionScript code.
 
 When you have written your code, run:
 
-```
+```bash
 python3 lang.py --file ./your_file.vic
 ```
 
@@ -94,7 +94,7 @@ python3 lang.py --file ./your_file.vic
 
 Running in debug mode shows the full Abstract Syntax Tree (AST) of your code.
 
-```
+```bash
 python3 lang.py --file ./your_file.vic --debug
 ```
 
@@ -173,16 +173,6 @@ For now, you can run all test cases using the following command:
 ```bash
 python3 test.py
 ```
-
-### Code Organization
-
-- `visionscript/lang.py`: Core language code.
-- `test/test.py`: Run tests.
-- `visionscript/usage.py`: Variables referenced for usage instructions in `lang.py`.
-- `visionscript/grammar.py`: The VisionScript grammar.
-- `visionscript/notebook.py`: The VisionScript notebook environment code.
-- `visionscript/cloud.py`: The VisionScript cloud environment code.
-- `tests/`: VisionScript tests.
 
 ## Supported Models 📚
 
