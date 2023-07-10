@@ -3,6 +3,8 @@ import json
 import os
 import time
 import uuid
+import requests
+import string
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
@@ -85,7 +87,7 @@ def upload():
 
     if session_id and notebooks.get(session_id) is None:
         return jsonify({"error": "No session found"}), 404
-    
+
     # if file is taken
     if os.path.exists(os.path.join("tmp", file.filename)):
         # add unique id
@@ -167,6 +169,35 @@ def save():
 
     return jsonify({"file": notebook})
 
+@app.route("/notebook/deploy", methods=["POST"])
+def deploy():
+    session_id = request.args.get("state_id")
+    app_name = request.form.get("app_name")
+
+    if session_id and notebooks.get(session_id) is None:
+        return jsonify({"error": "No session found"})
+
+    if file_name is None:
+        return jsonify({"error": "No file name provided"})
+
+    # make a post request
+    notebook = copy.deepcopy(notebooks[session_id])
+
+    app_slug = app_name.translate(
+        str.maketrans("", "", string.punctuation.replace("-", ""))
+    )
+
+    deploy_request = requests.post("https://localhost:5000/deploy", json={
+        "title": app_name,
+        "slug": app_slug,
+        "script": "\n".join(notebook["cells"]),
+        "variables": notebook["session"].state["variables"],
+    })
+
+    if deploy_request.ok:
+        return jsonify({"success": True})
+    
+    return jsonify({"success": False})
 
 @app.route("/static/<path:path>")
 def static_files(path):

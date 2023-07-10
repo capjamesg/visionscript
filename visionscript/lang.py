@@ -137,10 +137,14 @@ def init_state():
         "output": None,
         "input_variables": {},
         "last_classes": [],
+        "confidence": 50,
     }
 
 
 class VisionScript:
+    """
+    A VisionScript program.
+    """
     def __init__(self, notebook=False):
         self.state = init_state()
         self.notebook = notebook
@@ -222,16 +226,25 @@ class VisionScript:
         self.state[key] = value
 
     def make(self, args):
-        print(args, "args")
+        """
+        Declare a function.
+        """
         function_name = args[0].children[0].value.strip()
 
         function_body = lark.Tree("expr", args[1:])
 
         self.state["functions"][function_name] = function_body
 
-        print(f"Function {function_name} created.")
+    def set_confidence(self, args):
+        """
+        Set the confidence level for use in filtering detections.
+        """
+        self.state["confidence"] = args[0]
 
     def load(self, filename):
+        """
+        Load an image or folder of images into state.
+        """
         import requests
         import validators
 
@@ -281,6 +294,13 @@ class VisionScript:
         if self.state.get("ctx") and self.state["ctx"].get("in"):
             filename = self.state["ctx"]["active_file"]
 
+        # make filename safe
+        # from werkzeug.utils import secure_filename
+
+        # filename = filename.split("/")[-1]
+
+        # filename = secure_filename(filename)
+
         self.state["last_loaded_image_name"] = filename
 
         return np.array(Image.open(filename).convert("RGB"))[:, :, ::-1]
@@ -289,7 +309,9 @@ class VisionScript:
         return self.state["image_stack"][-1].shape[:2]
 
     def import_(self, args):
-        # execute code from a file
+        """
+        Import a module from another file.
+        """
         # this will update self.state for the entire script
 
         file_name = "".join(
@@ -308,12 +330,18 @@ class VisionScript:
         self.parse_tree(tree)
 
     def cutout(self, _):
+        """
+        Cut out a detection from an image.
+        """
         x1, y1, x2, y2 = self.state["last"].xyxy[0]
         image = self.state["image_stack"][-1]
         cropped_image = image.crop((x1, y1, x2, y2))
         self.state["image_stack"].append(cropped_image)
 
     def select(self, args):
+        """
+        Select a detection from a sv.Detections object.
+        """
         # if detect, select from detections
         if self.state.get("last_function_type", None) in (
             "detect",
@@ -322,16 +350,26 @@ class VisionScript:
         ):
             detections = self.state["last"]
 
+            detections = detections[detections.confidence > self.state["confidence"]]
+
             if len(args) == 0:
                 self.state["last"] = detections
             else:
                 self.state["last"] = detections[args[0]]
 
     def paste(self, args):
+        """
+        Paste an image onto another image.
+        """
         x, y = args
-        self.state["image_stack"].append(self.state["image_stack"][-2].paste(self.state["image_stack"][-1], (x, y)))
+        self.state["image_stack"].append(
+            self.state["image_stack"][-2].paste(self.state["image_stack"][-1], (x, y))
+        )
 
     def resize(self, args):
+        """
+        Resize an image.
+        """
         width, height = args
         image = self.state["image_stack"]
         image = image.resize((width, height))
@@ -352,7 +390,11 @@ class VisionScript:
         index.add(image)
 
     def search(self, label):
-        print(label)
+        """
+        Search for an image using a text label or image.
+
+        On first run, this will create an index of all images on the loaded image stack.
+        """
         # embed
         import clip
         import torch
@@ -398,12 +440,15 @@ class VisionScript:
         return image_names
 
     def pasterandom(self, _):
+        """
+        Paste the most recent image in a random position on the previously most recent image.
+        """
         x, y = []
 
         while True:
-            x, y = random.randint(
-                0, self.state["image_stack"].size[0]
-            ), random.randint(0, self.state["image_stack"].size[1])
+            x, y = random.randint(0, self.state["image_stack"].size[0]), random.randint(
+                0, self.state["image_stack"].size[1]
+            )
 
             if len(self.state["last"].xyxy) == 0:
                 break
@@ -421,9 +466,15 @@ class VisionScript:
         )
 
     def save(self, filename):
+        """
+        Save an image to a file.
+        """
         self.state["image_stack"].save(filename)
 
     def count(self, args):
+        """
+        Count the number of detections in a sv.Detections object.
+        """
         if len(args) == 0:
             return len(self.state["last"].xyxy)
         else:
@@ -432,6 +483,9 @@ class VisionScript:
             )
 
     def greyscale(self, _):
+        """
+        Turn an image to greyscale.
+        """
         image = self.state["image_stack"][-1]
         # turn to bgr
         image = image[:, :, ::-1].copy()
@@ -443,6 +497,9 @@ class VisionScript:
         self.state["output"] = image
 
     def deploy(self, app_name):
+        """
+        Deploy a script to a VisionScript Cloud web app.
+        """
         # make POST to http://localhost:6999/create
         import string
 
@@ -469,6 +526,9 @@ class VisionScript:
         return "Error deploying."
 
     def get_text(self, _):
+        """
+        Use OCR to get text from an image.
+        """
         import easyocr
 
         reader = easyocr.Reader(["en"])
@@ -477,6 +537,9 @@ class VisionScript:
         return result
 
     def rotate(self, args):
+        """
+        Rotate an image.
+        """
         image = self.state["image_stack"][-1]
         # load into cv2
         args = int(args)
@@ -493,6 +556,9 @@ class VisionScript:
         self.state["image_stack"].append(image)
 
     def getcolours(self, k):
+        """
+        Get the most common colours in an image.
+        """
         if not k:
             k = 1
 
@@ -527,6 +593,9 @@ class VisionScript:
         return human_readable_colours[:k]
 
     def detect(self, classes):
+        """
+        Run object detection on an image.
+        """
         logging.disable(logging.CRITICAL)
 
         if (
@@ -586,6 +655,9 @@ class VisionScript:
         return results
 
     def classify(self, labels):
+        """
+        Classify an image using provided labels.
+        """
         image = self.state["last"]
 
         if self.state.get("model") and self.state["model"].__class__.__name__ == "ViT":
@@ -634,11 +706,19 @@ class VisionScript:
         return label_name
 
     def segment(self, text_prompt):
+        """
+        Apply image segmentation and generate segmentation masks.
+        """
         # check for model
-        from fastsam import FastSAM, FastSAMPrompt
+        from .FastSAM.fastsam import FastSAM, FastSAMPrompt
 
         logging.disable(logging.CRITICAL)
-        model = FastSAM("./weights/FastSAM.pt")
+        # get current path
+        import os
+
+        current_path = os.getcwd()
+
+        model = FastSAM(os.path.join(current_path, "weights", "FastSAM.pt"))
 
         DEVICE = "cpu"
         everything_results = model(
@@ -671,15 +751,26 @@ class VisionScript:
             )
             class_ids.append(0)
 
-        return sv.Detections(
+        detections = sv.Detections(
             mask=np.array([item.mask[0] for item in results]),
             xyxy=np.array([item.xyxy[0] for item in results]),
             class_id=np.array(class_ids),
             confidence=np.array([1]),
         )
 
+        detections = detections[detections.confidence > self.state["confidence"]]
+
+        self.state["detections_stack"].append(detections)
+
+        return detections
+
     def countInRegion(self, x1, y1, x2, y2):
+        """
+        Count the number of detections in a region.
+        """
         detections = self.state["last"]
+
+        detections = detections[detections.confidence > self.state["confidence"]]
 
         xyxy = detections.xyxy
 
@@ -708,8 +799,10 @@ class VisionScript:
         return self.state["last"]
 
     def say(self, statement):
-        # if list, say each item
-        # if last item is an image, execute show
+        """
+        Print a statement to the console, or create a text representation of a statement for use
+        in a notebook.
+        """
         if isinstance(self.state["last"], np.ndarray):
             self.show(None)
             return
@@ -752,6 +845,9 @@ class VisionScript:
         self.state["output"] = statement
 
     def blur(self, args):
+        """
+        Blur an image.
+        """
         image = self.state["image_stack"][-1]
 
         image = cv2.blur(image, (args[0], args[0]))
@@ -759,11 +855,14 @@ class VisionScript:
         self.state["image_stack"].append(image)
 
     def replace(self, color):
+        """
+        Replace a detection or list of detections with an image or color.
+        """
         detections = self.state["last"]
 
-        xyxy = detections.xyxy
+        detections = detections[detections.confidence > self.state["confidence"]]
 
-        print(color)
+        xyxy = detections.xyxy
 
         if color is not None:
             import webcolors
@@ -787,13 +886,15 @@ class VisionScript:
                 # cast all to int
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
-                new_image = self.state["image_stack"][-1][y1:y2, x1:x2] = color_to_rgb
-
-                
+                self.state["image_stack"][-1][y1:y2, x1:x2] = color_to_rgb
 
     def label(self, args):
+        """
+        Label a folder of images using an object detection, classification, or segmentation model.
+
+        Not fully implemented.
+        """
         folder = args[0]
-        model = args[1]
         items = args[2]
 
         if (
@@ -813,6 +914,9 @@ class VisionScript:
         base_model.label(folder)
 
     def caption(self, _):
+        """
+        Generate a caption for an image.
+        """
         from transformers import BlipForConditionalGeneration, BlipProcessor
 
         processor = BlipProcessor.from_pretrained(
@@ -831,6 +935,11 @@ class VisionScript:
         return processor.decode(out[0], skip_special_tokens=True)
 
     def train(self, args):
+        """
+        Train a model on a dataset.
+
+        Not fully implemented.
+        """
         folder = args[0]
         model = args[1]
         # if Detect or Classify run, train
@@ -856,7 +965,9 @@ class VisionScript:
         self.state["model"] = model
 
     def get_edges(self, _):
-        # convert to greyscale first
+        """
+        Convert image to greyscale then perform Sobel edge detection.
+        """
         self.greyscale(_)
 
         image = self.state["image_stack"][-1]
@@ -867,11 +978,15 @@ class VisionScript:
         self.state["output"] = sobelxy
 
     def show(self, _):
-        # get most recent Detect or Segment
+        """
+        Show the image in the notebook or in a new window.
+
+        If a Detect or Segment function was run previously, this function shows the image with the bounding boxes.
+        """
         most_recent_detect_or_segment = None
 
-        if self.state["history"][-1] in ("detect", "segment"):
-            most_recent_detect_or_segment = self.state["history"][i]
+        if self.state["history"][-2] in ("detect", "segment"):
+            most_recent_detect_or_segment = self.state["history"][-2]
 
         if most_recent_detect_or_segment == "detect":
             annotator = sv.BoxAnnotator()
@@ -952,9 +1067,8 @@ class VisionScript:
 
         if annotator:
             image = annotator.annotate(
-                cv2.imread(self.state["last_loaded_image_name"]),
-                self.state["detections_stack"][-1],
-                labels=self.state["last_classes"],
+                np.array(self.state["image_stack"][-1]),
+                detections=self.state["detections_stack"][-1],
             )
         elif (
             self.state.get("last_loaded_image") is not None
@@ -977,6 +1091,7 @@ class VisionScript:
 
             # show image
             if annotator:
+                print("annotator")
                 fig = plt.figure(figsize=(8, 8))
                 # if grey, show in grey
                 if len(image.shape) == 2:
@@ -989,18 +1104,28 @@ class VisionScript:
 
                 image = Image.open(buffer)
 
-                img_str = {
-                    "image": base64.b64encode(buffer.getvalue()).decode("utf-8")
-                }
+                img_str = {"image": base64.b64encode(buffer.getvalue()).decode("utf-8")}
+
+                self.state["output"] = img_str
+
+                return
             else:
+                # if ndarray, convert to PIL
+                if isinstance(image, np.ndarray):
+                    image = Image.fromarray(image)
+                    # do bgr to rgb
+                    image = image.convert("RGB")
+
+                # convert to rgb if needed
+                if image.mode != "RGB":
+                    image = image.convert("RGB")
+
                 # PIL to base64
                 buffered = io.BytesIO()
                 image.save(buffered, format="PNG")
                 img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                
-            self.state["output"] = {
-                "image": img_str
-            }
+
+            self.state["output"] = {"image": img_str}
 
             return
 
@@ -1010,7 +1135,9 @@ class VisionScript:
         self.state["last"] = self.state["last"][x]
 
     def similarity(self, n):
-        # get similarity of last N images
+        """
+        Get similarity of last N images.
+        """
         if not n:
             n = 2
 
@@ -1050,6 +1177,9 @@ class VisionScript:
         return as_float
 
     def read_qr(self, _):
+        """
+        Read QR code from last image.
+        """
         image = self.state["image_stack"][-1]
 
         data, _, _ = cv2.QRCodeDetector().detectAndDecode(image)
@@ -1057,6 +1187,9 @@ class VisionScript:
         return data
 
     def set_brightness(self, brightness):
+        """
+        Set brightness of last image.
+        """
         # brightness is between -100 and 100
         image = self.state["image_stack"][-1]
 
@@ -1078,12 +1211,18 @@ class VisionScript:
         self.state["output"] = image
 
     def contains(self, statement):
+        """
+        Check if a statement is contained in the last statement.
+        """
         if isinstance(self.state["last"], str):
             return statement in self.state["last"]
         else:
             return False
 
     def parse_tree(self, tree):
+        """
+        Abstract Syntax Tree (AST) parser for VisionScript.
+        """
         if not hasattr(tree, "children"):
             if hasattr(tree, "value") and tree.value.isdigit():
                 return int(tree.value)
@@ -1318,7 +1457,7 @@ def activate_console(parser):
 @click.option("--ref", default=False, help="Name of the file")
 @click.option("--debug", default=False, help="To debug")
 @click.option("--file", default=None, help="Name of the file")
-@click.option("--repl", default=None, help="To enter to vscript console")
+@click.option("--repl", default=None, help="To enter to visionscript console")
 @click.option("--notebook/--no-notebook", help="Start a notebook environment")
 @click.option("--cloud/--no-cloud", help="Start a cloud deployment environment")
 def main(validate, ref, debug, file, repl, notebook, cloud) -> None:
@@ -1335,9 +1474,9 @@ def main(validate, ref, debug, file, repl, notebook, cloud) -> None:
 
         from visionscript.notebook import app
 
-        # webbrowser.open("http://localhost:5000/notebook?" + str(uuid.uuid4()))
+        # webbrowser.open("http://localhost:5001/notebook?" + str(uuid.uuid4()))
 
-        app.run(debug=True)
+        app.run(debug=True, host="localhost", port=5001)
 
         return
 
