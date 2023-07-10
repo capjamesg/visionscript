@@ -1,6 +1,6 @@
 
 const FUNCTIONS = {
-    "input": {
+    "Input": {
         "Load": {
             "args": ["file"],
             "description": "Load an image from a file",
@@ -9,7 +9,7 @@ const FUNCTIONS = {
             "argument_default": "\"\""
         },
     },
-    "process": {
+    "Process": {
         "Greyscale": {
             "args": [],
             "description": "Convert an image to greyscale",
@@ -74,7 +74,7 @@ const FUNCTIONS = {
             "supports_arguments": true
         }
     },
-    "find": {
+    "Find": {
         "Classify": {
             "args": ["object"],
             "description": "Classify an image",
@@ -153,7 +153,7 @@ const FUNCTIONS = {
             "supports_arguments": false
         }
     },
-    "output": {
+    "Output": {
         "Say": {
             "args": [],
             "description": "Output the result of the previous function",
@@ -186,7 +186,7 @@ const FUNCTIONS = {
             "supports_arguments": false
         },
     },
-    "logic": {
+    "Logic": {
         "If": {
             "args": ["condition"],
             "description": "If a condition is true, run the next function",
@@ -215,7 +215,7 @@ const FUNCTIONS = {
             "supports_arguments": false
         }
     },
-    "deploy": {
+    "Deploy": {
         "Input": {
             "args": [],
             "description": "Specify a custom field users can input with a deployed model",

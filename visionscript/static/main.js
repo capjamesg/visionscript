@@ -56,15 +56,12 @@ document.addEventListener("keydown", function (event) {
     }
 
 
-    //  Command + Enter should run
-    console.log(event.key);
+    // Command + Enter should run
     if (event.key == "Enter" && event.metaKey) {
         var code = getCodeFromInteractiveEnvironment();
         executeCode(code);
         return;
     }
-
-    console.log(event.key);
 
     if (event.key == "Enter") {
         // set background color
@@ -94,11 +91,11 @@ function importNotebookToInteractiveCode (notebook) {
 }
 
 var colors = {
-    "input": "#a2d2ff",
-    "process": "#cdb4db",
-    "find": "#ccd5ae",
-    "output": "lavender",
-    "logic": "#ffdf6b"
+    "Input": "#a2d2ff",
+    "Process": "#cdb4db",
+    "Find": "#ccd5ae",
+    "Output": "lavender",
+    "Logic": "#ffdf6b"
 };
 
 for (var category in FUNCTIONS) {
@@ -128,6 +125,89 @@ for (var i = 0; i < functions.length; i++) {
     var function_element = functions[i];
     function_element.addEventListener("dragstart", function (event) {
         event.dataTransfer.setData("text/plain", event.target.id);
+    });
+
+    // on mobile tap, add to notebook
+    function_element.addEventListener("touchstart", function (event) {
+        event.preventDefault();
+        // set background color
+        document.getElementById("drag_drop_notebook").style.background = "white";
+        var function_name = event.target.id;
+        var function_element = document.getElementById(function_name);
+        
+        var color = function_element.firstElementChild.style.color;
+
+        var html = "";
+
+        var cell_count = cells.children.length + 1;
+
+        if (mapped_functions[function_name].supports_arguments) {
+            html = `
+                <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: 20px;">
+                    <p>${function_name}[<input type="text" class="argument_block" id="cell_${cell_count}" />]</p>
+                </div>
+            `;
+        } else {
+            html = `
+                <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: 20px;">
+                    <p>${function_name}[]</p>
+                </div>
+            `;
+        }
+
+        notebook.appendChild(document.createRange().createContextualFragment(html));
+
+        // if argument block, allow tap on block to upload file
+        if (mapped_functions[function_name].supports_arguments && mapped_functions[function_name].args.includes("file")) {
+            var argument_block = document.getElementsByClassName("argument_block");
+            var argument_block = argument_block[argument_block.length - 1];
+            argument_block.addEventListener("click", function (event) {
+                event.preventDefault();
+                var file_input = document.createElement("input");
+                file_input.type = "file";
+                file_input.click();
+                file_input.addEventListener("change", function (event) {
+                    var file = event.target.files[0];
+                    var body = new FormData();
+                    body.append("file", file)
+                    body.append("state_id", STATE_ID);
+                    // base64 file
+                    var reader = new FileReader();
+                    // read file
+                    reader.readAsDataURL(file);
+
+                    // only allow jpeg, jpg, png, or .vicnb
+                    if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb")) {
+                        var dialog = document.getElementById("dialog");
+                        var error_message = document.getElementById("error_message");
+                        error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
+                        dialog.showModal();
+                        return;
+                    }
+
+                    // post to /notebook/upload with state id
+                    fetch(`http://localhost:5001/notebook/upload?state_id=${STATE_ID}`, {
+                        method: 'POST',
+                        body: body
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        var cell = document.getElementById("cell_" + argument_block.id.split("_")[1]);
+                        cell.value = data.file_name;
+                        cell.dataset.filename = data.file_name;
+                        var img = document.createElement("img");
+                        img.src = reader.result;
+                        img.style.width = "100px";
+                        img.style.height = "100px";
+                        argument_block.innerHTML = "";
+                        img.dataset.filename = data.file_name;
+                        img.classList.add("argument_block");
+                        // replace cell with image
+                        cell.replaceWith(img);
+                    });
+                });
+            });
+        }
     });
 }
 
@@ -161,7 +241,6 @@ notebook.addEventListener("drop", function (event) {
 
     // if is cell, don't do anything
     if (function_element.classList.contains("cell")) {
-        console.log("is cell");
         // move cell in list
         var cell = function_element;
         var cell_index = Array.prototype.indexOf.call(cells.children, cell);
@@ -214,8 +293,6 @@ notebook.addEventListener("drop", function (event) {
         if (cells.children[cells.children.length - 1].id.includes("If") || cells.children[cells.children.length - 1].id.includes("In")) {
             var last_cell = cells.children[cells.children.length - 1];
             var last_cell_rect = last_cell.getBoundingClientRect();
-            var notebook_rect = notebook.getBoundingClientRect();
-            console.log(event.clientY);
             if (event.clientY > last_cell_rect.top && event.clientY < last_cell_rect.bottom) {
                 margin = 40;
                 nested = true;
@@ -224,7 +301,6 @@ notebook.addEventListener("drop", function (event) {
     }
 
     // if target cell is an If statement, don't add input
-    console.log(event.target.id);
     if (event.target.id.includes("If")) {
         var function_name = event.dataTransfer.getData("text/plain");
         var function_element = document.getElementById(function_name);
@@ -253,8 +329,6 @@ notebook.addEventListener("drop", function (event) {
     var html = "";
 
     var cell_count = cells.children.length + 1;
-
-    console.log(function_name)
 
     if (mapped_functions[function_name].supports_arguments) {
         // if it is an if statement, don't add input
@@ -314,7 +388,6 @@ notebook.addEventListener("drop", function (event) {
                 // replace argument_block
                 var argument_block = document.getElementById("cell_" + argument_block.id.split("_")[1]);
                 var input_field = event.target;
-                console.log(input_field);
                 // replace with p
                 var p = document.createElement("p");
                 p.innerText = "Input[]";
@@ -345,7 +418,6 @@ function getCodeFromInteractiveEnvironment () {
     var code = "";
     var functions = document.getElementsByClassName("cell");
 
-    var in_nested_context = false;
     for (var i = 0; i < functions.length; i++) {
         var function_element = functions[i];
         var function_name = function_element.id.split("_")[0];
@@ -356,8 +428,6 @@ function getCodeFromInteractiveEnvironment () {
         }
 
         var argument_block = function_element.getElementsByClassName("argument_block");
-
-        console.log(argument_block, "iiiii");
 
         if (argument_block.length > 0) {
             var argument_block = argument_block[0];
@@ -375,7 +445,6 @@ function getCodeFromInteractiveEnvironment () {
             } else if (argument_block.children.length > 0) {
                 var first_arg = argument_block.innerText;
                 // remove last two cars
-                console.log(first_arg, argument);
                 first_arg = first_arg.substring(0, first_arg.length - 2);
                 argument = first_arg + "[\"" + argument_block.children[0].value + "\"]";
             } else {
@@ -412,7 +481,7 @@ function getCodeFromInteractiveEnvironment () {
     }
 
     // if code doesn't end with Say[], add it
-    if (!code.endsWith("Say[]\n")) {
+    if (!code.endsWith("Say[]\n") && !code.endsWith("Show[]\n")) {
         code += "Say[]\n";
     }
 
@@ -436,7 +505,7 @@ function deploy () {
         event.preventDefault();
         var data = new FormData(deploy_form);
         var name = data.get("name");
-        fetch('http://localhost:5000/deploy', {
+        fetch('http://localhost:5001/deploy', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -491,19 +560,18 @@ function executeCode (code) {
     error_cell.innerText = "";
     error_cell.style.display = "none";
 
-    fetch('http://localhost:5000/notebook', {
+    fetch('http://localhost:5001/notebook', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({code:
             code,
-            state_id: "{{ state_id }}"
+            state_id: STATE_ID
         })
     })
     .then(response => response.json())
     .then(data => {
-        console.log('Success:', data);
         if (data.output == null) {
             data.output = "";
         }
@@ -533,7 +601,6 @@ function executeCode (code) {
             </li>
         `;
         
-        console.log(cells.children.length);
         document.getElementById("current_count").innerHTML = `#${cells.children.length + 1}`;
 
         // click to copy to clipboard
@@ -626,17 +693,15 @@ dropzone.addEventListener("drop", function (event) {
     var file = event.dataTransfer.files[0];
     var body = new FormData();
     body.append("file", file)
-    body.append("state_id", "{{ state_id }}");
+    body.append("state_id", STATE_ID);
     // base64 file
     var reader = new FileReader();
     // read file
     reader.readAsDataURL(file);
 
     // only allow jpeg, jpg, png, or .vicnb
-    console.log(file.name);
     if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb")) {
         var dialog = document.getElementById("dialog");
-        console.log(dialog, "e");
         var error_message = document.getElementById("error_message");
         error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
         dialog.showModal();
@@ -644,13 +709,12 @@ dropzone.addEventListener("drop", function (event) {
     }
 
     // post to /notebook/upload with state id
-    fetch('http://localhost:5000/notebook/upload?state_id={{ state_id }}', {
+    fetch(`http://localhost:5001/notebook/upload?state_id=${STATE_ID}`, {
         method: 'POST',
         body: body
     })
     .then(response => response.json())
     .then(data => {
-        console.log(data);
         if (data.cells) {
             if (mode == "code") {
                 data.cells.forEach(function (cell) {
@@ -687,7 +751,6 @@ dropzone.addEventListener("drop", function (event) {
                         if (argument) {
                             argument = argument.split("]")[0];
                         }
-                        console.log(function_name);
                         var color = mapped_functions[function_name].element.firstElementChild.style.color;
                         var html = "";
                         if (mapped_functions[function_name].supports_arguments) {
@@ -723,7 +786,6 @@ dropzone.addEventListener("drop", function (event) {
 
         for (var i = 0; i < file_names.length; i++) {
             var file_name_element = file_names[i];
-            console.log(file_name_element.innerText, file_name);
             if (file_name_element.innerText == file_name) {
                 return;
             }
@@ -774,22 +836,11 @@ function resetNotebook() {
     dialog.showModal();
 }
 
-var export_vicnb = document.getElementById("export_vicnb");
-
-export_vicnb.addEventListener("click", function (event) {
-    event.preventDefault();
-    fetch('http://localhost:5000/notebook/save?state_id={{ state_id }}', {
-        method: 'POST'
-    })
-    .then(response => response.json())
-    .then(data => {
-        var blob = new Blob([JSON.stringify(data.file)], {type: "text/plain;charset=utf-8"});
-        var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "notebook.vicnb";
-        a.click();
-    })
-    .catch(err => {
-        console.log(err);
-    });
-});
+function toggle_menu () {
+    var menu = document.getElementById("nav_menu");
+    if (menu.style.display != "none") {
+        menu.style.display = "flex";
+    } else {
+        menu.style.display = "none";
+    }
+}

@@ -8,19 +8,29 @@
         <link rel="stylesheet" href="/static/styles.css" />
 
         <link rel="manifest" href="/static/manifest.json" />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+        <script>
+            const STATE_ID = "{{ state_id }}";
+        </script>
     </head>
     <body>
         <nav>
             <p>
-                VisionScript Notebook
+                VisionScript <span class="hide_on_mobile">Notebook</span>
             </p>
             <ul>
-                <li onclick="switch_mode()"><a id="mode_switch">Use Code Mode 📝</a></li>
-                <li><a href="https://visionscript.dev/docs" target="_blank">Docs 📚</a></li>
-                <li><a id="export_vic">Export 💾</a></li>
-                <li onclick="deploy()"><a>Use as Web App ☁️</a></li>
-                <li id="reset"><a>Reset 🔄</a></li>
+                <div id="nav_menu">
+                    <li onclick="switch_mode()"><a id="mode_switch">Use Code Mode 📝</a></li>
+                    <li><a href="https://visionscript.dev/docs" target="_blank">Docs 📚</a></li>
+                    <li><a id="export_vic">Export 💾</a></li>
+                    <li onclick="deploy()"><a>Use as Web App ☁️</a></li>
+                    <li id="reset"><a>Reset 🔄</a></li>
+                    <li id="toggle_menu" onclick="toggle_menu()"><a>Close</a></li>
+                </div>
                 <li id="run"><a>Run All 🟢</a></li>
+                <li id="menu" onclick="toggle_menu()"><a>Menu</a></li>
             </ul>
         </nav>
         <main>
@@ -30,7 +40,7 @@
             </aside>
             <section id="interactive_mode">
                 <h2>Make something cool</h2>
-                <p>Drag and drop functions to the box below to build your program.</p>
+                <p class="hide_on_mobile">Drag and drop functions in the box below to build your program.</p>
                 <div id="drag_drop_notebook"></div>
                 <p class="error" id="error"></p>
                 <div id="output">Output</div>
@@ -43,9 +53,9 @@
                 <form class="cell" id="new">
                     <p id="current_count">#1</p>
                     <textarea name="jscode" id="jscode" rows="3">
-        Load["./folder/abbey.jpg"]
-        Detect["person"]
-        Say[]</textarea>
+Load["./folder/abbey.jpg"]
+Detect["person"]
+Say[]</textarea>
                     <input type="submit" value="Submit">
                 </form>
             </section>

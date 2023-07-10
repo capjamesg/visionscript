@@ -58,6 +58,7 @@ section {
     max-width: 50em;
     margin: 0 auto;
     flex: 1;
+    min-height: 1000px;
 }
 #current_count {
     font-size: 1rem;
@@ -228,7 +229,7 @@ dialog section {
     margin: auto;
     width: 35em;
 }
-dialog button {
+dialog button, input[type="submit"] {
     background-color: darkgreen;
     color: white;
     border: none;
@@ -278,11 +279,76 @@ nav ul li:last-child {
 #files {
     min-height: 50vh;
 }
+#toggle_menu {
+    display: none;
+}
+.hide_on_mobile {
+    display: block;
+}
+#nav_menu {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 @media screen and (max-width: 800px) {
-    nav ul {
+    #nav_menu {
         display: none;
     }
-    aside {
+    #files_section {
         display: none;
+    }
+    #function_box {
+        display: block;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 300px;
+        min-height: 300px;
+    }
+    #function_box h2 {
+        display: none;
+    }
+    #nav_menu {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background-color: darkgreen;
+        z-index: 100;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        padding: 50px;
+    }
+    #nav_menu ul {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    #nav_menu li {
+        margin-top: 0;
+        margin-bottom: 25px; 
+        padding: 20px;
+        width: 100%;
+    }
+    #nav_menu {
+        margin-right: 0 !important;
+    }
+    nav ul li:last-child {
+        margin-left: initial !important;
+    }
+    #toggle_menu {
+        display: block;
+        background-color: lightskyblue;
+    }
+    .hide_on_mobile {
+        display: none;
+    }
+    #drag_drop_notebook {
+        min-height: 300px;
     }
 }
