@@ -1,6 +1,8 @@
 import setuptools
 from setuptools import find_packages
 import re
+import os
+import subprocess
 
 with open("./visionscript/__init__.py", 'r') as f:
     content = f.read()
@@ -12,6 +14,20 @@ with open("README.md", "r") as fh:
 
 with open("./requirements.txt", "r") as f:
     reqs = f.read().splitlines()
+
+def install_fast_sam_for_segmentation() -> None:
+    commands = [
+        "pip install -r requirements.txt",
+        "curl" # install weights
+    ]
+
+    HOME = os.getcwd()
+
+    subprocess.run(f"cd {HOME} && git clone https://github.com/CASIA-IVA-Lab/FastSAM")
+
+    for command in commands:
+        subprocess.run(f"cd {HOME} && {command}", shell=True)
+
     
 setuptools.setup(
     name="visionscript",
@@ -39,3 +55,5 @@ setuptools.setup(
     ],
     python_requires=">=3.7",
 )
+
+# install_fast_sam_for_segmentation()
