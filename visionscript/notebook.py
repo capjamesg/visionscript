@@ -15,7 +15,6 @@ app = Flask(__name__)
 
 notebooks = {}
 
-
 def init_notebook():
     # cells have a session that contains state and an output
     return {"session": None, "cells": [], "output": []}
@@ -64,8 +63,6 @@ def notebook():
 
         end_time = time.time()
 
-        print(session.state)
-
         run_time = round(end_time - start_time, 1)
 
         notebooks[session_id]["cells"].append(user_input)
@@ -80,7 +77,7 @@ def notebook():
 
     notebooks[state_id] = init_notebook()
 
-    return render_template("notebook.html", state_id=state_id)
+    return render_template("notebook.html", state_id=state_id, api_url=request.url_root)
 
 
 @app.route("/notebook/upload", methods=["POST"])

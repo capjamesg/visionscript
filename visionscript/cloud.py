@@ -10,7 +10,7 @@ from visionscript import lang, parser
 
 app = Flask(__name__)
 
-API_KEY = "test" #uuid.uuid4().hex
+API_KEY = uuid.uuid4().hex
 
 with open("scripts.json", "r") as f:
     scripts = json.load(f)
@@ -18,6 +18,8 @@ with open("scripts.json", "r") as f:
 for script in scripts:
     scripts[script]["session"] = lang.VisionScript()
 
+print("Your API key is", API_KEY)
+print("Keep it safe and don't share it with anyone!")
 
 @app.route("/")
 def index_page():

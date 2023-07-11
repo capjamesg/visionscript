@@ -186,7 +186,7 @@ for (var i = 0; i < functions.length; i++) {
                     }
 
                     // post to /notebook/upload with state id
-                    fetch(`http://localhost:5001/notebook/upload?state_id=${STATE_ID}`, {
+                    fetch(`${API_URL}/notebook/upload?state_id=${STATE_ID}`, {
                         method: 'POST',
                         body: body
                     })
@@ -512,7 +512,7 @@ function deploy () {
     var deploy_form = document.getElementById("deploy_form");
     deploy_form.addEventListener("submit", function (event) {
         event.preventDefault();
-        fetch('http://localhost:5001/notebook/deploy', {
+        fetch(`${API_URL}/notebook/deploy`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -567,7 +567,7 @@ function executeCode (code) {
     error_cell.innerText = "";
     error_cell.style.display = "none";
 
-    fetch('http://localhost:5001/notebook', {
+    fetch(`${API_URL}/notebook`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -716,7 +716,7 @@ dropzone.addEventListener("drop", function (event) {
     }
 
     // post to /notebook/upload with state id
-    fetch(`http://localhost:5001/notebook/upload?state_id=${STATE_ID}`, {
+    fetch(`${API_URL}/notebook/upload?state_id=${STATE_ID}`, {
         method: 'POST',
         body: body
     })
