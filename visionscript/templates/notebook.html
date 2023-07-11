@@ -73,23 +73,25 @@ Say[]</textarea>
                 </select>
             </aside>
             <dialog id="dialog">
-                <section>
+                <div>
                     <h2>Message</h2>
                     <p id="error_message"></p>
                     <button onclick="this.parentNode.parentNode.close()">Close</button>
-                </section>
+                </div>
             </dialog>
             <dialog id="deploy">
-                <section>
+                <div>
                     <h2>Deploy your app</h2>
                     <p>You can run your code as a local web app that people can use.</p>
                     <p>Choose a name for your app and click "Deploy".</p>
                     <form id="deploy_form">
                         <input type="text" name="name" id="name" placeholder="Name" />
+                        <input type="text" name="api_url" id="api_url" placeholder="https://example.com" value="http://localhost:6999/create" />
+                        <input type="text" name="api_key" id="api_key" placeholder="API key" />
                         <input type="submit" value="Deploy" />
                     </form>
                     <p id="deploy_message"></p>
-                </section>
+                </div>
             </dialog>
         </main>
         <script src="/static/functions.js"></script>

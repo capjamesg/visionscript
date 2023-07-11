@@ -219,7 +219,6 @@ class VisionScript:
         self.state["active_region"] = (x0, y0, x1, y1)
 
     def input_(self, key):
-        print(key)
         if self.state["input_variables"].get(literal_eval(key)) is not None:
             return self.state["input_variables"][literal_eval(key)]
         else:

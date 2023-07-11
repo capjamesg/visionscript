@@ -10,6 +10,7 @@
             box-sizing: border-box;
             padding: 0;
             margin: 0;
+            line-height: 1.5em;
         }
         html {
             background-color: #f7f7f7;
@@ -145,6 +146,27 @@
             padding: 10px;
             border-radius: 10px;
         }
+        .cta {
+            border: 3px solid darkgreen;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 10px;
+            display: block;
+            margin-top: 20px;
+        }
+        .cta a {
+            background-color: darkgreen;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            resize: none;
+            overflow: hidden;
+            text-decoration: none;
+            display: block;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -166,6 +188,11 @@
             {% endfor %}
             <input type="submit" value="Submit" />
         </form>
+        <section class="cta">
+            <h2>Build your own VisionScript apps</h2>
+            <p>Using VisionScript you can build computer vision apps with a drag-and-drop interface, or a concise programming language.</p>
+            <a href="https://visionscript.org" target="_blank">Get started ➡️</a>
+        </section>
     </main>
 </body>
 </html>

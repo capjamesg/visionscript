@@ -108,23 +108,29 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
-        .time {
-            font-size: 12px;
-            color: grey;
-            margin-bottom: 0.5rem;
-        }
         main {
             min-height: 100vh;
         }
-        .cell_run {
-            background-color: #eee;
-            padding: 1rem;
+        .cta {
+            border: 3px solid darkgreen;
             border-radius: 0.5rem;
             margin-bottom: 1rem;
-            cursor: pointer;
+            padding: 10px;
+            display: block;
+            margin-top: 20px;
         }
-        .cell_run:focus {
-            outline: none;
+        .cta a {
+            background-color: darkgreen;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            resize: none;
+            overflow: hidden;
+            text-decoration: none;
+            display: block;
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -136,7 +142,12 @@
     </nav>
     <main>
         <h1>VisionScript Deploy</h1>
-        <p>Run VisionScript applications via a web application and API.</p>
+        <p>Run VisionScript code via a web application and API.</p>
+        <section class="cta">
+            <h2>Build your own VisionScript apps</h2>
+            <p>Using VisionScript you can build computer vision apps with a drag-and-drop interface, or a concise programming language.</p>
+            <a href="https://visionscript.org" target="_blank">Get started ➡️</a>
+        </section>
     </main>
 </body>
 </html>

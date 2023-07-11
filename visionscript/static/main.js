@@ -239,6 +239,10 @@ notebook.addEventListener("drop", function (event) {
     var function_name = event.dataTransfer.getData("text/plain");
     var function_element = document.getElementById(function_name);
 
+    // skip Input[]
+    if (function_name == "Input") {
+        return;
+    }
     // if is cell, don't do anything
     if (function_element.classList.contains("cell")) {
         // move cell in list
@@ -379,8 +383,6 @@ notebook.addEventListener("drop", function (event) {
         argument_block.addEventListener("drop", function (event) {
             // replace <input> with Input[]
             var function_name = event.dataTransfer.getData("text/plain");
-            var function_element = document.getElementById(function_name);
-            var code = function_name + "[]";
             // if it is a cell, don't do anything
             // replace event.target with Input[]
             if (function_name == "Input") {
@@ -390,10 +392,10 @@ notebook.addEventListener("drop", function (event) {
                 var input_field = event.target;
                 // replace with p
                 var p = document.createElement("p");
-                p.innerText = "Input[]";
+                p.innerText = "Input[";
                 p.style.display = "inline-block";
-                p.style.margin = "0";
-                p.style.padding = "0";
+                p.style.margin = "10px";
+                p.style.padding = "5px;";
                 p.style.backgroundColor = "white";
                 p.classList.add("argument_block");
 
@@ -402,13 +404,20 @@ notebook.addEventListener("drop", function (event) {
                 input.type = "text";
                 input.classList.add("argument_block");
                 input.id = "cell_" + argument_block.id.split("_")[1];
-                input.style.display = "inline-block";
-                input.style.margin = "0";
-                input.style.padding = "0";
                 input.style.backgroundColor = "white";
+                input.style.margin = "10px";
+                // add "]" after input
+                var p2 = document.createElement("p");
+                p2.innerText = "]";
+                p2.style.display = "inline-block";
+                p2.style.margin = "0";
+                p2.style.padding = "0";
+                p2.style.backgroundColor = "white";
                 p.appendChild(input);
+                p.appendChild(p2);
                 // replace
                 argument_block.replaceWith(p);
+                argument_block.style.margin = "10px";
             }
         });
     }
@@ -508,7 +517,7 @@ function deploy () {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({state_id: STATE_ID, name: document.getElementById("name").value})
+            body: JSON.stringify({state_id: STATE_ID, name: document.getElementById("name").value, api_url: document.getElementById("api_url").value, api_key: document.getElementById("api_key").value})
         })
         .then(response => response.json())
         .then(data => {

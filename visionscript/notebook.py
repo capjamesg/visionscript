@@ -180,6 +180,8 @@ def save():
 def deploy():
     session_id = request.json.get("state_id")
     name = request.json.get("name")
+    api_url = request.json.get("api_url")
+    api_key = request.json.get("api_key")
 
     if session_id and notebooks.get(session_id) is None:
         return jsonify({"error": "No session found"}), 404
@@ -194,10 +196,10 @@ def deploy():
         str.maketrans("", "", string.punctuation.replace("-", ""))
     )
 
-    deploy_request = requests.post("http://localhost:6999/create", json={
+    deploy_request = requests.post(api_url, json={
         "title": name,
         "slug": app_slug,
-        "api_key": "test",
+        "api_key": api_key,
         "script": "\n".join(notebook["cells"]),
         "variables": notebook["session"].state["input_variables"],
     })
