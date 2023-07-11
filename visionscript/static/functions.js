@@ -48,7 +48,7 @@ const FUNCTIONS = {
             "supports_arguments": true
         },
         "Replace": {
-            "args": ["color"],
+            "args": ["file"],
             "description": "Replace part of an image",
             "example": "Replace[\"red\"]",
             "supports_arguments": true,
@@ -75,6 +75,13 @@ const FUNCTIONS = {
         }
     },
     "Find": {
+        "SetRegion": {
+            "args": ["x", "y", "width", "height"],
+            "description": "Set the region to search for objects in (use before Detect[] or Segment[])",
+            "example": "SetRegion[0, 0, 100, 100]",
+            "supports_arguments": true,
+            "argument_default": "0, 0, 0, 0"
+        },
         "Classify": {
             "args": ["object"],
             "description": "Classify an image",

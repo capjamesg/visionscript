@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL | EOF | " ")*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence)
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -15,15 +15,16 @@ search: "Search" "[" STRING "]"
 deploy: "Deploy" "[" STRING "]"
 getedges: "GetEdges"  ("[" "]")?
 describe: "Describe" ("[" "]")?
+setregion: "SetRegion" "[" INT "," INT "," INT "," INT "]" | "SetRegion" ("[" "]")?
 readqr: "ReadQR" ("[" "]")?
-setconfidence: "SetConfidence" "[" INT "]"
+setconfidence: "SetConfidence" "[" FLOAT "]"
 rotate: "Rotate" "[" (INT | STRING) "]"
 resize: "Resize" "[" INT "," INT "]"
 getcolors: "GetColors" ("[" "]")? | "GetColors" "[" INT "]"
 getcolours: "GetColours" ("[" "]")? | "GetColours" "[" INT "]"
 isita: "Is it a " (("," STRING)* | ("or" STRING)*)? EOL
 find: "Find" "[" STRING "]"
-args: ((STRING | INT | expr) ("," (STRING | INT | expr))*) | (STRING | INT | expr)?
+args: ((STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))*) | (STRING | INT | FLOAT | expr)?
 make: "Make" literal ("[" args "]")? EOL (INDENT expr+)* EOL
 caption: "Caption" ("[" "]")?
 size: "Size" ("[" "]")?
@@ -42,7 +43,7 @@ setbrightness: "SetBrightness" "[" INT "]"
 read: "Read" ("[" "]")?
 exit: "Exit" ("[" "]")?
 blur: "Blur" ("[" "]")?
-similarity: "Similarity" ("[" INT "]")?
+similarity: "Similarity" ("[" (INT | FLOAT) "]")?
 get: "Get" "[" INT "]" EOL
 list: "[" ((STRING | INT | expr) "," | (STRING | INT | expr) )* "]" EOL
 help: "Help" "[" STRING "]"
@@ -56,16 +57,17 @@ if: "If" "[" (expr+)* "]" EOL (INDENT expr+)* (EOL | EOF) (else EOL (INDENT expr
 reset: "Reset" ("[" "]")?
 negate: "Not" "[" expr "]"
 OPERAND: "+" | "-" | "*" | "/"
-equality: (INT | STRING | expr) "==" (INT | STRING | expr)
+equality: (INT | STRING | expr | FLOAT) "==" (INT | STRING | expr | FLOAT)
 not_equality: (INT | STRING | expr) "!=" (INT | STRING | expr)
 train: "Train" "[" STRING "," STRING "]" | "Train" "[" STRING "]"
 label: "Label" "[" STRING "," STRING ("," STRING )*  "]"
-literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | expr) ("," (STRING | INT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"
+literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"
 variable: /[a-zA-Z_][a-zA-Z0-9_]*/
 comment: "#"
 EOL: "\\n"
 EOF: "\\Z"
 INT: /-?\d+/
+FLOAT: /-?\d+\.\d+/
 INDENT: "    " | "\\t"
 BOOL: "True" | "False"
 %import common.ESCAPED_STRING -> STRING

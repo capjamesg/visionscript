@@ -1,6 +1,7 @@
 import json
 import uuid
 from io import BytesIO
+import string
 
 import numpy as np
 from flask import Flask, jsonify, redirect, render_template, request, send_file
@@ -9,7 +10,7 @@ from visionscript import lang, parser
 
 app = Flask(__name__)
 
-API_KEY = "test"  # uuid.uuid4().hex
+API_KEY = "test" #uuid.uuid4().hex
 
 with open("scripts.json", "r") as f:
     scripts = json.load(f)
@@ -60,7 +61,8 @@ def home(id):
         try:
             session = scripts[id]["session"]
 
-            session.state = {**session.state, **results}
+            session.state["input_variables"] = {**session.state["input_variables"], **results}
+
             session.notebook = True
 
             session.parse_tree(parser.parse(scripts[id]["script"]))
@@ -99,35 +101,25 @@ def create():
     if data.get("api_key") != API_KEY:
         return jsonify({"error": "Invalid API key"}), 401
 
-    id = data["slug"]
+    id = data["slug"].lower()
 
-    scripts[data["slug"]] = {
+    scripts = json.load(open("scripts.json", "r"))
+
+    scripts[id] = {
         "title": data["title"],
         "script": data["script"],
         "variables": data["variables"],
     }
 
-    # make POST to http://localhost:6999/create
-    import string
-
-    import requests
-
     app_slug = data["title"].translate(
         str.maketrans("", "", string.punctuation.replace("-", ""))
     )
 
-    response = requests.post(
-        "http://localhost:6999/create",
-        json={
-            "api_key": "test",
-            "title": data["title"],
-            "slug": app_slug,
-            "script": data["script"],
-            "variables": data["variables"],
-        },
-    )
+    scripts[id]["app_slug"] = app_slug
 
-    if response.status_code != 200:
-        return jsonify({"error": "Error creating app"}), 500
+    with open("scripts.json", "w") as f:
+        json.dump(scripts, f)
+
+    scripts = json.load(open("scripts.json", "r"))
 
     return jsonify({"id": id})

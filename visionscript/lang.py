@@ -43,6 +43,8 @@ SUPPORTED_TRAIN_MODELS = {
     "detect": {"yolov8": "autodistill_yolov8"},
 }
 
+class InputNotProvided():
+    pass
 
 def handle_unexpected_characters(e, code):
     # raise error if class doesn't exist
@@ -138,6 +140,7 @@ def init_state():
         "input_variables": {},
         "last_classes": [],
         "confidence": 50,
+        "active_region": None
     }
 
 
@@ -203,15 +206,26 @@ class VisionScript:
             "input": lambda x: self.input_(x),
             "deploy": lambda x: self.deploy(x),
             "getedges": lambda x: self.get_edges(x),
+            "setregion": lambda x: self.set_region(x),
+            "setconfidence": lambda x: self.set_confidence(x),
         }
 
+    def set_region(self, args):
+        if len(args) == 0:
+            self.state["active_region"] = None
+
+        x0, y0, x1, y1 = args
+
+        self.state["active_region"] = (x0, y0, x1, y1)
+
     def input_(self, key):
-        self.state["input_variables"][key] = "image"
-        if self.state.get(literal_eval(key)) is not None:
-            return self.state[literal_eval(key)]
+        print(key)
+        if self.state["input_variables"].get(literal_eval(key)) is not None:
+            return self.state["input_variables"][literal_eval(key)]
         else:
-            print(f"Input {key} does not exist.")
-            exit()
+            return InputNotProvided()
+            # print(f"Input {key} does not exist.")
+            # exit()
 
     def equality(self, args):
         return args[0] == args[1]
@@ -235,11 +249,11 @@ class VisionScript:
 
         self.state["functions"][function_name] = function_body
 
-    def set_confidence(self, args):
+    def set_confidence(self, confidence):
         """
         Set the confidence level for use in filtering detections.
         """
-        self.state["confidence"] = args[0]
+        self.state["confidence"] = confidence
 
     def load(self, filename):
         """
@@ -350,7 +364,7 @@ class VisionScript:
         ):
             detections = self.state["last"]
 
-            detections = detections[detections.confidence > self.state["confidence"]]
+            detections = detections[detections.confidence > self.state["confidence"] / 100]
 
             if len(args) == 0:
                 self.state["last"] = detections
@@ -371,8 +385,8 @@ class VisionScript:
         Resize an image.
         """
         width, height = args
-        image = self.state["image_stack"]
-        image = image.resize((width, height))
+        image = self.state["image_stack"][-1]
+        image = cv2.resize(image, (width, height))
         self.state["image_stack"].append(image)
 
     def _create_index(self):
@@ -642,6 +656,20 @@ class VisionScript:
 
         inference_classes = inference_results.names
 
+        if self.state["active_region"]:
+            x0, y0, x1, y1 = self.state["active_region"]
+
+            zone = sv.PolygonZone(
+                np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]),
+                frame_resolution_wh=(self.state["last"].shape[1], self.state["last"].shape[0]),
+            )
+
+            results_filtered_by_active_region = zone.trigger(detections=results)
+
+            results = results[results_filtered_by_active_region]
+
+        results = results[results.confidence > self.state["confidence"] / 100]
+
         if len(classes) == 0:
             classes = inference_classes
 
@@ -814,12 +842,14 @@ class VisionScript:
                 # if list or tuple, join
                 if isinstance(item, (list, tuple)):
                     item = ", ".join([str(i) for i in item])
+                elif isinstance(item, int) or isinstance(item, float):
+                    item = str(item)
 
                 self.state["output"] += item + "\n"
 
             return
 
-        if isinstance(statement, int):
+        if isinstance(statement, int) or isinstance(statement, float):
             statement = str(statement)
 
         if statement and isinstance(statement, str):
@@ -854,17 +884,42 @@ class VisionScript:
 
         self.state["image_stack"].append(image)
 
-    def replace(self, color):
+    def replace(self, args):
         """
         Replace a detection or list of detections with an image or color.
         """
         detections = self.state["last"]
 
-        detections = detections[detections.confidence > self.state["confidence"]]
-
         xyxy = detections.xyxy
 
-        if color is not None:
+        print(xyxy)
+
+        if os.path.exists(args):
+            print("Replacing with image.")
+            picture = cv2.imread(args)
+
+            # bgr to rgb
+            picture = picture[:, :, ::-1].copy()
+            
+            image_at_top_of_stack = self.state["image_stack"][-1].copy()
+
+            for i in range(len(xyxy)):
+                x1, y1, x2, y2 = xyxy[i]
+
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                
+                #resize picture to fit
+                picture = cv2.resize(picture, (x2 - x1, y2 - y1))
+
+                image_at_top_of_stack[y1:y2, x1:x2] = picture
+
+            self.state["image_stack"].append(image_at_top_of_stack)
+
+            return
+        
+        color = args
+
+        if args is not None:
             import webcolors
 
             try:
@@ -874,8 +929,6 @@ class VisionScript:
                 return
 
             color_to_rgb = np.array(color_to_rgb)
-
-            print(color_to_rgb, xyxy)
 
             # convert to bgr
             color_to_rgb = color_to_rgb[::-1]
@@ -1097,7 +1150,7 @@ class VisionScript:
                 if len(image.shape) == 2:
                     plt.imshow(image, cmap="gray")
                 else:
-                    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                    plt.imshow(image)
 
                 fig.savefig(buffer, format="png")
                 buffer.seek(0)
@@ -1114,11 +1167,11 @@ class VisionScript:
                 if isinstance(image, np.ndarray):
                     image = Image.fromarray(image)
                     # do bgr to rgb
-                    image = image.convert("RGB")
+                    # image = image.convert("RGB")
 
-                # convert to rgb if needed
-                if image.mode != "RGB":
-                    image = image.convert("RGB")
+                # # convert to rgb if needed
+                # if image.mode != "RGB":
+                #     image = image.convert("RGB")
 
                 # PIL to base64
                 buffered = io.BytesIO()
@@ -1218,16 +1271,32 @@ class VisionScript:
             return statement in self.state["last"]
         else:
             return False
+        
+    def check_inputs(self, tree):
+        # get all INPUT tokens and save them to state
+        for node in tree.children:
+            # if node has children, recurse
+            if hasattr(node, "children") and len(node.children) > 0:
+                self.check_inputs(node)
+                
+            if not hasattr(node, "data"):
+                continue
+
+            if node.data == "input":
+                self.state["input_variables"][node.children[0].value] = "image"
 
     def parse_tree(self, tree):
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
+                
         if not hasattr(tree, "children"):
             if hasattr(tree, "value") and tree.value.isdigit():
                 return int(tree.value)
             elif isinstance(tree, str):
                 return literal_eval(tree)
+            elif hasattr(tree, "value") and tree.value.isfloat():
+                return float(tree.value)
 
         if hasattr(tree, "children") and tree.data == "input":
             return self.input_(tree.children[0].value)
@@ -1252,6 +1321,10 @@ class VisionScript:
                 node, int
             ):
                 return int(node.value)
+            elif (hasattr(node, "type") and node.type == "FLOAT") or isinstance(
+                node, float
+            ):
+                return float(node.value)
             elif not hasattr(node, "children") or len(node.children) == 0:
                 node = node
             elif self.state.get("ctx") and (
@@ -1316,8 +1389,6 @@ class VisionScript:
 
                 statement = self.parse_tree(statement)
 
-                print(statement, "xxx")
-
                 if statement is None:
                     continue
 
@@ -1355,7 +1426,8 @@ class VisionScript:
                 func = self.function_calls[token.value]
 
             if token.value == "negate" or token.value == "input":
-                return func(self.parse_tree(node.children[0]))
+                result = self.parse_tree(node.children[0])
+                return func(result)
 
             if token.value == "get":
                 continue
@@ -1383,6 +1455,8 @@ class VisionScript:
                             item.value = int(item.value)
                         elif item.type == "input":
                             item.value = self.parse_tree(item.value)
+                        elif item.type == "FLOAT":
+                            item.value = float(item.value)
 
             if token.value == "in":
                 self.state["ctx"] = {

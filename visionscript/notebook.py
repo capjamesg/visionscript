@@ -51,13 +51,20 @@ def notebook():
 
         code = parser.parse(user_input.strip() + "\n")
 
-        try:
-            session.parse_tree(code)
-        except Exception as e:
-            raise e
-            return jsonify({"error": str(e)})
+        session.check_inputs(code)
+
+        print(session.state)
+
+        if len(session.state["input_variables"]) == 0:
+            try:
+                session.parse_tree(code)
+            except Exception as e:
+                raise e
+                return jsonify({"error": str(e)})
 
         end_time = time.time()
+
+        print(session.state)
 
         run_time = round(end_time - start_time, 1)
 
@@ -171,27 +178,28 @@ def save():
 
 @app.route("/notebook/deploy", methods=["POST"])
 def deploy():
-    session_id = request.args.get("state_id")
-    app_name = request.form.get("app_name")
+    session_id = request.json.get("state_id")
+    name = request.json.get("name")
 
     if session_id and notebooks.get(session_id) is None:
-        return jsonify({"error": "No session found"})
+        return jsonify({"error": "No session found"}), 404
 
-    if file_name is None:
-        return jsonify({"error": "No file name provided"})
+    if name is None:
+        return jsonify({"error": "No file name provided"}), 400
 
     # make a post request
     notebook = copy.deepcopy(notebooks[session_id])
 
-    app_slug = app_name.translate(
+    app_slug = name.translate(
         str.maketrans("", "", string.punctuation.replace("-", ""))
     )
 
-    deploy_request = requests.post("https://localhost:5000/deploy", json={
-        "title": app_name,
+    deploy_request = requests.post("http://localhost:6999/create", json={
+        "title": name,
         "slug": app_slug,
+        "api_key": "test",
         "script": "\n".join(notebook["cells"]),
-        "variables": notebook["session"].state["variables"],
+        "variables": notebook["session"].state["input_variables"],
     })
 
     if deploy_request.ok:

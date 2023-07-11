@@ -503,14 +503,12 @@ function deploy () {
     var deploy_form = document.getElementById("deploy_form");
     deploy_form.addEventListener("submit", function (event) {
         event.preventDefault();
-        var data = new FormData(deploy_form);
-        var name = data.get("name");
-        fetch('http://localhost:5001/deploy', {
+        fetch('http://localhost:5001/notebook/deploy', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({name: name})
+            body: JSON.stringify({state_id: STATE_ID, name: document.getElementById("name").value})
         })
         .then(response => response.json())
         .then(data => {
