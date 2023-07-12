@@ -1,11 +1,11 @@
 import copy
 import json
 import os
+import string
 import time
 import uuid
-import requests
-import string
 
+import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 import visionscript.lang as lang
@@ -15,8 +15,27 @@ app = Flask(__name__)
 
 notebooks = {}
 
+
 def init_notebook():
     # cells have a session that contains state and an output
+    # notebook schema looks like:
+    # {
+    #   "session": session,
+    #   "cells": [
+    #       {
+    #           "type": "code",
+    #           "data": "code"
+    #       },
+    #       {
+    #           "type": "comment",
+    #           "data": "comment"
+    #       }
+    #   ],
+    #   "output": [
+    #       "output",
+    #       ...
+    #   ]
+    # }
     return {"session": None, "cells": [], "output": []}
 
 
@@ -31,6 +50,7 @@ def notebook():
     if request.method == "POST":
         data = request.json
         session_id = data["state_id"]
+        is_text_cell = data.get("is_text_cell", False)
 
         user_input = data["code"]
 
@@ -46,13 +66,28 @@ def notebook():
 
         session = notebooks[session_id]["session"]
 
+        if is_text_cell:
+            notebooks[session_id]["cells"].append(
+                {"type": "comment", "data": user_input}
+            )
+
+            # save notebook
+            with open(os.path.join("tmp", session_id + ".vicnb"), "w") as f:
+                json.dump(
+                    {
+                        "cells": notebooks[session_id]["cells"],
+                        "output": notebooks[session_id]["output"],
+                    },
+                    f,
+                )
+
+            return jsonify({"output": "", "time": 0})
+
         start_time = time.time()
 
         code = parser.parse(user_input.strip() + "\n")
 
         session.check_inputs(code)
-
-        print(session.state)
 
         if len(session.state["input_variables"]) == 0:
             try:
@@ -65,8 +100,18 @@ def notebook():
 
         run_time = round(end_time - start_time, 1)
 
-        notebooks[session_id]["cells"].append(user_input)
+        notebooks[session_id]["cells"].append({"type": "code", "data": user_input})
         notebooks[session_id]["output"].append(session.state["output"])
+
+        # save notebook
+        with open(os.path.join("tmp", session_id + ".vicnb"), "w") as f:
+            json.dump(
+                {
+                    "cells": notebooks[session_id]["cells"],
+                    "output": notebooks[session_id]["output"],
+                },
+                f,
+            )
 
         return jsonify({"output": session.state["output"], "time": run_time})
 
@@ -173,12 +218,14 @@ def save():
 
     return jsonify({"file": notebook})
 
+
 @app.route("/notebook/deploy", methods=["POST"])
 def deploy():
     session_id = request.json.get("state_id")
     name = request.json.get("name")
     api_url = request.json.get("api_url")
     api_key = request.json.get("api_key")
+    description = request.json.get("description")
 
     if session_id and notebooks.get(session_id) is None:
         return jsonify({"error": "No session found"}), 404
@@ -193,18 +240,23 @@ def deploy():
         str.maketrans("", "", string.punctuation.replace("-", ""))
     )
 
-    deploy_request = requests.post(api_url, json={
-        "title": name,
-        "slug": app_slug,
-        "api_key": api_key,
-        "script": "\n".join(notebook["cells"]),
-        "variables": notebook["session"].state["input_variables"],
-    })
+    deploy_request = requests.post(
+        api_url,
+        json={
+            "title": name,
+            "slug": app_slug,
+            "api_key": api_key,
+            "description": description,
+            "script": "\n".join(notebook["cells"]),
+            "variables": notebook["session"].state["input_variables"],
+        },
+    )
 
     if deploy_request.ok:
         return jsonify({"success": True})
-    
+
     return jsonify({"success": False})
+
 
 @app.route("/static/<path:path>")
 def static_files(path):

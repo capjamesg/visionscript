@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL | EOF | " ")*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion)
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -14,10 +14,11 @@ greyscale: "Greyscale" ("[" "]")?
 search: "Search" "[" STRING "]"
 deploy: "Deploy" "[" STRING "]"
 getedges: "GetEdges"  ("[" "]")?
+filterbyclass: "FilterByClass" "[" STRING ("," STRING)* "]" | "FilterByClass" ("[" "]")?
 describe: "Describe" ("[" "]")?
 setregion: "SetRegion" "[" INT "," INT "," INT "," INT "]" | "SetRegion" ("[" "]")?
 readqr: "ReadQR" ("[" "]")?
-setconfidence: "SetConfidence" "[" FLOAT "]"
+setconfidence: "SetConfidence" "[" FLOAT "]" | "SetConfidence" ("[" "]")?
 rotate: "Rotate" "[" (INT | STRING) "]"
 resize: "Resize" "[" INT "," INT "]"
 getcolors: "GetColors" ("[" "]")? | "GetColors" "[" INT "]"

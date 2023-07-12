@@ -12,12 +12,14 @@ import random
 import string
 import sys
 import tempfile
+import time
 
 import click
 import cv2
 import lark
 import numpy as np
 import supervision as sv
+import torch
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from spellchecker import SpellChecker
@@ -25,6 +27,9 @@ from spellchecker import SpellChecker
 from visionscript.grammar import grammar
 from visionscript.usage import (USAGE, language_grammar_reference,
                                 lowercase_language_grammar_reference)
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+MAX_FILE_SIZE = 10000000  # 10MB
 
 spell = SpellChecker()
 
@@ -43,8 +48,10 @@ SUPPORTED_TRAIN_MODELS = {
     "detect": {"yolov8": "autodistill_yolov8"},
 }
 
-class InputNotProvided():
+
+class InputNotProvided:
     pass
+
 
 def handle_unexpected_characters(e, code):
     # raise error if class doesn't exist
@@ -140,7 +147,8 @@ def init_state():
         "input_variables": {},
         "last_classes": [],
         "confidence": 50,
-        "active_region": None
+        "active_region": None,
+        "active_filters": {"class": None, "region": None},
     }
 
 
@@ -148,6 +156,7 @@ class VisionScript:
     """
     A VisionScript program.
     """
+
     def __init__(self, notebook=False):
         self.state = init_state()
         self.notebook = notebook
@@ -208,15 +217,26 @@ class VisionScript:
             "getedges": lambda x: self.get_edges(x),
             "setregion": lambda x: self.set_region(x),
             "setconfidence": lambda x: self.set_confidence(x),
+            "filterbyclass": lambda x: self.filter_by_class(x),
         }
+
+    def filter_by_class(self, args):
+        """
+        Filter detections by class.
+        """
+        if len(args) == 0:
+            self.state["active_filters"] = None
+        elif self.state["active_filters"].get("class") is None:
+            self.state["active_filters"]["class"] = args
 
     def set_region(self, args):
         if len(args) == 0:
-            self.state["active_region"] = None
+            self.state["active_filters"]["region"] = None
+            return
 
         x0, y0, x1, y1 = args
 
-        self.state["active_region"] = (x0, y0, x1, y1)
+        self.state["active_filters"]["region"] = (x0, y0, x1, y1)
 
     def input_(self, key):
         if self.state["input_variables"].get(literal_eval(key)) is not None:
@@ -252,6 +272,13 @@ class VisionScript:
         """
         Set the confidence level for use in filtering detections.
         """
+        if not confidence:
+            confidence = 50
+
+        if confidence > 100 or confidence < 0:
+            print("Confidence must be between 0 and 100.")
+            return
+
         self.state["confidence"] = confidence
 
     def load(self, filename):
@@ -283,7 +310,35 @@ class VisionScript:
             return
 
         if filename and validators.url(filename):
-            response = requests.get(filename)
+            try:
+                response = requests.get(filename, timeout=5, stream=True)
+            except requests.exceptions.ConnectionError:
+                self.state["last"] = "Could not connect to URL."
+                return
+            except requests.exceptions.ReadTimeout:
+                self.state["last"] = "Timeout."
+                return
+            except:
+                self.state["last"] = "There was an error loading the image."
+                return
+
+            # check length
+            if len(response.content) > MAX_FILE_SIZE:
+                self.state["last"] = "Image too large."
+                return
+
+            size = 0
+            start = time.time()
+
+            for chunk in response.iter_content(1024):
+                if time.time() - start > 5:
+                    raise ValueError("timeout reached")
+
+                size += len(chunk)
+
+                if size > MAX_FILE_SIZE:
+                    raise ValueError("response too large")
+
             file_extension = mimetypes.guess_extension(response.headers["content-type"])
 
             # if not image, error
@@ -363,7 +418,7 @@ class VisionScript:
         ):
             detections = self.state["last"]
 
-            detections = detections[detections.confidence > self.state["confidence"] / 100]
+            detections = self._filter_controller(detections)
 
             if len(args) == 0:
                 self.state["last"] = detections
@@ -408,21 +463,18 @@ class VisionScript:
 
         On first run, this will create an index of all images on the loaded image stack.
         """
-        # embed
         import clip
-        import torch
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model, preprocess = clip.load("ViT-B/32", device=device)
+        model, preprocess = clip.load("ViT-B/32", device=DEVICE)
 
         with torch.no_grad():
             # if label is a filename, load image
             if os.path.exists(label):
-                comparator = preprocess(Image.open(label)).unsqueeze(0).to(device)
+                comparator = preprocess(Image.open(label)).unsqueeze(0).to(DEVICE)
 
                 comparator = model.encode_image(comparator)
             else:
-                comparator = clip.tokenize([label]).to(device)
+                comparator = clip.tokenize([label]).to(DEVICE)
 
                 comparator = model.encode_text(comparator)
 
@@ -433,7 +485,7 @@ class VisionScript:
                     # turn cv2 image into PIL image
                     image = Image.fromarray(image)
 
-                    processed_image = preprocess(image).unsqueeze(0).to(device)
+                    processed_image = preprocess(image).unsqueeze(0).to(DEVICE)
                     embedded_image = model.encode_image(processed_image)
 
                     self._add_to_index(embedded_image)
@@ -605,6 +657,33 @@ class VisionScript:
 
         return human_readable_colours[:k]
 
+    def _filter_controller(self):
+        results = self.state["detections_stack"][-1]
+
+        if self.state["active_filters"]["region"]:
+            x0, y0, x1, y1 = self.state["active_filters"]["region"]
+
+            zone = sv.PolygonZone(
+                np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]),
+                frame_resolution_wh=(
+                    self.state["last"].shape[1],
+                    self.state["last"].shape[0],
+                ),
+            )
+
+            results_filtered_by_active_region = zone.trigger(detections=results)
+
+            results = results[results_filtered_by_active_region]
+
+        if self.state["active_filters"]["class"]:
+            results = results[
+                np.isin(results.class_id, self.state["active_filters"]["class"])
+            ]
+
+        results = results[results.confidence > self.state["confidence"] / 100]
+
+        self.state["last"] = results
+
     def detect(self, classes):
         """
         Run object detection on an image.
@@ -655,20 +734,6 @@ class VisionScript:
 
         inference_classes = inference_results.names
 
-        if self.state["active_region"]:
-            x0, y0, x1, y1 = self.state["active_region"]
-
-            zone = sv.PolygonZone(
-                np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]),
-                frame_resolution_wh=(self.state["last"].shape[1], self.state["last"].shape[0]),
-            )
-
-            results_filtered_by_active_region = zone.trigger(detections=results)
-
-            results = results[results_filtered_by_active_region]
-
-        results = results[results.confidence > self.state["confidence"] / 100]
-
         if len(classes) == 0:
             classes = inference_classes
 
@@ -707,17 +772,15 @@ class VisionScript:
             return results
 
         import clip
-        import torch
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model, preprocess = clip.load("ViT-B/32", device=device)
+        model, preprocess = clip.load("ViT-B/32", device=DEVICE)
 
         image = (
             preprocess(Image.open(self.state["last_loaded_image_name"]))
             .unsqueeze(0)
-            .to(device)
+            .to(DEVICE)
         )
-        text = clip.tokenize(labels).to(device)
+        text = clip.tokenize(labels).to(DEVICE)
 
         with torch.no_grad():
             logits_per_image, _ = model(image, text)
@@ -747,7 +810,6 @@ class VisionScript:
 
         model = FastSAM(os.path.join(current_path, "weights", "FastSAM.pt"))
 
-        DEVICE = "cpu"
         everything_results = model(
             self.state["last_loaded_image_name"],
             device=DEVICE,
@@ -785,31 +847,9 @@ class VisionScript:
             confidence=np.array([1]),
         )
 
-        detections = detections[detections.confidence > self.state["confidence"]]
-
         self.state["detections_stack"].append(detections)
 
         return detections
-
-    def countInRegion(self, x1, y1, x2, y2):
-        """
-        Count the number of detections in a region.
-        """
-        detections = self.state["last"]
-
-        detections = detections[detections.confidence > self.state["confidence"]]
-
-        xyxy = detections.xyxy
-
-        counter = 0
-
-        for i in range(len(xyxy)):
-            x1_, y1_, x2_, y2_ = xyxy[i]
-
-            if x1_ >= x1 and y1_ >= y1 and x2_ <= x2 and y2_ <= y2:
-                counter += 1
-
-        return counter
 
     def read(self, _):
         if self.state.get("last_function_type", None) in ("detect", "segment"):
@@ -889,9 +929,9 @@ class VisionScript:
         """
         detections = self.state["last"]
 
-        xyxy = detections.xyxy
+        detections = self._filter_controller(detections)
 
-        print(xyxy)
+        xyxy = detections.xyxy
 
         if os.path.exists(args):
             print("Replacing with image.")
@@ -899,15 +939,15 @@ class VisionScript:
 
             # bgr to rgb
             picture = picture[:, :, ::-1].copy()
-            
+
             image_at_top_of_stack = self.state["image_stack"][-1].copy()
 
             for i in range(len(xyxy)):
                 x1, y1, x2, y2 = xyxy[i]
 
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                
-                #resize picture to fit
+
+                # resize picture to fit
                 picture = cv2.resize(picture, (x2 - x1, y2 - y1))
 
                 image_at_top_of_stack[y1:y2, x1:x2] = picture
@@ -915,7 +955,7 @@ class VisionScript:
             self.state["image_stack"].append(image_at_top_of_stack)
 
             return
-        
+
         color = args
 
         if args is not None:
@@ -1062,6 +1102,7 @@ class VisionScript:
                 for image, detections in zip(
                     self.state["last"], self.state["detections_stack"]
                 ):
+                    detections = self._filter_controller(self, detections)
                     if annotator and detections:
                         image = annotator.annotate(
                             np.array(image),
@@ -1097,6 +1138,7 @@ class VisionScript:
             for image, detections in zip(
                 self.state["image_stack"], self.state["detections_stack"]
             ):
+                detections = self._filter_controller(self, detections)
                 if annotator and detections:
                     image = annotator.annotate(
                         np.array(image), detections, labels=self.state["last_classes"]
@@ -1120,7 +1162,7 @@ class VisionScript:
         if annotator:
             image = annotator.annotate(
                 np.array(self.state["image_stack"][-1]),
-                detections=self.state["detections_stack"][-1],
+                detections=self._filter_controller(self.state["detections_stack"][-1]),
             )
         elif (
             self.state.get("last_loaded_image") is not None
@@ -1148,8 +1190,9 @@ class VisionScript:
                 # if grey, show in grey
                 if len(image.shape) == 2:
                     plt.imshow(image, cmap="gray")
-                else:
-                    plt.imshow(image)
+                # if bgr, show in rgb
+                elif image.shape[2] == 3:
+                    plt.imshow(image[:, :, ::-1])
 
                 fig.savefig(buffer, format="png")
                 buffer.seek(0)
@@ -1198,16 +1241,13 @@ class VisionScript:
             return
 
         import clip
-        import torch
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        model, preprocess = clip.load("ViT-B/32", device=device)
+        model, preprocess = clip.load("ViT-B/32", device=DEVICE)
 
         images = []
 
         for image in self.state["image_stack"][-n:]:
-            image = preprocess(Image.fromarray(image)).unsqueeze(0).to(device)
+            image = preprocess(Image.fromarray(image)).unsqueeze(0).to(DEVICE)
             images.append(image)
 
         embeddings = []
@@ -1270,14 +1310,14 @@ class VisionScript:
             return statement in self.state["last"]
         else:
             return False
-        
+
     def check_inputs(self, tree):
         # get all INPUT tokens and save them to state
         for node in tree.children:
             # if node has children, recurse
             if hasattr(node, "children") and len(node.children) > 0:
                 self.check_inputs(node)
-                
+
             if not hasattr(node, "data"):
                 continue
 
@@ -1288,7 +1328,7 @@ class VisionScript:
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
-                
+
         if not hasattr(tree, "children"):
             if hasattr(tree, "value") and tree.value.isdigit():
                 return int(tree.value)
@@ -1533,7 +1573,37 @@ def activate_console(parser):
 @click.option("--repl", default=None, help="To enter to visionscript console")
 @click.option("--notebook/--no-notebook", help="Start a notebook environment")
 @click.option("--cloud/--no-cloud", help="Start a cloud deployment environment")
-def main(validate, ref, debug, file, repl, notebook, cloud) -> None:
+@click.option("--deploy", help="Deploy a .vic file", default=None)
+@click.option(
+    "--name",
+    help="Application name (used if you are deploying your app via --deploy)",
+    default=None,
+)
+@click.option(
+    "--description",
+    help="Application description (used if you are deploying your app via --deploy)",
+    default=None,
+)
+@click.option("--api-key", help="API key for deploying your app", default=None)
+@click.option(
+    "--api-url",
+    help="API url for deploying your app",
+    default="http://localhost:6999/create",
+)
+def main(
+    validate,
+    ref,
+    debug,
+    file,
+    repl,
+    notebook,
+    cloud,
+    deploy,
+    name,
+    description,
+    api_key,
+    api_url,
+) -> None:
     if validate:
         print("Script is a valid VisionScript program.")
         exit(0)
@@ -1572,10 +1642,37 @@ def main(validate, ref, debug, file, repl, notebook, cloud) -> None:
 
         session = VisionScript()
 
-        # args = {"image": "./indieweb.jpg"}
+        if deploy:
+            if not name or not description or not api_key or not api_url:
+                print("Please provide a name, description, api key, and api url.")
+                return
 
-        # # merge state and args
-        # session.state = {**session.state, **args}
+            session.notebook = True
+
+            session.check_inputs(code)
+
+            import requests
+
+            app_slug = name.translate(
+                str.maketrans("", "", string.punctuation.replace("-", ""))
+            )
+
+            deploy_request = requests.post(
+                api_url,
+                json={
+                    "title": name,
+                    "slug": app_slug,
+                    "api_key": api_key,
+                    "description": description,
+                    "script": code,
+                    "variables": session.state["input_variables"],
+                },
+            )
+
+            if deploy_request.ok:
+                print("App deployed to", deploy_request.json()["url"])
+
+            return
 
         session.parse_tree(tree)
 

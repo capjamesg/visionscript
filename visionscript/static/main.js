@@ -1,5 +1,26 @@
 var mode = "interactive";
 
+function rerun (cell_number, code) {
+    var cells = document.getElementById("cells");
+    var cell = cells.children[cell_number - 1];
+    var textarea = cell.getElementsByTagName("textarea")[0];
+    textarea.value = code;
+    var output = cell.getElementsByTagName("pre")[0];
+    output.innerText = "";
+    var output = document.getElementById("output");
+    output.style.display = "block";
+    executeCode(code);
+}
+
+function show_toast (message) {
+    var toast = document.getElementById("toast");
+    toast.innerText = message;
+    toast.style.display = "block";
+    setTimeout(function () {
+        toast.style.display = "none";
+    }, 3000);
+}
+
 function switch_mode () {
     if (mode == "interactive") {
         document.getElementById("mode_switch").innerText = "Use Interactive Mode 📝";
@@ -46,6 +67,22 @@ function processSearch() {
     }
 }
 
+
+document.addEventListener("keydown", function (event) {
+    // Command + Enter should run
+    if (event.code == "Enter" && event.metaKey) {
+        var code = getCodeFromInteractiveEnvironment();
+        executeCode(code);
+        return;
+    }
+    // Command + S should save
+    if (event.key == "s" && event.metaKey) {
+        event.preventDefault();
+        export_vicnb();
+        return;
+    }
+});
+
 // if user hits enter, take top result
 // listen for key
 document.addEventListener("keydown", function (event) {
@@ -55,13 +92,6 @@ document.addEventListener("keydown", function (event) {
         return;
     }
 
-
-    // Command + Enter should run
-    if (event.key == "Enter" && event.metaKey) {
-        var code = getCodeFromInteractiveEnvironment();
-        executeCode(code);
-        return;
-    }
 
     if (event.key == "Enter") {
         // set background color
@@ -202,8 +232,13 @@ for (var i = 0; i < functions.length; i++) {
                         argument_block.innerHTML = "";
                         img.dataset.filename = data.file_name;
                         img.classList.add("argument_block");
-                        // replace cell with image
                         cell.replaceWith(img);
+
+                        if (file.name.endsWith(".vicnb")) {
+                            show_toast("Your notebook has been imported.");
+                        } else {
+                            show_toast("Your file has been uploaded.");
+                        }
                     });
                 });
             });
@@ -235,7 +270,7 @@ notebook.addEventListener("drop", function (event) {
             return;
         }
     }
-    // get "text/plain" cata
+    // get "text/plain" data
     var function_name = event.dataTransfer.getData("text/plain");
     var function_element = document.getElementById(function_name);
 
@@ -291,7 +326,6 @@ notebook.addEventListener("drop", function (event) {
     // last cell
     var margin = 20;
     var nested = false;
-    // con
     if (cells.children.length > 0) {
         // if last cell function was an If or In
         if (cells.children[cells.children.length - 1].id.includes("If") || cells.children[cells.children.length - 1].id.includes("In")) {
@@ -327,7 +361,6 @@ notebook.addEventListener("drop", function (event) {
     
     var function_name = event.dataTransfer.getData("text/plain");
     var function_element = document.getElementById(function_name);
-    var code = function_name + "[]";
     var color = function_element.firstElementChild.style.color;
 
     var html = "";
@@ -482,7 +515,6 @@ function getCodeFromInteractiveEnvironment () {
                 code += "    ";
                 in_nested_context = true;
             }
-
             code += function_name + "[" + argument + " ]" + "\n";
         } else {
             code += function_name + "[]" + "\n";
@@ -501,7 +533,6 @@ var run = document.getElementById("run");
 
 run.addEventListener("click", function (event) {
     event.preventDefault();
-    var output = document.getElementById("output");
     var code = getCodeFromInteractiveEnvironment();
     executeCode(code);
 });
@@ -517,7 +548,7 @@ function deploy () {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({state_id: STATE_ID, name: document.getElementById("name").value, api_url: document.getElementById("api_url").value, api_key: document.getElementById("api_key").value})
+            body: JSON.stringify({state_id: STATE_ID, name: document.getElementById("name").value, api_url: document.getElementById("api_url").value, api_key: document.getElementById("api_key").value, description: document.getElementById("description").value})
         })
         .then(response => response.json())
         .then(data => {
@@ -533,6 +564,7 @@ function deploy () {
 var cells = document.getElementById("cells");
 
 function startLoading(loading) {
+    loading.style.display = "block";
     var timer = setInterval(function () {
         if (loading.innerText == "Loading") {
             loading.innerText = "Loading.";
@@ -551,10 +583,6 @@ function startLoading(loading) {
 
 function executeCode (code) {
     // make loading wheel
-
-    cells.innerHTML += `
-        <li class="cell" id="loading">Loading</li>
-    `;
     var loading = document.getElementById("loading");
     var output = document.getElementById("output");
     // show output
@@ -651,15 +679,15 @@ textarea.addEventListener("input", function (event) {
     textarea.style.height = textarea.scrollHeight + "px";
 });
 
-var export_vic = document.getElementById("export_vic");
 
-export_vic.addEventListener("click", function (event) {
-    event.preventDefault();
-    var data = new FormData(form);
+function export_vic() {
+    var data = new FormData();
+
     if (mode == "interactive") {
         var code = getCodeFromInteractiveEnvironment();
         data.set("jscode", code);
     }
+
     var code = data.get("jscode");
     var blob = new Blob([code], {type: "text/plain;charset=utf-8"});
     // download
@@ -667,7 +695,26 @@ export_vic.addEventListener("click", function (event) {
     a.href = URL.createObjectURL(blob);
     a.download = "notebook.vic";
     a.click();
-});
+}
+
+function export_vicnb() {
+    fetch(`${API_URL}/notebook/save`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({state_id: STATE_ID})
+    }).then(response => response.json())
+    .then(data => {
+        var blob = new Blob([data.file], {type: "text/plain;charset=utf-8"});
+        blob.name = data.file_name;
+        // download
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = data.file_name;
+        a.click();
+    });
+}
 
 var dropzone = document.getElementsByTagName("body")[0];
 
@@ -689,7 +736,7 @@ dropzone.addEventListener("drop", function (event) {
     // if function box, delete the function box
     // read data channel
     var readData = event.dataTransfer.getData("text/plain");
-    if (readData) {
+    if (readData && readData.startsWith("function_box")) {
         // delete element
         var element = document.getElementById(readData);
         element.parentNode.removeChild(element);
@@ -736,8 +783,9 @@ dropzone.addEventListener("drop", function (event) {
                     cells.innerHTML += `
                         <li class="cell">
                             <p>#${cells.children.length + 1}</p>
-                            <textarea rows="3" disabled>${code}</textarea>
+                            <textarea rows="3">${code}</textarea>
                             <pre>${output}</pre>
+                            <p class="rerun" onclick="rerun(${cells.children.length + 1}, '${code}')">Rerun</p>
                         </li>
                     `;
                 });
@@ -821,7 +869,7 @@ dropzone.addEventListener("drop", function (event) {
         var dialog = document.getElementById("dialog");
         var error_message = document.getElementById("error_message");
         // if file ends with .vicnb
-        console.log(err);
+
         if (file.name.endsWith(".vicnb")) {
             error_message.innerText = "Please import your notebook in interactive mode.";
             dialog.showModal();
@@ -836,11 +884,8 @@ dropzone.addEventListener("drop", function (event) {
 function resetNotebook() {
     var code = "Reset[]\n";
     executeCode(code);
-    // show dialog
-    var dialog = document.getElementById("dialog");
-    var error_message = document.getElementById("error_message");
-    error_message.innerText = "Your notebook has been reset.";
-    dialog.showModal();
+    // show toast
+    show_toast("Your notebook has been reset.");
 }
 
 function toggle_menu () {

@@ -27,11 +27,11 @@
                     <li><a href="https://visionscript.dev/docs" target="_blank">Docs 📚</a></li>
                     <li><a id="export_vic">Export 💾</a></li>
                     <li onclick="deploy()"><a>Use as Web App ☁️</a></li>
-                    <li id="reset"><a>Reset 🔄</a></li>
+                    <li id="reset" onclick="resetNotebook()"><a>Reset 🔄</a></li>
                     <li id="toggle_menu" onclick="toggle_menu()"><a>Close</a></li>
                 </div>
                 <li id="run"><a>Run All 🟢</a></li>
-                <li id="menu" onclick="toggle_menu()"><a>Menu</a></li>
+                <li id="menu" onclick="toggle_menu()" class="hide_on_desktop"><a>Menu</a></li>
             </ul>
         </nav>
         <main>
@@ -44,6 +44,7 @@
                 <p class="hide_on_mobile">Drag and drop functions in the box below to build your program.</p>
                 <div id="drag_drop_notebook"></div>
                 <p class="error" id="error"></p>
+                <p class="loading" id="loading" style="display: none;">Loading...</p>
                 <div id="output">Output</div>
             </section>
             <section id="code_mode">
@@ -57,7 +58,8 @@
 Load["./folder/abbey.jpg"]
 Detect["person"]
 Say[]</textarea>
-                    <input type="submit" value="Submit">
+                    <input type="submit" value="Run Code">
+                    <input onclick="saveCommentCell()" value="Save as Comment">
                 </form>
             </section>
             <aside id="files_section">
@@ -74,6 +76,7 @@ Say[]</textarea>
                 </select>
             </aside>
             <dialog id="dialog">
+                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer;">Close</p>
                 <div>
                     <h2>Message</h2>
                     <p id="error_message"></p>
@@ -81,17 +84,32 @@ Say[]</textarea>
                 </div>
             </dialog>
             <dialog id="deploy">
+                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer;">Close</p>
                 <div>
                     <h2>Deploy your app</h2>
                     <p>You can run your code as a local web app that people can use.</p>
                     <p>Choose a name for your app and click "Deploy".</p>
                     <form id="deploy_form">
+                        <label for="name">Name</label>
                         <input type="text" name="name" id="name" placeholder="Name" />
+                        <label for="api_url">API URL</label>
                         <input type="text" name="api_url" id="api_url" placeholder="https://example.com" value="http://localhost:6999/create" />
+                        <label for="api_key">API key</label>
                         <input type="text" name="api_key" id="api_key" placeholder="API key" />
+                        <label for="description">Description</label>
+                        <input type="text" name="description" id="description" placeholder="Description" />
                         <input type="submit" value="Deploy" />
                     </form>
                     <p id="deploy_message"></p>
+                </div>
+            </dialog>
+            <dialog id="export">
+                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer;">Close</p>
+                <div>
+                    <h2>Export your app</h2>
+                    <p><a onclick="export_vic()">Export</a> your app as a .vic file.</p>
+                    <p><a onclick="export_vicnb()">Export</a> your app as a .vicnb file.</p>
+                    <p id="export_message"></p>
                 </div>
             </dialog>
         </main>

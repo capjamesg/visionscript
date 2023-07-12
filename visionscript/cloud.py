@@ -1,7 +1,7 @@
 import json
+import string
 import uuid
 from io import BytesIO
-import string
 
 import numpy as np
 from flask import Flask, jsonify, redirect, render_template, request, send_file
@@ -20,6 +20,7 @@ for script in scripts:
 
 print("Your API key is", API_KEY)
 print("Keep it safe and don't share it with anyone!")
+
 
 @app.route("/")
 def index_page():
@@ -63,7 +64,10 @@ def home(id):
         try:
             session = scripts[id]["session"]
 
-            session.state["input_variables"] = {**session.state["input_variables"], **results}
+            session.state["input_variables"] = {
+                **session.state["input_variables"],
+                **results,
+            }
 
             session.notebook = True
 
@@ -111,6 +115,7 @@ def create():
         "title": data["title"],
         "script": data["script"],
         "variables": data["variables"],
+        "description": data.get("description"),
     }
 
     app_slug = data["title"].translate(

@@ -82,6 +82,13 @@ const FUNCTIONS = {
             "supports_arguments": true,
             "argument_default": "0, 0, 0, 0"
         },
+        "FilterByClass": {
+            "args": ["object"],
+            "description": "Filter objects by class",
+            "example": "FilterByClass[\"person\"]",
+            "supports_arguments": true,
+            "argument_default": "\"\""
+        },
         "Classify": {
             "args": ["object"],
             "description": "Classify an image",
@@ -121,13 +128,6 @@ const FUNCTIONS = {
             "description": "Count objects in an image",
             "example": "Count[]",
             "supports_arguments": false
-        },
-        "CountInRegion": {
-            "args": ["object", "x", "y", "width", "height"],
-            "description": "Count objects in a region of an image",
-            "example": "CountInRegion[\"person\", 0, 0, 100, 100]",
-            "supports_arguments": true,
-            "argument_default": "\"\", 0, 0, 0, 0"
         },
         "ReadQR": {
             "args": [],
