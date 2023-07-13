@@ -371,7 +371,7 @@ class VisionScript:
 
         self.state["last_loaded_image_name"] = filename
 
-        return np.array(Image.open(filename).convert("RGB"))[:, :, ::-1]
+        return np.array(Image.open(filename).convert("RGB"))  # [:, :, ::-1]
 
     def size(self, _):
         return self.state["image_stack"][-1].shape[:2]
@@ -534,7 +534,15 @@ class VisionScript:
         """
         Save an image to a file.
         """
+        if not filename:
+            filename = os.path.join(
+                "output",
+                "".join(random.choice(string.ascii_letters) for _ in range(10)),
+            )
+
         self.state["image_stack"].save(filename)
+
+        self.state["output"] = {"text": "Saved to " + filename}
 
     def count(self, args):
         """
@@ -559,7 +567,7 @@ class VisionScript:
         # save to test.png
 
         self.state["image_stack"].append(image)
-        self.state["output"] = image
+        self.state["output"] = {"image": image}
 
     def deploy(self, app_name):
         """
@@ -617,7 +625,7 @@ class VisionScript:
         else:
             image = image
 
-        self.state["output"] = image
+        self.state["output"] = {"image": image}
         self.state["image_stack"].append(image)
 
     def getcolours(self, k):
@@ -657,8 +665,8 @@ class VisionScript:
 
         return human_readable_colours[:k]
 
-    def _filter_controller(self):
-        results = self.state["detections_stack"][-1]
+    def _filter_controller(self, detections):
+        results = detections
 
         if self.state["active_filters"]["region"]:
             x0, y0, x1, y1 = self.state["active_filters"]["region"]
@@ -682,7 +690,9 @@ class VisionScript:
 
         results = results[results.confidence > self.state["confidence"] / 100]
 
-        self.state["last"] = results
+        # self.state["last"] = results
+
+        return results
 
     def detect(self, classes):
         """
@@ -791,7 +801,7 @@ class VisionScript:
 
             label_name = labels[label_idx]
 
-        self.state["output"] = label_name
+        self.state["output"] = {"text": label_name}
 
         return label_name
 
@@ -875,7 +885,8 @@ class VisionScript:
             return
 
         if isinstance(self.state["last"], (list, tuple)):
-            self.state["output"] = ""
+            output = ""
+
             for item in self.state["last"]:
                 print(item)
                 # if list or tuple, join
@@ -884,7 +895,9 @@ class VisionScript:
                 elif isinstance(item, int) or isinstance(item, float):
                     item = str(item)
 
-                self.state["output"] += item + "\n"
+                output += item + "\n"
+
+            self.state["output"] = {"text": output}
 
             return
 
@@ -911,7 +924,7 @@ class VisionScript:
         if statement:
             print(statement.strip())
 
-        self.state["output"] = statement
+        self.state["output"] = {"text": statement}
 
     def blur(self, args):
         """
@@ -1067,7 +1080,7 @@ class VisionScript:
         sobelxy = cv2.Sobel(image, cv2.CV_64F, 1, 1, ksize=5)
 
         self.state["image_stack"].append(sobelxy)
-        self.state["output"] = sobelxy
+        self.state["output"] = {"image": sobelxy}
 
     def show(self, _):
         """
@@ -1201,7 +1214,7 @@ class VisionScript:
 
                 img_str = {"image": base64.b64encode(buffer.getvalue()).decode("utf-8")}
 
-                self.state["output"] = img_str
+                self.state["output"] = {"image": img_str}
 
                 return
             else:
@@ -1300,7 +1313,7 @@ class VisionScript:
         image = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
 
         self.state["image_stack"].append(image)
-        self.state["output"] = image
+        self.state["output"] = {"image": image}
 
     def contains(self, statement):
         """
@@ -1535,7 +1548,7 @@ class VisionScript:
 
             if result is not None:
                 self.state["last"] = result
-                self.state["output"] = result
+                self.state["output"] = {"text": result}
 
             self.state["last_function_type"] = token.value
             self.state["last_function_args"] = [value]

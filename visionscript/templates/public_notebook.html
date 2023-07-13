@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>VisionScript Notebook</title>
+        
+        <link rel="stylesheet" href="/static/deploy_styles.css" />
+
+        <link rel="manifest" href="/static/manifest.json" />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    </head>
+    <body>
+        <nav>
+            <p>
+                {{ title }} - VisionScript <span class="hide_on_mobile">Notebook</span>
+            </p>
+        </nav>
+        <main>
+            <h1>{{ title }}</h1>
+            <p style="margin-bottom: 20px;">{{ description }}</p>
+            <ul id="cells">
+                {% for cell in cells %}
+                    <li class="cell">
+                        <p>Cell #{{ cell.id + 1 }}</p>
+                        <textarea rows="3" disabled style="margin-bottom: 20px;">{{ cell.data.data }}</textarea>
+                        {% if cell.output %}
+                            {% if cell.output.image %}
+                                <img src="data:image/png;base64,{{ cell.output.image.image }}" />
+                            {% else %}
+                                <pre>{{ cell.output.text }}</pre>
+                            {% endif %}
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+            <section class="download">
+                <p><a href="/{{ id }}/download">Download as .vic</a></p>
+                <p><a href="/{{ id }}/download">Download as .vicnb</a></p>
+            </section>
+            <section class="cta embed_this_notebook">
+                <h2>Embed this notebook</h2>
+                <p>Embed this notebook in your website using the following code:</p>
+                <textarea rows="3"><iframe src="{{ url_root }}/notebook/{{ id }}/embed" width="100%" height="500px"></iframe></textarea>
+            </section>
+            <section class="cta">
+                <h2>Build your own VisionScript apps</h2>
+                <p>Using VisionScript you can build computer vision apps with a drag-and-drop interface, or a concise programming language.</p>
+                <a href="https://visionscript.dev" target="_blank">Get started ➡️</a>
+            </section>
+        </main>
+    </body>
+</html>

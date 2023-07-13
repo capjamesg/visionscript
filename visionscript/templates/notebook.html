@@ -59,7 +59,7 @@ Load["./folder/abbey.jpg"]
 Detect["person"]
 Say[]</textarea>
                     <input type="submit" value="Run Code">
-                    <input onclick="saveCommentCell()" value="Save as Comment">
+                    <input onclick="saveCommentCell()" type="submit" value="Save as Comment" style="background-color: initial; color: darkgreen; border: 2px solid darkgreen;">
                 </form>
             </section>
             <aside id="files_section">
@@ -101,6 +101,9 @@ Say[]</textarea>
                         <input type="submit" value="Deploy" />
                     </form>
                     <p id="deploy_message"></p>
+                    <p id="publish">You can also publish your notebook in its current state as a public notebook.</p>
+                    <p>This is only available for code notebooks.</p>
+                    <button onclick="deploy_code(true);">Publish</button>
                 </div>
             </dialog>
             <dialog id="export">
@@ -112,6 +115,7 @@ Say[]</textarea>
                     <p id="export_message"></p>
                 </div>
             </dialog>
+            <div id="toast"></div>
         </main>
         <script src="/static/functions.js"></script>
         <script src="/static/main.js"></script>

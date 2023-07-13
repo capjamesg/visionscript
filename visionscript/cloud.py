@@ -4,19 +4,31 @@ import uuid
 from io import BytesIO
 
 import numpy as np
+import os
 from flask import Flask, jsonify, redirect, render_template, request, send_file
 
 from visionscript import lang, parser
 
 app = Flask(__name__)
 
-API_KEY = uuid.uuid4().hex
+API_KEY = "test" # uuid.uuid4().hex
+
+if not os.path.exists("scripts.json"):
+    with open("scripts.json", "w") as f:
+        json.dump({}, f)
+
+if not os.path.exists("notebooks.json"):
+    with open("notebooks.json", "w") as f:
+        json.dump({}, f)
 
 with open("scripts.json", "r") as f:
     scripts = json.load(f)
 
 for script in scripts:
     scripts[script]["session"] = lang.VisionScript()
+
+with open("notebooks.json", "r") as f:
+    notebooks = json.load(f)
 
 print("Your API key is", API_KEY)
 print("Keep it safe and don't share it with anyone!")
@@ -100,6 +112,40 @@ def home(id):
     )
 
 
+@app.route("/notebook/<id>")
+@app.route("/notebook/<id>/embed")
+def notebook(id):
+    with open("notebooks.json", "r") as f:
+        notebooks = json.load(f)
+
+    notebook_data = notebooks.get(id)
+
+    if notebook_data is None:
+        return redirect("/notebook")
+
+    # merge cells and output
+    cells = []
+
+    for i, cell in enumerate(notebook_data["notebook"]):
+        cells.append(
+            {
+                "type": "code",
+                "data": cell,
+                "output": notebook_data["output"][i],
+                "id": i,
+            }
+        )
+
+    if request.path.endswith("/embed"):
+        template = "public_notebook_embed.html"
+    else:
+        template = "public_notebook.html"
+
+    return render_template(
+        template, cells=cells, url_root=request.url_root.strip("/"), title=notebook_data["title"], description=notebook_data["description"], id=id
+    )
+
+
 @app.route("/create", methods=["POST"])
 def create():
     data = request.json
@@ -108,6 +154,30 @@ def create():
         return jsonify({"error": "Invalid API key"}), 401
 
     id = data["slug"].lower()
+
+    publish_as_noninteractive_webpage = data.get("publish_as_noninteractive_webpage")
+
+    if publish_as_noninteractive_webpage:
+        # add to notebooks.json
+        notebooks = json.load(open("notebooks.json", "r"))
+
+        notebooks[id] = {
+            "title": data["title"],
+            "notebook": data["notebook"],
+            "output": data["output"],
+            "description": data.get("description"),
+        }
+
+        app_slug = data["title"].translate(
+            str.maketrans("", "", string.punctuation.replace("-", ""))
+        )
+
+        notebooks[id]["app_slug"] = app_slug
+
+        with open("notebooks.json", "w") as f:
+            json.dump(notebooks, f)
+
+        return jsonify({"id": request.url_root + "notebook/" + id})
 
     scripts = json.load(open("scripts.json", "r"))
 
@@ -129,4 +199,4 @@ def create():
 
     scripts = json.load(open("scripts.json", "r"))
 
-    return jsonify({"id": id})
+    return jsonify({"id": request.url_root + id})

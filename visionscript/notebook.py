@@ -13,6 +13,8 @@ from visionscript.lang import parser
 
 app = Flask(__name__)
 
+API_URL = None
+
 notebooks = {}
 
 
@@ -122,7 +124,9 @@ def notebook():
 
     notebooks[state_id] = init_notebook()
 
-    return render_template("notebook.html", state_id=state_id, api_url=request.url_root)
+    return render_template(
+        "notebook.html", state_id=state_id, api_url=API_URL or request.url_root
+    )
 
 
 @app.route("/notebook/upload", methods=["POST"])
@@ -226,6 +230,9 @@ def deploy():
     api_url = request.json.get("api_url")
     api_key = request.json.get("api_key")
     description = request.json.get("description")
+    publish_as_noninteractive_webpage = request.json.get(
+        "publish_as_noninteractive_webpage"
+    )
 
     if session_id and notebooks.get(session_id) is None:
         return jsonify({"error": "No session found"}), 404
@@ -247,15 +254,18 @@ def deploy():
             "slug": app_slug,
             "api_key": api_key,
             "description": description,
-            "script": "\n".join(notebook["cells"]),
+            "script": "\n".join([cell["data"] for cell in notebook["cells"]]),
+            "notebook": notebook["cells"],
+            "output": notebook["output"],
             "variables": notebook["session"].state["input_variables"],
+            "publish_as_noninteractive_webpage": publish_as_noninteractive_webpage,
         },
     )
 
     if deploy_request.ok:
-        return jsonify({"success": True})
+        return jsonify({"success": True, "message": deploy_request.json()["id"]})
 
-    return jsonify({"success": False})
+    return jsonify({"success": False, "message": deploy_request.text})
 
 
 @app.route("/static/<path:path>")
