@@ -70,7 +70,10 @@ def notebook():
 
         if is_text_cell:
             notebooks[session_id]["cells"].append(
-                {"type": "comment", "data": user_input}
+                {"type": "editable_text", "data": user_input}
+            )
+            notebooks[session_id]["output"].append(
+                {"type": "editable_text", "data": ""}
             )
 
             # save notebook

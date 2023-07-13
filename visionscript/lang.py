@@ -534,9 +534,15 @@ class VisionScript:
         """
         Save an image to a file.
         """
+        if not os.path.exists("tmp"):
+            os.makedirs("tmp")
+
+        if not os.path.exists("tmp/output"):
+            os.makedirs("tmp/output")
+
         if not filename:
             filename = os.path.join(
-                "output",
+                "tmp/output/",
                 "".join(random.choice(string.ascii_letters) for _ in range(10)),
             )
 

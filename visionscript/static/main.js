@@ -585,7 +585,7 @@ function startLoading(loading) {
     return timer;
 }
 
-function executeCode (code) {
+function executeCode (code, comment = false) {
     // make loading wheel
     var loading = document.getElementById("loading");
     var output = document.getElementById("output");
@@ -606,16 +606,17 @@ function executeCode (code) {
         },
         body: JSON.stringify({code:
             code,
-            state_id: STATE_ID
+            state_id: STATE_ID,
+            is_text_cell: comment
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.output == null) {
-            data.output = "";
+            return;
         }
         if (data.output.image) {
-            data.output = `<img src="data:image/png;base64,${data.output.image.image}">`;
+            data.output = `<img src="data:image/png;base64,${data.output.image}">`;
         } else { 
             data.output = data.output.text;
         }
@@ -634,27 +635,25 @@ function executeCode (code) {
             return;
         }
 
-        cells.innerHTML += `
-            <li class="cell">
-                <p class="time">#${cells.children.length + 1} (${time}s)</p>
-                <textarea rows="${row_count}" readonly class="cell_run">${code}</textarea>
-                <pre ${data.error ? 'class="error_cell"' : ''}>${data.error ? data.error : data.output}</pre>
-            </li>
-        `;
+        if (data.output) {
+            cells.innerHTML += `
+                <li class="cell">
+                    <p class="time">#${cells.children.length + 1} (${time}s)</p>
+                    <textarea rows="${row_count}" class="cell_run">${code}</textarea>
+                    <pre ${data.error ? 'class="error_cell"' : ''}>${data.error ? data.error : data.output}</pre>
+                    <p class="rerun" onclick="rerun(${cells.children.length + 1}, '${code}')">Rerun</p>
+                </li>
+            `;
+        } else {
+            cells.innerHTML += `
+                <li class="cell">
+                    <p class="time">#${cells.children.length + 1}</p>
+                    <textarea rows="${row_count}" class="cell_run">${code}</textarea>
+                </li>
+            `;
+        }
         
         document.getElementById("current_count").innerHTML = `#${cells.children.length + 1}`;
-
-        // click to copy to clipboard
-        for (var i = 0; i < cells.children.length; i++) {
-            var cell = cells.children[i];
-            var textarea = cell.getElementsByTagName("textarea")[0];
-            textarea.addEventListener("click", function (event) {
-                event.preventDefault();
-                var text = event.target.value;
-                navigator.clipboard.writeText(text);
-                alert("Copied to clipboard");
-            });
-        }
     })
     .catch((error) => {
         console.log(error);
@@ -670,12 +669,20 @@ function executeCode (code) {
 }
 
 var form = document.getElementById("new");
+var create_comment = document.getElementById("create_comment");
 
 form.addEventListener("submit", function (event) {
     event.preventDefault();
     var data = new FormData(form);
     var code = data.get("jscode");
     executeCode(code);
+});
+
+create_comment.addEventListener("click", function (event) {
+    event.preventDefault();
+    var data = new FormData(form);
+    var code = data.get("jscode");
+    executeCode(code, comment=true);
 });
 
 // auto-expand textarea

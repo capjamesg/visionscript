@@ -18,13 +18,17 @@
             <p style="margin-bottom: 20px;">{{ description }}</p>
             <ul id="cells">
                 {% for cell in cells %}
-                    <li class="cell">
-                        <p>Cell #{{ cell.id + 1 }}</p>
-                        <textarea rows="3" disabled>{{ cell.data.data }}</textarea>
+                    <li {% if cell.data.type != "editable_text" %} class="cell" {% endif %}>
+                        {% if cell.data.type != "editable_text" %}
+                            <p>Cell #{{ cell.id + 1 }}</p>
+                            <textarea rows="3" disabled style="margin-bottom: 20px;">{{ cell.data.data }}</textarea>
+                        {% else %}
+                            <p style="margin-bottom: 20px;">{{ cell.data.data | safe }}</p>
+                        {% endif %}
                         {% if cell.output %}
                             {% if cell.output.image %}
                                 <img src="data:image/png;base64,{{ cell.output.image }}" />
-                            {% else %}
+                            {% elif cell.output.text %}
                                 <pre>{{ cell.output.text }}</pre>
                             {% endif %}
                         {% endif %}

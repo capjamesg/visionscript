@@ -1,6 +1,7 @@
 import json
 import string
 import uuid
+import markdown
 from io import BytesIO
 
 import numpy as np
@@ -11,7 +12,7 @@ from visionscript import lang, parser
 
 app = Flask(__name__)
 
-API_KEY = "test" # uuid.uuid4().hex
+API_KEY = uuid.uuid4().hex
 
 if not os.path.exists("scripts.json"):
     with open("scripts.json", "w") as f:
@@ -99,6 +100,9 @@ def home(id):
             return send_file(image, mimetype="image/png")
 
         return jsonify({"output": session.state["output"]})
+    
+    if not scripts.get(id):
+        return redirect("/")
 
     image_inputs = [[v, k] for k, v in scripts[id]["variables"].items() if v == "image"]
     text_inputs = [[v, k] for k, v in scripts[id]["variables"].items() if v == "text"]
@@ -127,6 +131,10 @@ def notebook(id):
     cells = []
 
     for i, cell in enumerate(notebook_data["notebook"]):
+        # if output has editable_text key, parse with markdown
+        if cell.get("type") == "editable_text":
+            cell["data"] = markdown.markdown(cell["data"])
+
         cells.append(
             {
                 "type": "code",
@@ -179,7 +187,8 @@ def create():
 
         return jsonify({"id": request.url_root + "notebook/" + id})
 
-    scripts = json.load(open("scripts.json", "r"))
+    with open("scripts.json", "r") as f:
+        scripts = json.load(f)
 
     scripts[id] = {
         "title": data["title"],
