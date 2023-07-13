@@ -1,11 +1,11 @@
 import json
+import os
 import string
 import uuid
-import markdown
 from io import BytesIO
 
+import markdown
 import numpy as np
-import os
 from flask import Flask, jsonify, redirect, render_template, request, send_file
 
 from visionscript import lang, parser
@@ -100,7 +100,7 @@ def home(id):
             return send_file(image, mimetype="image/png")
 
         return jsonify({"output": session.state["output"]})
-    
+
     if not scripts.get(id):
         return redirect("/")
 
@@ -150,7 +150,12 @@ def notebook(id):
         template = "public_notebook.html"
 
     return render_template(
-        template, cells=cells, url_root=request.url_root.strip("/"), title=notebook_data["title"], description=notebook_data["description"], id=id
+        template,
+        cells=cells,
+        url_root=request.url_root.strip("/"),
+        title=notebook_data["title"],
+        description=notebook_data["description"],
+        id=id,
     )
 
 
