@@ -1,0 +1,51 @@
+name: 🐞 Bug Report
+description: Problems with VisionScript
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for submitting a VisionScript Bug Report!
+
+  - type: checkboxes
+    attributes:
+      label: Search before asking
+      description: >
+        Please search the [issues](https://github.com/capjamesg/visionscript/issues) to see if a similar bug report already exists.
+      options:
+        - label: >
+            I have searched the VisionScript [issues](https://github.com/capjamesg/visionscript/issues) and found no similar bug report.
+          required: true
+
+  - type: textarea
+    attributes:
+      label: What is the issue?
+      description: Provide a detailed description of the issue you are facing. Also note in what environment you are working (REPL, Notebook, running a .vic file, or using VisionScript Cloud).
+      placeholder: |
+        💡 ProTip! Include as much information as possible (screenshots, logs, tracebacks etc.).
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Environment
+      description: Please specify the software and hardware you used to produce the bug.
+      placeholder: |
+        - VisionScript: 0.0.3
+        - OS: Ubuntu 20.04
+        - Python: 3.8.10
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: How can we replicate the bug?
+      description: >
+        Provide instructions on how to replicate the bug you have encountered.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Additional
+      description: Anything else you would like to share?
