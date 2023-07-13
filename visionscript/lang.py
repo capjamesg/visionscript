@@ -666,7 +666,6 @@ class VisionScript:
                     _get_colour_name((int(center[0]), int(center[1]), int(center[2])))
                 )
             except ValueError as e:
-                print(e)
                 continue
 
         self.state["last"] = human_readable_colours[:k]
@@ -896,7 +895,6 @@ class VisionScript:
             output = ""
 
             for item in self.state["last"]:
-                print(item)
                 # if list or tuple, join
                 if isinstance(item, (list, tuple)):
                     item = ", ".join([str(i) for i in item])
@@ -1206,7 +1204,6 @@ class VisionScript:
 
             # show image
             if annotator:
-                print("annotator")
                 fig = plt.figure(figsize=(8, 8))
                 # if grey, show in grey
                 if len(image.shape) == 2:
@@ -1362,7 +1359,6 @@ class VisionScript:
             return self.input_(tree.children[0].value)
 
         for node in tree.children:
-            print(node)
             if node == "True":
                 return True
             elif node == "False":
@@ -1467,8 +1463,6 @@ class VisionScript:
             if token.value == "run":
                 function_name = node.children[0].value
 
-                print(f"Running {function_name}...")
-
                 if function_name not in self.state["functions"]:
                     print(f"Function {function_name} does not exist.")
                     exit(1)
@@ -1503,7 +1497,6 @@ class VisionScript:
             else:
                 # convert children to strings
                 for item in node.children:
-                    print(item, "eeee")
                     if hasattr(item, "value"):
                         if item.value.startswith('"') and item.value.endswith('"'):
                             item.value = literal_eval(item.value)

@@ -3,13 +3,14 @@ var mode = "interactive";
 function rerun (cell_number) {
     var cells = document.getElementById("cells");
     var cell = cells.children[cell_number - 1];
-    console.log(cell, cell_number);
+    
     var textarea = cell.getElementsByTagName("textarea")[0];
     textarea.value = textarea.value.trim();
     var output = cell.getElementsByTagName("pre")[0];
     output.innerText = "";
     var output = document.getElementById("output");
     output.style.display = "block";
+
     executeCode(textarea.value, false, cell.id);
 }
 
@@ -614,11 +615,11 @@ function startLoading(loading) {
 }
 
 function executeCode (code, comment = false, existing_cell = null) {
-    // make loading wheel
     var loading = document.getElementById("loading");
     var output = document.getElementById("output");
-    // show output
+
     output.style.display = "block";
+
     var timer = startLoading(loading);
     var output_timer = startLoading(output);
 
@@ -643,8 +644,10 @@ function executeCode (code, comment = false, existing_cell = null) {
     .then(response => response.json())
     .then((data) => {
         var data = data;
+        var is_image = false;
 
         if (data.output.image) {
+            is_image = true;
             data.output = `<img src="data:image/png;base64,${data.output.image}" />`;
         } else if (is_text_cell) {
             data.output = DOMPurify.sanitize(marked.parse(code));
@@ -661,8 +664,19 @@ function executeCode (code, comment = false, existing_cell = null) {
 
         if (existing_cell) {
             var cell = document.getElementById(existing_cell);
-            var output = cell.getElementsByTagName("pre")[0];
-            output.innerText = data.output;
+            if (is_image) {
+                cell.innerHTML = `
+                    <p class="time">#${existing_cell} (${time}s) - <a href="#" onclick="rerun(${existing_cell})">Rerun</a></p>
+                    <textarea rows="${row_count}">${code}</textarea>
+                    <p>${data.output}</p>
+                `;
+                return;
+            }
+            cell.innerHTML = `
+                <p class="time">#${existing_cell} (${time}s) - <a href="#" onclick="rerun(${existing_cell})">Rerun</a></p>
+                <textarea rows="${row_count}">${data.output}</textarea>
+                <pre ${data.error ? 'class="error_cell"' : ''}>${data.error ? data.error : data.output}</pre>
+            `;
             return;
         }
 
@@ -677,7 +691,7 @@ function executeCode (code, comment = false, existing_cell = null) {
 
         if (!is_text_cell) {
             cells.innerHTML += `
-                <li class="cell">
+                <li class="cell" id="${cells.children.length + 1}">
                     <p class="time">#${cells.children.length + 1} (${time}s) - <a href="#" onclick="rerun(${cells.children.length + 1})">Rerun</a></p>
                     <textarea rows="${row_count}">${code}</textarea>
                     <pre ${data.error ? 'class="error_cell"' : ''}>${data.error ? data.error : data.output}</pre>
@@ -685,7 +699,7 @@ function executeCode (code, comment = false, existing_cell = null) {
             `;
         } else {
             cells.innerHTML += `
-                <li class="cell">
+                <li class="cell" id="${cells.children.length + 1}">
                     <p class="time">#${cells.children.length + 1}</p>
                     ${data.output}
                 </li>
@@ -695,7 +709,6 @@ function executeCode (code, comment = false, existing_cell = null) {
         document.getElementById("current_count").innerHTML = `#${cells.children.length + 1}`;
     })
     .catch((error) => {
-        console.log(error);
         clearInterval(timer);
         clearInterval(output_timer);
         
