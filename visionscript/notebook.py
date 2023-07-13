@@ -4,6 +4,7 @@ import os
 import string
 import time
 import uuid
+import numpy as np
 
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
@@ -108,6 +109,24 @@ def notebook():
         notebooks[session_id]["cells"].append({"type": "code", "data": user_input})
         notebooks[session_id]["output"].append(session.state["output"])
 
+        # if output is ndarray, convert to base64 image
+        if isinstance(session.state["output"].get("text"), np.ndarray):
+            import base64
+            from io import BytesIO
+
+            image = BytesIO()
+            # load from np array
+            from PIL import Image
+
+            Image.fromarray(session.state["output"]["text"]).save(image, format="PNG")
+
+            notebooks[session_id]["output"][-1] = {
+                "image": base64.b64encode(
+                image.getvalue()
+            ).decode("utf-8"),
+                "type": "image",
+            }
+
         # save notebook
         with open(os.path.join("tmp", session_id + ".vicnb"), "w") as f:
             json.dump(
@@ -118,7 +137,7 @@ def notebook():
                 f,
             )
 
-        return jsonify({"output": session.state["output"], "time": run_time})
+        return jsonify({"output": notebooks[session_id]["output"][-1], "time": run_time})
 
     if request.args.get("state_id"):
         state_id = request.args.get("state_id")
@@ -206,7 +225,7 @@ def upload():
 # save
 @app.route("/notebook/save", methods=["POST"])
 def save():
-    session_id = request.args.get("state_id")
+    session_id = request.json.get("state_id")
     file_name = "export.vic"
 
     if session_id and notebooks.get(session_id) is None:
@@ -219,9 +238,6 @@ def save():
 
     # delete session
     del notebook["session"]
-
-    with open(file_name, "w") as f:
-        json.dump(notebook, f)
 
     return jsonify({"file": notebook})
 

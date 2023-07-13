@@ -371,6 +371,8 @@ class VisionScript:
 
         self.state["last_loaded_image_name"] = filename
 
+        self.state["output"] = {"image": Image.open(filename).convert("RGB")}
+
         return np.array(Image.open(filename).convert("RGB"))  # [:, :, ::-1]
 
     def size(self, _):

@@ -3,13 +3,14 @@ var mode = "interactive";
 function rerun (cell_number) {
     var cells = document.getElementById("cells");
     var cell = cells.children[cell_number - 1];
+    console.log(cell, cell_number);
     var textarea = cell.getElementsByTagName("textarea")[0];
     textarea.value = textarea.value.trim();
     var output = cell.getElementsByTagName("pre")[0];
     output.innerText = "";
     var output = document.getElementById("output");
     output.style.display = "block";
-    executeCode(textarea.value, cell_number=cell_number);
+    executeCode(textarea.value, false, cell.id);
 }
 
 function show_toast (message) {
@@ -106,19 +107,23 @@ document.addEventListener("keydown", function (event) {
 
         var cell_count = cells.children.length + 1;
 
-        html = `
-            <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color};">
-                <p>${function_name}[]</p>
-            </div>
-        `;
+        if (mapped_functions[function_name].supports_arguments) {
+            html = `
+                <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: 20px;">
+                    <p>${function_name}[<input type="text" class="argument_block" id="cell_${cell_count}" />]</p>
+                </div>
+            `;
+        } else {
+            html = `
+                <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: 20px;">
+                    <p>${function_name}[]</p>
+                </div>
+            `;
+        }
 
         notebook.appendChild(document.createRange().createContextualFragment(html));
     }
 });
-
-function importNotebookToInteractiveCode (notebook) {
-
-}
 
 var colors = {
     "Input": "#a2d2ff",
@@ -186,6 +191,24 @@ for (var i = 0; i < functions.length; i++) {
         }
 
         notebook.appendChild(document.createRange().createContextualFragment(html));
+
+        function doubleTap (element) {
+            var lastTap = 0;
+            return function (event) {
+                var currentTime = new Date().getTime();
+                var tapLength = currentTime - lastTap;
+                event.preventDefault();
+                if (tapLength < 500 && tapLength > 0) {
+                    // double tap
+                    element.remove();
+                }
+                lastTap = currentTime;
+            };
+        }
+        // if double tap, delete block
+        var cell = document.getElementById(`${function_name}_${cell_count}`);
+
+        cell.addEventListener("touchstart", doubleTap(cell));
 
         // if argument block, allow tap on block to upload file
         if (mapped_functions[function_name].supports_arguments && mapped_functions[function_name].args.includes("file")) {
@@ -549,10 +572,15 @@ function deploy_code (publish_as_noninteractive_webpage) {
     .then(data => {
         var deploy_message = document.getElementById("deploy_message");
         deploy_message.innerText = data.message;
+        deploy_message.style.display = "block";
     })
     .catch((error) => {
         var deploy_message = document.getElementById("deploy_message");
-        deploy_message.innerText = "Your app could not be deployed. Please make sure your app code is valid.";
+        deploy_message.innerText = "Your app could not be deployed. Please make sure your app code is valid and you have filled out the deployment form in full.";
+        // show deploy_message
+        deploy_message.style.display = "block";
+        // add error class
+        deploy_message.classList.add("error");
     });
 }
 
@@ -585,7 +613,7 @@ function startLoading(loading) {
     return timer;
 }
 
-function executeCode (code, comment = false, cell_number = null) {
+function executeCode (code, comment = false, existing_cell = null) {
     // make loading wheel
     var loading = document.getElementById("loading");
     var output = document.getElementById("output");
@@ -613,16 +641,17 @@ function executeCode (code, comment = false, cell_number = null) {
         })
     })
     .then(response => response.json())
-    .then(data => {
-        if (data.output == null) {
-            return;
-        }
+    .then((data) => {
+        var data = data;
+
         if (data.output.image) {
-            data.output = `<img src="data:image/png;base64,${data.output.image}">`;
+            data.output = `<img src="data:image/png;base64,${data.output.image}" />`;
         } else if (is_text_cell) {
             data.output = DOMPurify.sanitize(marked.parse(code));
         } else if (data.output.text) {
             data.output = data.output.text;
+        } else {
+            data.output = data.output;
         }
         var time = data.time;
         // hide loading cell
@@ -630,19 +659,19 @@ function executeCode (code, comment = false, cell_number = null) {
         clearInterval(timer);
         clearInterval(output_timer);
 
+        if (existing_cell) {
+            var cell = document.getElementById(existing_cell);
+            var output = cell.getElementsByTagName("pre")[0];
+            output.innerText = data.output;
+            return;
+        }
+
         var row_count = (code.match(/\n/g) || []).length + 1;
 
         // if interactive mode, show in #output
         if (mode == "interactive") {
             var output = document.getElementById("output");
             output.innerHTML = data.output;
-            return;
-        }
-
-        if (cell_number) {
-            var cell = document.getElementById(`${data.cell_name}_${cell_number}`);
-            var output = cell.getElementsByTagName("pre")[0];
-            output.innerText = data.output;
             return;
         }
 
@@ -705,6 +734,10 @@ textarea.addEventListener("input", function (event) {
     textarea.style.height = textarea.scrollHeight + "px";
 });
 
+function exportNotebook() {
+    var export_modal = document.getElementById("export");
+    export_modal.showModal();
+}
 
 function export_vic() {
     var data = new FormData();
@@ -732,12 +765,14 @@ function export_vicnb() {
         body: JSON.stringify({state_id: STATE_ID})
     }).then(response => response.json())
     .then(data => {
-        var blob = new Blob([data.file], {type: "text/plain;charset=utf-8"});
-        blob.name = data.file_name;
-        // download
+        var data = JSON.stringify(data);
+
+        var blob = new Blob([data], {type: "text/plain;charset=utf-8"});
+        blob.name = "notebook.vicnb";
+        
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = data.file_name;
+        a.download = "notebook.vicnb";
         a.click();
     });
 }
@@ -790,6 +825,14 @@ function resetNotebook() {
     executeCode(code);
     // show toast
     show_toast("Your notebook has been reset.");
+    // delete all cells
+    var cells = document.getElementById("cells");
+    cells.innerHTML = "";
+    // delete all interactive cells
+    var notebook = document.getElementById("drag_drop_notebook");
+    notebook.innerHTML = "";
+    // set background back to image
+    document.getElementById("drag_drop_notebook").style.background = "url('/static/drag_and_drop.png')";
 }
 
 function toggle_menu () {

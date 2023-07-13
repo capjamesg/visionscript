@@ -7,6 +7,10 @@
 html {
     background-color: #f7f7f7;
 }
+a {
+    color: darkgreen;
+    text-decoration: none;
+}
 ul {
     list-style-type: none;
     padding: 0;
@@ -198,7 +202,7 @@ footer {
     border-radius: 5px;
     margin-left: 10px;
 }
-#error {
+#error, .error {
     display: none;
     background-color: lightcoral;
     border-radius: 5px;
@@ -220,6 +224,12 @@ dialog {
     padding: 50px;
     background-color: white;
     margin: auto;
+    max-width: 40em;
+    min-width: 20em;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 dialog h2 {
     font-size: 18px;
@@ -242,7 +252,7 @@ dialog button, input[type="submit"] {
     width: 100%;
 }
 dialog input {
-    margin-top: 20px;
+    margin-top: 5px;
     width: 100%;
     border: 1px solid #ccc;
     resize: none;
@@ -293,7 +303,7 @@ nav ul li:last-child {
     justify-content: space-between;
     align-items: center;
 }
-.toast {
+#toast {
     position: fixed;
     top: 0;
     right: 0;
@@ -304,10 +314,20 @@ nav ul li:last-child {
     border: 1px solid lightgrey;
     box-shadow: 0 0 10px lightgrey;
     z-index: 100;
+    display: none;
 }
-.deploy_message {
-    display: block;
+#deploy_message {
+    display: none;
     margin-bottom: 10px;
+    border: 1px solid lightgrey;
+    padding: 10px;
+}
+dialog p {
+    margin-bottom: 10px;
+}
+label {
+    display: block;
+    font-weight: bold;
 }
 @media screen and (max-width: 800px) {
     #nav_menu {

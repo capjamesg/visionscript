@@ -28,7 +28,7 @@
                 <div id="nav_menu">
                     <li onclick="switch_mode()"><a id="mode_switch">Use Code Mode 📝</a></li>
                     <li><a href="https://visionscript.dev/docs" target="_blank">Docs 📚</a></li>
-                    <li><a id="export_vic">Export 💾</a></li>
+                    <li><a onclick="exportNotebook();">Export 💾</a></li>
                     <li onclick="deploy()"><a>Use as Web App ☁️</a></li>
                     <li id="reset" onclick="resetNotebook()"><a>Reset 🔄</a></li>
                     <li id="toggle_menu" onclick="toggle_menu()"><a>Close</a></li>
@@ -81,19 +81,21 @@
                 </select>
             </aside>
             <dialog id="dialog">
-                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer;">Close</p>
+                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer; color: coral;">Close</p>
                 <div>
                     <h2>Message</h2>
                     <p id="error_message"></p>
-                    <button onclick="this.parentNode.parentNode.close()">Close</button>
                 </div>
             </dialog>
             <dialog id="deploy">
-                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer;">Close</p>
-                <div>
+                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer; color: coral;">Close</p>
+                <div style="line-height: 1.5em;">
                     <h2>Deploy your app</h2>
-                    <p>You can run your code as a local web app that people can use.</p>
-                    <p>Choose a name for your app and click "Deploy".</p>
+                    <p id="deploy_message"></p>
+                    <p>You can deploy your app as a web app or a notebook.</p>
+                    <p>People can use your apps, and you can use them in your own projects.</p>
+                    <p>Notebooks, on the other hand, are a great way to share your code with others.</p>
+                    <p style="margin-bottom: 20px;">Learn more in the <a href="https://visionscript.dev/docs/deploy" target="_blank">VisionScript documentation</a>.</p>
                     <form id="deploy_form">
                         <label for="name">Name</label>
                         <input type="text" name="name" id="name" placeholder="Name" />
@@ -103,21 +105,22 @@
                         <input type="text" name="api_key" id="api_key" placeholder="API key" />
                         <label for="description">Description</label>
                         <input type="text" name="description" id="description" placeholder="Description" />
-                        <input type="submit" value="Deploy" />
+                        <input type="submit" value="Publish as App" />
+                        <button onclick="deploy_code(true);" style="background-color: initial; color: darkgreen; border: 2px solid darkgreen;">Publish as Notebook</button>
                     </form>
-                    <p id="deploy_message"></p>
-                    <p id="publish">You can also publish your notebook in its current state as a public notebook.</p>
-                    <p>This is only available for code notebooks.</p>
-                    <button onclick="deploy_code(true);">Publish</button>
                 </div>
             </dialog>
             <dialog id="export">
-                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer;">Close</p>
+                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer; color: coral;">Close</p>
                 <div>
                     <h2>Export your app</h2>
-                    <p><a onclick="export_vic()">Export</a> your app as a .vic file.</p>
-                    <p><a onclick="export_vicnb()">Export</a> your app as a .vicnb file.</p>
                     <p id="export_message"></p>
+                    <p>You can export your app as a .vic file (a script), or a .vicnb file (a notebook).</p>
+                    <p style="margin-bottom: 20px;">These files can be used in your own projects, or shared with others.</p>
+                    <ul>
+                        <p><a onclick="export_vic()" style="cursor: pointer;">Export your app as a .vic file</a>.</p>
+                        <p><a onclick="export_vicnb()" style="cursor: pointer">Export your app as a .vicnb file</a>.</p>
+                    </ul>
                 </div>
             </dialog>
             <div id="toast"></div>
