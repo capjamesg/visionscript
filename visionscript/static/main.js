@@ -1,15 +1,15 @@
 var mode = "interactive";
 
-function rerun (cell_number, code) {
+function rerun (cell_number) {
     var cells = document.getElementById("cells");
     var cell = cells.children[cell_number - 1];
     var textarea = cell.getElementsByTagName("textarea")[0];
-    textarea.value = code;
+    textarea.value = textarea.value.trim();
     var output = cell.getElementsByTagName("pre")[0];
     output.innerText = "";
     var output = document.getElementById("output");
     output.style.display = "block";
-    executeCode(code);
+    executeCode(textarea.value, cell_number=cell_number);
 }
 
 function show_toast (message) {
@@ -585,7 +585,7 @@ function startLoading(loading) {
     return timer;
 }
 
-function executeCode (code, comment = false) {
+function executeCode (code, comment = false, cell_number = null) {
     // make loading wheel
     var loading = document.getElementById("loading");
     var output = document.getElementById("output");
@@ -599,6 +599,8 @@ function executeCode (code, comment = false) {
     error_cell.innerText = "";
     error_cell.style.display = "none";
 
+    var is_text_cell = comment;
+
     fetch(`${API_URL}/notebook`, {
         method: 'POST',
         headers: {
@@ -607,7 +609,7 @@ function executeCode (code, comment = false) {
         body: JSON.stringify({code:
             code,
             state_id: STATE_ID,
-            is_text_cell: comment
+            is_text_cell: is_text_cell
         })
     })
     .then(response => response.json())
@@ -617,7 +619,9 @@ function executeCode (code, comment = false) {
         }
         if (data.output.image) {
             data.output = `<img src="data:image/png;base64,${data.output.image}">`;
-        } else { 
+        } else if (is_text_cell) {
+            data.output = DOMPurify.sanitize(marked.parse(code));
+        } else if (data.output.text) {
             data.output = data.output.text;
         }
         var time = data.time;
@@ -635,20 +639,26 @@ function executeCode (code, comment = false) {
             return;
         }
 
-        if (data.output) {
+        if (cell_number) {
+            var cell = document.getElementById(`${data.cell_name}_${cell_number}`);
+            var output = cell.getElementsByTagName("pre")[0];
+            output.innerText = data.output;
+            return;
+        }
+
+        if (!is_text_cell) {
             cells.innerHTML += `
                 <li class="cell">
-                    <p class="time">#${cells.children.length + 1} (${time}s)</p>
-                    <textarea rows="${row_count}" class="cell_run">${code}</textarea>
+                    <p class="time">#${cells.children.length + 1} (${time}s) - <a href="#" onclick="rerun(${cells.children.length + 1})">Rerun</a></p>
+                    <textarea rows="${row_count}">${code}</textarea>
                     <pre ${data.error ? 'class="error_cell"' : ''}>${data.error ? data.error : data.output}</pre>
-                    <p class="rerun" onclick="rerun(${cells.children.length + 1}, '${code}')">Rerun</p>
                 </li>
             `;
         } else {
             cells.innerHTML += `
                 <li class="cell">
                     <p class="time">#${cells.children.length + 1}</p>
-                    <textarea rows="${row_count}" class="cell_run">${code}</textarea>
+                    ${data.output}
                 </li>
             `;
         }
@@ -665,6 +675,8 @@ function executeCode (code, comment = false) {
         error_cell.style.display = "block";
         // hide output
         output.style.display = "none";
+        var loading = document.getElementById("loading");
+        loading.style.display = "none";
     });
 }
 
@@ -758,6 +770,8 @@ dropzone.addEventListener("drop", function (event) {
     }
     event.preventDefault();
     dropzone.style.backgroundColor = "white";
+
+    var file = event.dataTransfer.files[0];
 
     // only allow jpeg, jpg, png, or .vicnb
     if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb")) {

@@ -15,6 +15,9 @@
             const STATE_ID = "{{ state_id }}";
             const API_URL = "{{ api_url }}";
         </script>
+
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+        <script type="text/javascript" src="/static/purify.min.js"></script>
     </head>
     <body>
         <nav>
@@ -39,29 +42,31 @@
                 <h2 style="font-size: 24px;">Code Blocks</h2>
                 <input type="text" id="search" name="search" placeholder="Search functions" style="width: 100%; padding: 10px; border: 1px solid lightgrey; border-radius: 5px; margin-bottom: 10px;" onkeyup="processSearch()" />
             </aside>
-            <section id="interactive_mode">
-                <h2>Make something cool</h2>
-                <p class="hide_on_mobile">Drag and drop functions in the box below to build your program.</p>
-                <div id="drag_drop_notebook"></div>
+            <div id="notebook">
+                <section id="interactive_mode">
+                    <h2>Make something cool</h2>
+                    <p class="hide_on_mobile">Drag and drop functions in the box below to build your program.</p>
+                    <div id="drag_drop_notebook"></div>
+                    <div id="output">Output</div>
+                </section>
+                <section id="code_mode">
+                    <h2>Notebook</h2>
+                    <p style="margin-bottom: 20px;">Write your program in the boxes below.</p>
+                    <ul id="cells">
+                    </ul>
+                    <form class="cell" id="new">
+                        <p id="current_count">#1</p>
+                        <textarea name="jscode" id="jscode" rows="3">
+    Load["./folder/abbey.jpg"]
+    Detect["person"]
+    Say[]</textarea>
+                        <input type="submit" value="Run Code">
+                        <button id="create_comment" style="background-color: initial; color: darkgreen; border: 2px solid darkgreen;">Save as Comment</button>
+                    </form>
+                </section>
                 <p class="error" id="error"></p>
                 <p class="loading" id="loading" style="display: none;">Loading...</p>
-                <div id="output">Output</div>
-            </section>
-            <section id="code_mode">
-                <h2>Notebook</h2>
-                <p style="margin-bottom: 20px;">Write your program in the boxes below.</p>
-                <ul id="cells">
-                </ul>
-                <form class="cell" id="new">
-                    <p id="current_count">#1</p>
-                    <textarea name="jscode" id="jscode" rows="3">
-Load["./folder/abbey.jpg"]
-Detect["person"]
-Say[]</textarea>
-                    <input type="submit" value="Run Code">
-                    <button id="create_comment" style="background-color: initial; color: darkgreen; border: 2px solid darkgreen;">Save as Comment</button>
-                </form>
-            </section>
+            </div>
             <aside id="files_section">
                 <h2>Files</h2>
                 <p style="margin-bottom: 20px;">Drag and drop files here to load them.</p>
@@ -118,6 +123,7 @@ Say[]</textarea>
             <div id="toast"></div>
         </main>
         <script src="/static/functions.js"></script>
+        <script src="/static/renderCells.js"></script>
         <script src="/static/main.js"></script>
         <script src="/static/examples.js"></script>
     </body>

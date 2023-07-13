@@ -118,6 +118,8 @@ def home(id):
 
 @app.route("/notebook/<id>")
 @app.route("/notebook/<id>/embed")
+@app.route("/notebook/<id>/export_vic")
+@app.route("/notebook/<id>/export_vicnb")
 def notebook(id):
     with open("notebooks.json", "r") as f:
         notebooks = json.load(f)
@@ -126,6 +128,21 @@ def notebook(id):
 
     if notebook_data is None:
         return redirect("/notebook")
+    
+    if request.path.endswith("/export_vicnb"):
+        # force download with Content-Disposition so that user doesn't see raw JSON
+        return jsonify(notebook_data), 200, {
+            "Content-Disposition": f"attachment; filename={id}.vicnb"
+        }
+    elif request.path.endswith("/export_vic"):
+        # concatenate all celsl
+        cells = [i["data"] for i in notebook_data["notebook"]]
+
+        code = "\n".join(cells) + "\n"
+
+        return jsonify(code), 200, {
+            "Content-Disposition": f"attachment; filename={id}.vic"
+        }
 
     # merge cells and output
     cells = []
@@ -156,6 +173,7 @@ def notebook(id):
         title=notebook_data["title"],
         description=notebook_data["description"],
         id=id,
+        notebook_url=request.url_root.strip("/") + "/notebook/" + id,
     )
 
 
@@ -183,7 +201,7 @@ def create():
 
         app_slug = data["title"].translate(
             str.maketrans("", "", string.punctuation.replace("-", ""))
-        )
+        ).replace(" ", "-")
 
         notebooks[id]["app_slug"] = app_slug
 
@@ -204,7 +222,7 @@ def create():
 
     app_slug = data["title"].translate(
         str.maketrans("", "", string.punctuation.replace("-", ""))
-    )
+    ).replace(" ", "-")
 
     scripts[id]["app_slug"] = app_slug
 

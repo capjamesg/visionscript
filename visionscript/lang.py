@@ -586,7 +586,7 @@ class VisionScript:
 
         app_slug = app_name.translate(
             str.maketrans("", "", string.punctuation.replace("-", ""))
-        )
+        ).replace(" ", "-")
 
         response = requests.post(
             "http://localhost:6999/create",
@@ -1674,7 +1674,7 @@ def main(
 
             app_slug = name.translate(
                 str.maketrans("", "", string.punctuation.replace("-", ""))
-            )
+            ).replace(" ", "-")
 
             deploy_request = requests.post(
                 api_url,

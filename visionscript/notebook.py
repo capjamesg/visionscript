@@ -248,7 +248,7 @@ def deploy():
 
     app_slug = name.translate(
         str.maketrans("", "", string.punctuation.replace("-", ""))
-    )
+    ).replace(" ", "-")
 
     deploy_request = requests.post(
         api_url,

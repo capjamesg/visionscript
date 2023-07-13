@@ -54,12 +54,11 @@ h3 {
     font-size: 14px;
     margin-bottom: 0.5rem;
 }
-section {
+section, #notebook {
     padding: 1rem;
     max-width: 50em;
     margin: 0 auto;
     flex: 1;
-    min-height: 1000px;
 }
 #current_count {
     font-size: 1rem;
