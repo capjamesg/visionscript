@@ -163,12 +163,31 @@ for (var i = 0; i < functions.length; i++) {
         event.dataTransfer.setData("text/plain", event.target.id);
     });
 
+    console.log("function", functions[i]);
+
     // on mobile tap, add to notebook
     function_element.addEventListener("touchstart", function (event) {
         event.preventDefault();
         // set background color
+        // ACCESS functinos from parent
+
         document.getElementById("drag_drop_notebook").style.background = "white";
+  
+        // get function name
         var function_name = event.target.id;
+
+        // if no id, traverse up
+        if (!function_name) {
+            while (!function_name) {
+                function_name = event.target.parentElement.id;
+                // break if element is <html>
+                if (event.target.parentElement.tagName == "HTML") {
+                    break;
+                }
+            }
+        }
+
+
         var function_element = document.getElementById(function_name);
         
         var color = function_element.firstElementChild.style.color;
