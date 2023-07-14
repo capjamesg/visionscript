@@ -1,14 +1,14 @@
+import base64
 import copy
 import json
 import os
 import string
 import time
 import uuid
-import numpy as np
-import qrcode
 from io import BytesIO
 
-import base64
+import numpy as np
+import qrcode
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
@@ -126,9 +126,7 @@ def notebook():
             Image.fromarray(session.state["output"]["text"]).save(image, format="PNG")
 
             notebooks[session_id]["output"][-1] = {
-                "image": base64.b64encode(
-                image.getvalue()
-            ).decode("utf-8"),
+                "image": base64.b64encode(image.getvalue()).decode("utf-8"),
                 "type": "image",
             }
 
@@ -142,7 +140,9 @@ def notebook():
                 f,
             )
 
-        return jsonify({"output": notebooks[session_id]["output"][-1], "time": run_time})
+        return jsonify(
+            {"output": notebooks[session_id]["output"][-1], "time": run_time}
+        )
 
     if request.args.get("state_id"):
         state_id = request.args.get("state_id")
@@ -152,7 +152,10 @@ def notebook():
     notebooks[state_id] = init_notebook()
 
     return render_template(
-        "notebook.html", state_id=state_id, api_url=API_URL or request.url_root, url_root=request.url_root.strip("/")
+        "notebook.html",
+        state_id=state_id,
+        api_url=API_URL or request.url_root,
+        url_root=request.url_root.strip("/"),
     )
 
 
@@ -229,7 +232,7 @@ def upload():
                 result.append({"cell": cell, "output": output})
 
             return jsonify({"cells": result})
-        
+
     # notebook session should have state id
     if notebooks[session_id]["session"] is None:
         notebooks[session_id]["session"] = lang.VisionScript()
@@ -298,17 +301,25 @@ def deploy():
             "publish_as_noninteractive_webpage": publish_as_noninteractive_webpage,
         },
     )
-    qr_code = qrcode.make(api_url.strip().strip("/create") + "/notebook?state_id=" + session_id)
+    qr_code = qrcode.make(
+        api_url.strip().strip("/create") + "/notebook?state_id=" + session_id
+    )
 
     image = BytesIO()
     qr_code.save(image, format="PNG")
 
-    qr_code = "data:image/png;base64," + base64.b64encode(
-        image.getvalue()
-    ).decode("utf-8")
+    qr_code = "data:image/png;base64," + base64.b64encode(image.getvalue()).decode(
+        "utf-8"
+    )
 
     if deploy_request.ok:
-        return jsonify({"success": True, "message": deploy_request.json()["id"], "qr_code": qr_code})
+        return jsonify(
+            {
+                "success": True,
+                "message": deploy_request.json()["id"],
+                "qr_code": qr_code,
+            }
+        )
 
     return jsonify({"success": False, "message": deploy_request.text})
 
@@ -322,9 +333,11 @@ def static_files(path):
 def quit():
     exit()
 
+
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template("error.html", title="Page Not Found"), 404
+
 
 @app.errorhandler(500)
 def internal_server_error(e):

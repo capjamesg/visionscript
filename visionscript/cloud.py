@@ -101,6 +101,16 @@ def home(id):
 
         return jsonify({"output": session.state["output"]})
 
+    # make sure any new scripts are added
+    # but preserve any existing scripts and
+    # their state
+    with open("scripts.json", "r") as f:
+        new_scripts = json.load(f)
+
+    for script in new_scripts:
+        if scripts.get(script) is None:
+            scripts[script] = new_scripts[script].copy()
+
     if not scripts.get(id):
         return redirect("/")
 
@@ -128,21 +138,25 @@ def notebook(id):
 
     if notebook_data is None:
         return redirect("/notebook")
-    
+
     if request.path.endswith("/export_vicnb"):
         # force download with Content-Disposition so that user doesn't see raw JSON
-        return jsonify(notebook_data), 200, {
-            "Content-Disposition": f"attachment; filename={id}.vicnb"
-        }
+        return (
+            jsonify(notebook_data),
+            200,
+            {"Content-Disposition": f"attachment; filename={id}.vicnb"},
+        )
     elif request.path.endswith("/export_vic"):
         # concatenate all celsl
         cells = [i["data"] for i in notebook_data["notebook"]]
 
         code = "\n".join(cells) + "\n"
 
-        return jsonify(code), 200, {
-            "Content-Disposition": f"attachment; filename={id}.vic"
-        }
+        return (
+            jsonify(code),
+            200,
+            {"Content-Disposition": f"attachment; filename={id}.vic"},
+        )
 
     # merge cells and output
     cells = []
@@ -199,9 +213,11 @@ def create():
             "description": data.get("description"),
         }
 
-        app_slug = data["title"].translate(
-            str.maketrans("", "", string.punctuation.replace("-", ""))
-        ).replace(" ", "-")
+        app_slug = (
+            data["title"]
+            .translate(str.maketrans("", "", string.punctuation.replace("-", "")))
+            .replace(" ", "-")
+        )
 
         notebooks[id]["app_slug"] = app_slug
 
@@ -220,9 +236,11 @@ def create():
         "description": data.get("description"),
     }
 
-    app_slug = data["title"].translate(
-        str.maketrans("", "", string.punctuation.replace("-", ""))
-    ).replace(" ", "-")
+    app_slug = (
+        data["title"]
+        .translate(str.maketrans("", "", string.punctuation.replace("-", "")))
+        .replace(" ", "-")
+    )
 
     scripts[id]["app_slug"] = app_slug
 
@@ -233,9 +251,11 @@ def create():
 
     return jsonify({"id": request.url_root + id})
 
+
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template("error.html", title="Page Not Found"), 404
+
 
 @app.errorhandler(500)
 def internal_server_error(e):

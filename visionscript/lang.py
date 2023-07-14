@@ -11,13 +11,13 @@ import os
 import random
 import string
 import sys
-import tempfile
 import time
 
 import click
 import cv2
 import lark
 import numpy as np
+import registry
 import supervision as sv
 import torch
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
@@ -35,17 +35,15 @@ spell = SpellChecker()
 
 parser = Lark(grammar)
 
-SUPPORTED_INFERENCE_MODELS = {
-    "classify": {
-        "clip": "clip",
-    },
-    "detect": {"yolov8": "autodistill_yolov8"},
-    "segment": {"fastsam": "fastsam", "groundedsam": "autodistill_groundedsam"},
-}
-
 SUPPORTED_TRAIN_MODELS = {
     "classify": {"vit": "autodistill_vit"},
     "detect": {"yolov8": "autodistill_yolov8"},
+}
+
+SUPPORTED_INFERENCE_MODELS = {
+    "groundingdino": lambda self, classes: registry.grounding_dino_base(self, classes),
+    "yolov8": lambda self, classes: registry.yolov8_base(self, classes),
+    "fastsam": lambda self, classes: registry.fast_sam_base(self, classes),
 }
 
 
@@ -368,7 +366,9 @@ class VisionScript:
                 os.makedirs(os.path.join("tmp", self.state["session_id"]))
 
             # save to tmp
-            with open(os.path.join("tmp", self.state["session_id"], filename), "wb") as f:
+            with open(
+                os.path.join("tmp", self.state["session_id"], filename), "wb"
+            ) as f:
                 f.write(response.content)
 
             filename = os.path.join("tmp", self.state["session_id"], filename)
@@ -438,7 +438,7 @@ class VisionScript:
             image = image.crop((0, 0, image.size[0] // 2, image.size[1] // 2))
         else:
             x0, y0, x1, y1 = args
-            
+
             x0 = int(x0) if isinstance(x0, str) else x0
             y0 = int(y0) if isinstance(y0, str) else y0
             x1 = int(x1) if isinstance(x1, str) else x1
@@ -746,52 +746,14 @@ class VisionScript:
         """
         logging.disable(logging.CRITICAL)
 
-        if (
-            self.state.get("current_active_model")
-            and self.state["current_active_model"].lower() == "groundingdino"
-        ):
-            from autodistill.detection import CaptionOntology
-            from autodistill_grounding_dino import GroundingDINO
+        if self.state.get("current_active_model") is None:
+            self.state["current_active_model"] = "yolov8"
 
-            mapped_items = {item: item for item in classes}
+        self.state["current_active_model"] = self.state["current_active_model"].lower()
 
-            base_model = GroundingDINO(CaptionOntology(mapped_items))
-
-            inference_results = base_model.predict(self.state["last_loaded_image_name"])
-        else:
-            from ultralytics import YOLO
-
-            # model name should be only letters and - and numbers
-
-            model_name = self.state.get("current_active_model", "yolov8n")
-
-            model_name = "".join(
-                [
-                    letter
-                    for letter in model_name
-                    if letter.isalpha() or letter == "-" or letter.isdigit()
-                ]
-            )
-
-            if (
-                self.state.get("model")
-                and self.state["current_active_model"].lower() == "yolo"
-            ):
-                model = model
-            else:
-                model = YOLO(model_name + ".pt")
-
-            inference_results = model(self.state["image_stack"][-1])[0]
-
-            logging.disable(logging.NOTSET)
-
-            # Inference
-            results = sv.Detections.from_yolov8(inference_results)
-
-        inference_classes = inference_results.names
-
-        if len(classes) == 0:
-            classes = inference_classes
+        results, inference_classes = SUPPORTED_INFERENCE_MODELS[
+            self.state["current_active_model"]
+        ](self, classes)
 
         classes = [key for key, item in inference_classes.items() if item in classes]
 
@@ -856,51 +818,11 @@ class VisionScript:
         Apply image segmentation and generate segmentation masks.
         """
         # check for model
-        from .FastSAM.fastsam import FastSAM, FastSAMPrompt
+        if self.state.get("current_active_model") is None:
+            self.state["current_active_model"] = "fastsam"
 
-        logging.disable(logging.CRITICAL)
-        # get current path
-        import os
-
-        current_path = os.getcwd()
-
-        model = FastSAM(os.path.join(current_path, "weights", "FastSAM.pt"))
-
-        everything_results = model(
-            self.state["last_loaded_image_name"],
-            device=DEVICE,
-            retina_masks=True,
-            imgsz=1024,
-            conf=0.4,
-            iou=0.9,
-        )
-        prompt_process = FastSAMPrompt(
-            self.state["last_loaded_image_name"], everything_results, device=DEVICE
-        )
-
-        # text prompt
-        ann = prompt_process.text_prompt(text=text_prompt)
-        logging.disable(logging.NOTSET)
-
-        results = []
-        class_ids = []
-
-        for mask in ann:
-            results.append(
-                sv.Detections(
-                    mask=np.array([mask]),
-                    xyxy=sv.mask_to_xyxy(np.array([mask])),
-                    class_id=np.array([0]),
-                    confidence=np.array([1]),
-                )
-            )
-            class_ids.append(0)
-
-        detections = sv.Detections(
-            mask=np.array([item.mask[0] for item in results]),
-            xyxy=np.array([item.xyxy[0] for item in results]),
-            class_id=np.array(class_ids),
-            confidence=np.array([1]),
+        detections = SUPPORTED_INFERENCE_MODELS[self.state["current_active_model"]](
+            self, text_prompt
         )
 
         self.state["detections_stack"].append(detections)
@@ -953,7 +875,7 @@ class VisionScript:
             print(statement.strip())
             return
 
-        if self.state.get("last_function_type", None) in ("detect", "segment"):
+        if isinstance(self.state["last"], sv.Detections):
             last_args = self.state["last_function_args"]
             statement = "".join(
                 [
