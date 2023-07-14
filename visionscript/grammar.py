@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL | EOF | " ")*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass)
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -36,6 +36,7 @@ select: "Select" ("[" "]")? | "Select" "[" INT "]"
 paste: "Paste" "[" INT "," INT "]"
 pasterandom: "PasteRandom" ("[" "]")?
 cutout: "Cutout" ("[" "]")?
+crop: "Crop" ("[" (INT | STRING) "," (INT | STRING) "," (INT | STRING) "," (INT | STRING) "]")?
 count: "Count" ("[" "]")?
 input: "Input" ("[" STRING "]")?
 contains: "Contains" "[" STRING "]"

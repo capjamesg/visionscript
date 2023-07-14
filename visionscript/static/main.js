@@ -239,23 +239,23 @@ for (var i = 0; i < functions.length; i++) {
 
         notebook.appendChild(document.createRange().createContextualFragment(html));
 
-        function doubleTap (element) {
-            var lastTap = 0;
-            return function (event) {
-                var currentTime = new Date().getTime();
-                var tapLength = currentTime - lastTap;
-                event.preventDefault();
-                if (tapLength < 500 && tapLength > 0) {
-                    // double tap
-                    element.remove();
-                }
-                lastTap = currentTime;
-            };
-        }
-        // if double tap, delete block
-        var cell = document.getElementById(`${function_name}_${cell_count}`);
+        // function doubleTap (element) {
+        //     var lastTap = 0;
+        //     return function (event) {
+        //         var currentTime = new Date().getTime();
+        //         var tapLength = currentTime - lastTap;
+        //         event.preventDefault();
+        //         if (tapLength < 500 && tapLength > 0) {
+        //             // double tap
+        //             element.remove();
+        //         }
+        //         lastTap = currentTime;
+        //     };
+        // }
+        // // if double tap, delete block
+        // var cell = document.getElementById(`${function_name}_${cell_count}`);
 
-        cell.addEventListener("touchstart", doubleTap(cell));
+        // cell.addEventListener("touchstart", doubleTap(cell));
 
         // if argument block, allow tap on block to upload file
         if (mapped_functions[function_name].supports_arguments && mapped_functions[function_name].args.includes("file")) {
@@ -267,50 +267,52 @@ for (var i = 0; i < functions.length; i++) {
                 file_input.type = "file";
                 file_input.click();
                 file_input.addEventListener("change", function (event) {
-                    var file = event.target.files[0];
-                    var body = new FormData();
-                    body.append("file", file)
-                    body.append("state_id", STATE_ID);
-                    // base64 file
-                    var reader = new FileReader();
-                    // read file
-                    reader.readAsDataURL(file);
+                    for (var file of event.target.files) {
+                        console.log(file);
+                        var body = new FormData();
+                        body.append("file", file)
+                        body.append("state_id", STATE_ID);
+                        // base64 file
+                        var reader = new FileReader();
+                        // read file
+                        reader.readAsDataURL(file);
 
-                    // only allow jpeg, jpg, png, or .vicnb, avif, webp
-                    file.name = file.name.toLowerCase();
-                    if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
-                        var dialog = document.getElementById("dialog");
-                        var error_message = document.getElementById("error_message");
-                        error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
-                        dialog.showModal();
-                        return;
-                    }
-
-                    // post to /notebook/upload with state id
-                    fetch(`${API_URL}/notebook/upload?state_id=${STATE_ID}`, {
-                        method: 'POST',
-                        body: body
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        var cell = document.getElementById("cell_" + argument_block.id.split("_")[1]);
-                        cell.value = data.file_name;
-                        cell.dataset.filename = data.file_name;
-                        var img = document.createElement("img");
-                        img.src = reader.result;
-                        img.style.width = "100px";
-                        img.style.height = "100px";
-                        argument_block.innerHTML = "";
-                        img.dataset.filename = data.file_name;
-                        img.classList.add("argument_block");
-                        cell.replaceWith(img);
-
-                        if (file.name.endsWith(".vicnb")) {
-                            show_toast("Your notebook has been imported.");
-                        } else {
-                            show_toast("Your file has been uploaded.");
+                        // only allow jpeg, jpg, png, or .vicnb, avif, webp
+                        file.name = file.name.toLowerCase();
+                        if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
+                            var dialog = document.getElementById("dialog");
+                            var error_message = document.getElementById("error_message");
+                            error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
+                            dialog.showModal();
+                            return;
                         }
-                    });
+
+                        // post to /notebook/upload with state id
+                        fetch(`${API_URL}/notebook/upload?state_id=${STATE_ID}`, {
+                            method: 'POST',
+                            body: body
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            var cell = document.getElementById("cell_" + argument_block.id.split("_")[1]);
+                            cell.value = data.file_name;
+                            cell.dataset.filename = data.file_name;
+                            var img = document.createElement("img");
+                            img.src = reader.result;
+                            img.style.width = "100px";
+                            img.style.height = "100px";
+                            argument_block.innerHTML = "";
+                            img.dataset.filename = data.file_name;
+                            img.classList.add("argument_block");
+                            cell.replaceWith(img);
+
+                            if (file.name.endsWith(".vicnb")) {
+                                show_toast("Your notebook has been imported.");
+                            } else {
+                                show_toast("Your file has been uploaded.");
+                            }
+                        });
+                    }
                 });
             });
         }
@@ -624,8 +626,14 @@ function deploy_code (publish_as_noninteractive_webpage) {
     .then(response => response.json())
     .then(data => {
         var deploy_message = document.getElementById("deploy_message");
-        deploy_message.innerText = data.message;
+        deploy_message.innerText = "Published to " + data.message;
         deploy_message.style.display = "block";
+        console.log(data);
+        var qrcode = data.qr_code;
+        // base64
+        deploy_message.innerHTML += `<p>Scan the code below to view your creation on a mobile device: <br /><br /><img src="${qrcode}" />`;
+        // add success class
+        deploy_message.classList.add("success");
     })
     .catch((error) => {
         var deploy_message = document.getElementById("deploy_message");
@@ -875,19 +883,30 @@ dropzone.addEventListener("drop", function (event) {
     event.preventDefault();
     dropzone.style.backgroundColor = "white";
 
-    var file = event.dataTransfer.files[0];
+    // IF FOLDER, UPLOAD ALL FILES in folder
+    if (event.dataTransfer.items) {
+        for (var item of event.dataTransfer.items) {
+            if (item.kind === 'file') {
+                console.log(item.getAsFile());
+                var file = item.getAsFile();
+                uploadNotebook(event, mode, file);
+            }
+        }
+    } else {
+        for (var file of event.dataTransfer.files) {
+            // only allow jpeg, jpg, png, or .vicnb
+            file.name = file.name.toLowerCase();
+            if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
+                var dialog = document.getElementById("dialog");
+                var error_message = document.getElementById("error_message");
+                error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
+                dialog.showModal();
+                return;
+            }
 
-    // only allow jpeg, jpg, png, or .vicnb
-    file.name = file.name.toLowerCase();
-    if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
-        var dialog = document.getElementById("dialog");
-        var error_message = document.getElementById("error_message");
-        error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
-        dialog.showModal();
-        return;
+            uploadNotebook(event, mode, file);
+        }
     }
-
-    uploadNotebook(event, mode);
 });
 
 function resetNotebook() {

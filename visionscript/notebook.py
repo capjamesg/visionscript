@@ -5,7 +5,10 @@ import string
 import time
 import uuid
 import numpy as np
+import qrcode
+from io import BytesIO
 
+import base64
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
@@ -295,9 +298,17 @@ def deploy():
             "publish_as_noninteractive_webpage": publish_as_noninteractive_webpage,
         },
     )
+    qr_code = qrcode.make(api_url.strip().strip("/create") + "/notebook?state_id=" + session_id)
+
+    image = BytesIO()
+    qr_code.save(image, format="PNG")
+
+    qr_code = "data:image/png;base64," + base64.b64encode(
+        image.getvalue()
+    ).decode("utf-8")
 
     if deploy_request.ok:
-        return jsonify({"success": True, "message": deploy_request.json()["id"]})
+        return jsonify({"success": True, "message": deploy_request.json()["id"], "qr_code": qr_code})
 
     return jsonify({"success": False, "message": deploy_request.text})
 

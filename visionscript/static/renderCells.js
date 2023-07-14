@@ -1,5 +1,5 @@
-function uploadNotebook (event, mode) {
-    var file = event.dataTransfer.files[0];
+function uploadNotebook (event, mode, file = null) {
+    var file = file || event.dataTransfer.files[0];
     var body = new FormData();
     body.append("file", file)
     body.append("state_id", STATE_ID);

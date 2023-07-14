@@ -218,6 +218,7 @@ class VisionScript:
             "setregion": lambda x: self.set_region(x),
             "setconfidence": lambda x: self.set_confidence(x),
             "filterbyclass": lambda x: self.filter_by_class(x),
+            "crop": lambda x: self.crop(x),
         }
 
     def filter_by_class(self, args):
@@ -289,7 +290,7 @@ class VisionScript:
         import validators
 
         # if session_id and notebook, concatenate tmp/session_id/ to filename
-        if self.notebook:
+        if self.notebook and not validators.url(filename):
             filename = os.path.join("tmp", self.state["session_id"], filename)
 
         if isinstance(filename, np.ndarray):
@@ -359,9 +360,18 @@ class VisionScript:
                 + file_extension
             )
 
-            with tempfile.NamedTemporaryFile(delete=True) as f:
+            # mk session dir + tmp if needed
+            if not os.path.exists("tmp"):
+                os.makedirs("tmp")
+
+            if not os.path.exists(os.path.join("tmp", self.state["session_id"])):
+                os.makedirs(os.path.join("tmp", self.state["session_id"]))
+
+            # save to tmp
+            with open(os.path.join("tmp", self.state["session_id"], filename), "wb") as f:
                 f.write(response.content)
-                filename = f.name
+
+            filename = os.path.join("tmp", self.state["session_id"], filename)
 
         if self.state.get("ctx") and self.state["ctx"].get("in"):
             filename = self.state["ctx"]["active_file"]
@@ -413,6 +423,30 @@ class VisionScript:
         image = self.state["image_stack"][-1]
         cropped_image = image.crop((x1, y1, x2, y2))
         self.state["image_stack"].append(cropped_image)
+
+    def crop(self, args):
+        """
+        Crop an image.
+        """
+        image = self.state["image_stack"][-1]
+
+        # if ndarray, convert to PIL image
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+
+        if len(args) == 0:
+            image = image.crop((0, 0, image.size[0] // 2, image.size[1] // 2))
+        else:
+            x0, y0, x1, y1 = args
+            
+            x0 = int(x0) if isinstance(x0, str) else x0
+            y0 = int(y0) if isinstance(y0, str) else y0
+            x1 = int(x1) if isinstance(x1, str) else x1
+            y1 = int(y1) if isinstance(y1, str) else y1
+
+            image = image.crop((x0, y0, x1, y1))
+
+        self.state["image_stack"].append(image)
 
     def select(self, args):
         """
@@ -574,8 +608,7 @@ class VisionScript:
         Turn an image to greyscale.
         """
         image = self.state["image_stack"][-1]
-        # turn to bgr
-        image = image[:, :, ::-1].copy()
+
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         self.state["image_stack"].append(image)
         # save to test.png
@@ -1646,7 +1679,7 @@ def main(
 
         # webbrowser.open("http://localhost:5001/notebook?" + str(uuid.uuid4()))
 
-        app.run(debug=True, host="localhost", port=5001)
+        app.run(debug=True, host="0.0.0.0", port=5001)
 
         return
 

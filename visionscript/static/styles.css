@@ -236,6 +236,12 @@ dialog h2 {
     font-size: 18px;
     margin-bottom: 10px;
 }
+.success {
+    background-color: lightgreen;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 10px;
+}
 dialog section {
     margin: auto;
     width: 35em;
