@@ -343,6 +343,7 @@ notebook.addEventListener("drop", function (event) {
             return;
         }
     }
+
     // get "text/plain" data
     var function_name = event.dataTransfer.getData("text/plain");
     var function_element = document.getElementById(function_name);

@@ -10,14 +10,13 @@ import mimetypes
 import os
 import random
 import string
-import sys
 import time
 
 import click
 import cv2
 import lark
 import numpy as np
-import registry
+from visionscript import registry
 import supervision as sv
 import torch
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
@@ -25,8 +24,11 @@ from PIL import Image
 from spellchecker import SpellChecker
 
 from visionscript.grammar import grammar
-from visionscript.usage import (USAGE, language_grammar_reference,
-                                lowercase_language_grammar_reference)
+from visionscript.usage import (
+    USAGE,
+    language_grammar_reference,
+    lowercase_language_grammar_reference,
+)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_FILE_SIZE = 10000000  # 10MB
@@ -35,15 +37,15 @@ spell = SpellChecker()
 
 parser = Lark(grammar)
 
-SUPPORTED_TRAIN_MODELS = {
-    "classify": {"vit": "autodistill_vit"},
-    "detect": {"yolov8": "autodistill_yolov8"},
-}
-
 SUPPORTED_INFERENCE_MODELS = {
     "groundingdino": lambda self, classes: registry.grounding_dino_base(self, classes),
     "yolov8": lambda self, classes: registry.yolov8_base(self, classes),
     "fastsam": lambda self, classes: registry.fast_sam_base(self, classes),
+}
+
+SUPPORTED_TRAIN_MODELS = {
+    "vit": lambda self, folder: registry.vit_target(self, folder),
+    "yolov8": lambda self, folder: registry.yolov8_target(self, folder),
 }
 
 
@@ -1014,27 +1016,17 @@ class VisionScript:
         """
         folder = args[0]
         model = args[1]
+
         # if Detect or Classify run, train
         if "Detect" in self.state["history"] or model == "yolov8":
-            if "autodistill_yolov8" not in sys.modules:
-                from autodistill_yolov8 import YOLOv8
-
-            base_model = YOLOv8("yolov8n.pt")
-
-            model = base_model.train(os.path.join(folder, "data.yaml"), epochs=10)
-
+            self.state["current_active_model"] = "yolov8"
         elif "Classify" in self.state["history"] or model == "vit":
-            if "autodistill_vit" not in sys.modules:
-                import autodistill_vit as ViT
-
-            base_model = ViT("ViT-B/32")
-
-            model = base_model.train(folder, "ViT-B/32")
+            self.state["current_active_model"] = "vit"
         else:
             print("No training needed.")
             return
 
-        self.state["model"] = model
+        self.state["model"] = SUPPORTED_TRAIN_MODELS[model](self, folder)
 
     def get_edges(self, _):
         """
