@@ -9,6 +9,14 @@
 
         <link rel="manifest" href="/static/manifest.json" />
 
+        <meta name="description" content="VisionScript Notebook lets you write VisionScript code in your browser." />
+    
+        <meta property="og:title" content="VisionScript Notebook" />
+        
+        <meta property="og:description" content="VisionScript Notebook lets you write VisionScript code in your browser." />
+        
+        <meta property="og:image" content="https://screenshot.jamesg.blog?url={{ url_root }}" />
+
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
         <script>
@@ -39,6 +47,7 @@
         </nav>
         <main>
             <aside id="function_box">
+                <p class="hide_tab hide_on_desktop"><a onclick="hideFunctionBox()" id="hide_function_box">Hide Blocks</a></p>
                 <h2 style="font-size: 24px;">Code Blocks</h2>
                 <input type="text" id="search" name="search" placeholder="Search functions" style="width: 100%; padding: 10px; border: 1px solid lightgrey; border-radius: 5px; margin-bottom: 10px;" onkeyup="processSearch()" />
             </aside>

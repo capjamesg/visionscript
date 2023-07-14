@@ -288,6 +288,10 @@ class VisionScript:
         import requests
         import validators
 
+        # if session_id and notebook, concatenate tmp/session_id/ to filename
+        if self.notebook:
+            filename = os.path.join("tmp", self.state["session_id"], filename)
+
         if isinstance(filename, np.ndarray):
             self.state["image_stack"].append(filename)
             # save file
@@ -368,6 +372,8 @@ class VisionScript:
         # filename = filename.split("/")[-1]
 
         # filename = secure_filename(filename)
+
+        filename = filename.strip()
 
         self.state["last_loaded_image_name"] = filename
 
@@ -1227,15 +1233,22 @@ class VisionScript:
                 if isinstance(image, np.ndarray):
                     image = Image.fromarray(image)
                     # do bgr to rgb
-                    # image = image.convert("RGB")
+                    image = image.convert("RGB")
 
                 # # convert to rgb if needed
-                # if image.mode != "RGB":
-                #     image = image.convert("RGB")
+                if image.mode != "RGB":
+                    image = image.convert("RGB")
 
                 # PIL to base64
                 buffered = io.BytesIO()
-                image.save(buffered, format="PNG")
+
+                # save to either jpeg or png
+
+                if self.state.get("last_loaded_image_name", "").endswith(".jpg"):
+                    image.save(buffered, format="JPEG")
+                else:
+                    image.save(buffered, format="PNG")
+
                 img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
             self.state["output"] = {"image": img_str}

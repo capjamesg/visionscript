@@ -2,12 +2,19 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>VisionScript Notebook</title>
+        
+        <title>{{ title }} - VisionScript Notebook</title>
         
         <link rel="stylesheet" href="/static/deploy_styles.css" />
 
         <link rel="manifest" href="/static/manifest.json" />
+
+        <meta name="description" content="{{ description }}" />
+
+        <meta property="og:title" content="{{ title }} - VisionScript Notebook" />
+        <meta property="og:description" content="{{ description }}" />
+
+        <meta property="og:image" content="https://screenshot.jamesg.blog?url={{ url_root }}/notebook/{{ id }}" />
 
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     </head>

@@ -1,5 +1,32 @@
 var mode = "interactive";
 
+function hideFunctionBox () {
+    var function_box = document.getElementById("function_box");
+    var toggle = document.getElementById("hide_function_box");
+    // hide ul in function box
+    var ul = function_box.getElementsByTagName("div");
+    for (var i = 0; i < ul.length; i++) {
+        if (!ul[i].style.display || ul[i].style.display == "block") {
+            ul[i].style.display = "none";
+            // set function box height to 100 px
+            function_box.style.height = "100px";
+            // hide search
+            var search = document.getElementById("search");
+            search.style.display = "none";
+            toggle.innerText = "Show Blocks";
+        } else {
+            ul[i].style.display = "block";
+            // set function box height to 300 px
+            function_box.style.height = "300px";
+            // show search
+            var search = document.getElementById("search");
+            search.style.display = "block";
+            toggle.innerText = "Hide Blocks";
+        }
+    }
+}
+
+
 function rerun (cell_number) {
     var cells = document.getElementById("cells");
     var cell = cells.children[cell_number - 1];
@@ -249,8 +276,9 @@ for (var i = 0; i < functions.length; i++) {
                     // read file
                     reader.readAsDataURL(file);
 
-                    // only allow jpeg, jpg, png, or .vicnb
-                    if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb")) {
+                    // only allow jpeg, jpg, png, or .vicnb, avif, webp
+                    file.name = file.name.toLowerCase();
+                    if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
                         var dialog = document.getElementById("dialog");
                         var error_message = document.getElementById("error_message");
                         error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
@@ -577,6 +605,11 @@ var run = document.getElementById("run");
 run.addEventListener("click", function (event) {
     event.preventDefault();
     var code = getCodeFromInteractiveEnvironment();
+    // if code doesn't end with Say[], add it
+    if (!code.endsWith("Say[]\n") && !code.endsWith("Show[]\n")) {
+        code += "Say[]\n";
+    }
+
     executeCode(code);
 });
 
@@ -634,6 +667,10 @@ function startLoading(loading) {
 }
 
 function executeCode (code, comment = false, existing_cell = null) {
+    // if (!code.endsWith("Say[]\n") && !code.endsWith("Show[]\n")) {
+    //     code += "\n Say[]\n";
+    // }
+
     var loading = document.getElementById("loading");
     var output = document.getElementById("output");
 
@@ -841,7 +878,8 @@ dropzone.addEventListener("drop", function (event) {
     var file = event.dataTransfer.files[0];
 
     // only allow jpeg, jpg, png, or .vicnb
-    if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb")) {
+    file.name = file.name.toLowerCase();
+    if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
         var dialog = document.getElementById("dialog");
         var error_message = document.getElementById("error_message");
         error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
@@ -869,9 +907,10 @@ function resetNotebook() {
 
 function toggle_menu () {
     var menu = document.getElementById("nav_menu");
-    if (menu.style.display != "none") {
-        menu.style.display = "flex";
-    } else {
+    
+    if (menu.style.display == "flex") {
         menu.style.display = "none";
+    } else {
+        menu.style.display = "flex";
     }
 }

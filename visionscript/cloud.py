@@ -37,7 +37,7 @@ print("Keep it safe and don't share it with anyone!")
 
 @app.route("/")
 def index_page():
-    return render_template("deployintro.html")
+    return render_template("deployintro.html", url_root=request.url_root.strip("/"))
 
 
 @app.route("/<id>", methods=["GET", "POST"])
@@ -232,3 +232,11 @@ def create():
     scripts = json.load(open("scripts.json", "r"))
 
     return jsonify({"id": request.url_root + id})
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("error.html", title="Page Not Found"), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template("error.html", title="Internal Server Error"), 500

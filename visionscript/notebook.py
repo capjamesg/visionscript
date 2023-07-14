@@ -65,6 +65,8 @@ def notebook():
 
             session.notebook = True
 
+            session.state["session_id"] = session_id
+
             notebooks[session_id]["session"] = session
 
         session = notebooks[session_id]["session"]
@@ -147,7 +149,7 @@ def notebook():
     notebooks[state_id] = init_notebook()
 
     return render_template(
-        "notebook.html", state_id=state_id, api_url=API_URL or request.url_root
+        "notebook.html", state_id=state_id, api_url=API_URL or request.url_root, url_root=request.url_root.strip("/")
     )
 
 
@@ -183,7 +185,7 @@ def upload():
             "text"
         ) and not mimetypes.guess_type(file_name)[0].startswith("image"):
             return jsonify({"error": "File type not allowed"}), 415
-    elif not file_name.endswith(".vicnb"):
+    elif not file_name.endswith(("png", "jpg", "jpeg", "gif", "vicnb", "vic", "avif")):
         return jsonify({"error": "File type not allowed"}), 415
 
     # remove special chars
@@ -195,7 +197,11 @@ def upload():
     if not os.path.exists("tmp"):
         os.mkdir("tmp")
 
-    with open(os.path.join("tmp", file_name), "wb") as f:
+    # mkdir tmp/session
+    if not os.path.exists(os.path.join("tmp", session_id)):
+        os.mkdir(os.path.join("tmp", session_id))
+
+    with open(os.path.join("tmp", session_id, file_name), "wb") as f:
         f.write(file.read())
 
     # if filename ends in .vicnb, reset state
@@ -204,6 +210,8 @@ def upload():
 
         notebooks[session_id]["session"] = lang.VisionScript()
         notebooks[session_id]["session"].notebook = True
+
+        notebooks[session_id]["session"].state["session_id"] = session_id
 
         with open(os.path.join("tmp", file_name), "r") as f:
             # file is json
@@ -218,8 +226,15 @@ def upload():
                 result.append({"cell": cell, "output": output})
 
             return jsonify({"cells": result})
+        
+    # notebook session should have state id
+    if notebooks[session_id]["session"] is None:
+        notebooks[session_id]["session"] = lang.VisionScript()
+        notebooks[session_id]["session"].notebook = True
 
-    return jsonify({"file_name": os.path.join("tmp", file_name)})
+    notebooks[session_id]["session"].state["session_id"] = session_id
+
+    return jsonify({"file_name": file_name})
 
 
 # save
@@ -295,3 +310,11 @@ def static_files(path):
 @app.route("/quit")
 def quit():
     exit()
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("error.html", title="Page Not Found"), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template("error.html", title="Internal Server Error"), 500

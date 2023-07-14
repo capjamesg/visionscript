@@ -103,6 +103,7 @@ h2 {
     border-radius: 10px;
     white-space: pre-wrap;
     word-wrap: break-word;
+    max-width: 150px;
 }
 pre {
     margin-top: 0.5rem;
@@ -329,12 +330,18 @@ label {
     display: block;
     font-weight: bold;
 }
+#hide_tab {
+    display: none;
+}
 @media screen and (max-width: 800px) {
     #nav_menu {
         display: none;
     }
     #files_section {
         display: none;
+    }
+    #hide_tab {
+        display: block;
     }
     #function_box {
         position: fixed;
@@ -348,7 +355,7 @@ label {
         flex-direction: column;
         padding: 50px;
         top: initial;
-        height: 500px;
+        height: 300px;
     }
     #function_box h2 {
         display: none;
@@ -361,7 +368,7 @@ label {
         width: 100%;
         height: 100vh;
         background-color: darkgreen;
-        z-index: 100;
+        z-index: 200;
         justify-content: center;
         align-items: center;
         flex-direction: column;
@@ -388,11 +395,18 @@ label {
     #toggle_menu {
         display: block;
         background-color: lightskyblue;
+        color: white;
+    }
+    #nav_menu li {
+        margin-right: 0;
     }
     .hide_on_mobile {
         display: none;
     }
     #drag_drop_notebook {
         min-height: 300px;
+    }
+    .hide_on_desktop {
+        display: block;
     }
 }

@@ -1,0 +1,11 @@
+{
+    "short_name": "Notebook",
+    "name": "Notebook",
+    "id": "/?source=pwa",
+    "start_url": "/?source=pwa",
+    "background_color": "#fff",
+    "display": "standalone",
+    "scope": "/",
+    "theme_color": "darkgreen",
+    "description": "An interactive VisionScript notebook environment for building computer vision apps."
+}
