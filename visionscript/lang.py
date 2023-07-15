@@ -389,9 +389,15 @@ class VisionScript:
 
         self.state["last_loaded_image_name"] = filename
 
-        self.state["output"] = {"image": Image.open(filename).convert("RGB")}
+        try:
+            image = Image.open(filename).convert("RGB")
+        except:
+            print(f"Could not load image {filename}.")
+            return
 
-        return np.array(Image.open(filename).convert("RGB"))  # [:, :, ::-1]
+        self.state["output"] = {"image": image}
+
+        return np.array(image)[:, :, ::-1]
 
     def size(self, _):
         return self.state["image_stack"][-1].shape[:2]
@@ -510,6 +516,8 @@ class VisionScript:
         import clip
 
         model, preprocess = clip.load("ViT-B/32", device=DEVICE)
+
+        print(label)
 
         with torch.no_grad():
             # if label is a filename, load image
@@ -757,12 +765,10 @@ class VisionScript:
             self.state["current_active_model"]
         ](self, classes)
 
-        classes = [key for key, item in inference_classes.items() if item in classes]
-
         results = results[np.isin(results.class_id, classes)]
 
         self.state["detections_stack"].append(results)
-        self.state["last_classes"] = [inference_classes[item] for item in classes]
+        self.state["last_classes"] = inference_classes
 
         return results
 
@@ -899,6 +905,7 @@ class VisionScript:
         """
         Blur an image.
         """
+
         image = self.state["image_stack"][-1]
 
         image = cv2.blur(image, (args[0], args[0]))
@@ -1019,7 +1026,7 @@ class VisionScript:
 
         # if Detect or Classify run, train
         if "Detect" in self.state["history"] or model == "yolov8":
-            self.state["current_active_model"] = "yolov8"
+            self.state["current_active_model"] = "yolov8n"
         elif "Classify" in self.state["history"] or model == "vit":
             self.state["current_active_model"] = "vit"
         else:
@@ -1074,7 +1081,7 @@ class VisionScript:
                 for image, detections in zip(
                     self.state["last"], self.state["detections_stack"]
                 ):
-                    detections = self._filter_controller(self, detections)
+                    detections = self._filter_controller(detections)
                     if annotator and detections:
                         image = annotator.annotate(
                             np.array(image),
@@ -1110,7 +1117,7 @@ class VisionScript:
             for image, detections in zip(
                 self.state["image_stack"], self.state["detections_stack"]
             ):
-                detections = self._filter_controller(self, detections)
+                detections = self._filter_controller(detections)
                 if annotator and detections:
                     image = annotator.annotate(
                         np.array(image), detections, labels=self.state["last_classes"]
@@ -1132,8 +1139,12 @@ class VisionScript:
             # image = images[0]
 
         if annotator:
+            # turn (self.state["image_stack"][-1]) into RGB
+            image = np.array(self.state["image_stack"][-1])
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
             image = annotator.annotate(
-                np.array(self.state["image_stack"][-1]),
+                image,
                 detections=self._filter_controller(self.state["detections_stack"][-1]),
             )
         elif (
@@ -1319,6 +1330,7 @@ class VisionScript:
             return self.input_(tree.children[0].value)
 
         for node in tree.children:
+            print(node)
             if node == "True":
                 return True
             elif node == "False":
@@ -1477,13 +1489,15 @@ class VisionScript:
                 }
 
                 for file_name in self.state["ctx"]["in"]:
+                    # must be image
+                    if not file_name.endswith((".jpg", ".png", ".jpeg")):
+                        continue
+                    
                     self.state["ctx"]["active_file"] = os.path.join(
                         literal_eval(node.children[0]), file_name
                     )
                     # ignore first 2, then do rest
                     context = node.children[3:]
-
-                    # print(context)
 
                     for item in context:
                         self.parse_tree(item)
@@ -1524,7 +1538,7 @@ def activate_console(parser):
     print("Read the docs at https://visionscript.org/docs")
     print("For help, type 'Help[FunctionName]'.")
     print("-" * 20)
-    
+
     session = VisionScript()
 
     while True:

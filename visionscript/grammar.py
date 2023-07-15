@@ -26,7 +26,7 @@ getcolours: "GetColours" ("[" "]")? | "GetColours" "[" INT "]"
 isita: "Is it a " (("," STRING)* | ("or" STRING)*)? EOL
 find: "Find" "[" STRING "]"
 args: ((STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))*) | (STRING | INT | FLOAT | expr)?
-make: "Make" literal ("[" args "]")? EOL (INDENT expr+)* EOL
+make: "Make" literal ("[" args "]")? EOL (INDENT (expr+))* EOL
 caption: "Caption" ("[" "]")?
 size: "Size" ("[" "]")?
 import: "Import" "[" STRING "]"
