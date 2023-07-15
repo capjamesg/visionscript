@@ -190,8 +190,6 @@ for (var i = 0; i < functions.length; i++) {
         event.dataTransfer.setData("text/plain", event.target.id);
     });
 
-    console.log("function", functions[i]);
-
     // on mobile tap, add to notebook
     function_element.addEventListener("touchstart", function (event) {
         event.preventDefault();
@@ -772,6 +770,10 @@ function executeCode (code, comment = false, existing_cell = null) {
         }
         
         document.getElementById("current_count").innerHTML = `#${cells.children.length + 1}`;
+
+        // clear form text area
+        var textarea = document.getElementById("jscode");
+        textarea.value = "";
     })
     .catch((error) => {
         clearInterval(timer);
@@ -826,6 +828,7 @@ function export_vic() {
     }
 
     var code = data.get("jscode");
+    
     var blob = new Blob([code], {type: "text/plain;charset=utf-8"});
     // download
     var a = document.createElement("a");
@@ -884,29 +887,18 @@ dropzone.addEventListener("drop", function (event) {
     event.preventDefault();
     dropzone.style.backgroundColor = "white";
 
-    // IF FOLDER, UPLOAD ALL FILES in folder
-    if (event.dataTransfer.items) {
-        for (var item of event.dataTransfer.items) {
-            if (item.kind === 'file') {
-                console.log(item.getAsFile());
-                var file = item.getAsFile();
-                uploadNotebook(event, mode, file);
-            }
+    for (var file of event.dataTransfer.files) {
+        // only allow jpeg, jpg, png, or .vicnb
+        file.name = file.name.toLowerCase();
+        if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
+            var dialog = document.getElementById("dialog");
+            var error_message = document.getElementById("error_message");
+            error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
+            dialog.showModal();
+            return;
         }
-    } else {
-        for (var file of event.dataTransfer.files) {
-            // only allow jpeg, jpg, png, or .vicnb
-            file.name = file.name.toLowerCase();
-            if (!file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".vicnb") && !file.name.endsWith(".avif") && !file.name.endsWith(".webp")) {
-                var dialog = document.getElementById("dialog");
-                var error_message = document.getElementById("error_message");
-                error_message.innerText = "Your file could not be uploaded. Please make sure you have uploaded a supported format.";
-                dialog.showModal();
-                return;
-            }
 
-            uploadNotebook(event, mode, file);
-        }
+        uploadNotebook(event, mode, file);
     }
 });
 

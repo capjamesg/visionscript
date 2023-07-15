@@ -1524,6 +1524,7 @@ def activate_console(parser):
     print("Read the docs at https://visionscript.org/docs")
     print("For help, type 'Help[FunctionName]'.")
     print("-" * 20)
+    
     session = VisionScript()
 
     while True:

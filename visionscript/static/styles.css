@@ -104,6 +104,7 @@ h2 {
     white-space: pre-wrap;
     word-wrap: break-word;
     max-width: 150px;
+    margin-bottom: 20px;
 }
 pre {
     margin-top: 0.5rem;
