@@ -219,6 +219,8 @@ class VisionScript:
             "setconfidence": lambda x: self.set_confidence(x),
             "filterbyclass": lambda x: self.filter_by_class(x),
             "crop": lambda x: self.crop(x),
+            "shuffle": lambda x: self.shuffle(x),
+            "grid": lambda x: self.grid(x),
         }
 
     def filter_by_class(self, args):
@@ -377,13 +379,19 @@ class VisionScript:
 
         if self.state.get("ctx") and self.state["ctx"].get("in"):
             filename = self.state["ctx"]["active_file"]
+        elif self.state.get("ctx") and self.state["ctx"].get("in") and isinstance(
+            self.state["ctx"]["active_file"], np.ndarray
+        ):
+            # if in video context, frame is already loaded
+            self.state["output"] = {"image": self.state["ctx"]["active_file"]}
 
-        # make filename safe
-        # from werkzeug.utils import secure_filename
+            return self.state["ctx"]["active_file"]
 
-        # filename = filename.split("/")[-1]
+        from werkzeug.utils import secure_filename
 
-        # filename = secure_filename(filename)
+        filename = filename.split("/")[-1]
+
+        filename = secure_filename(filename)
 
         filename = filename.strip()
 
@@ -397,7 +405,7 @@ class VisionScript:
 
         self.state["output"] = {"image": image}
 
-        return np.array(image)[:, :, ::-1]
+        return np.array(image)
 
     def size(self, _):
         return self.state["image_stack"][-1].shape[:2]
@@ -493,6 +501,39 @@ class VisionScript:
         image = cv2.resize(image, (width, height))
         self.state["image_stack"].append(image)
 
+    def grid(self, n):
+        """
+        Divide into a grid of N images.
+        """
+        if not n:
+            n = 9
+
+        image = self.state["image_stack"][-1]
+
+        height, width, _ = image.shape
+
+        # divide into n equal boxes with w and h
+        images = []
+
+        for i in range(n):
+            images.append(
+                image[
+                    (height // n) * i : (height // n) * (i + 1),
+                    (width // n) * i : (width // n) * (i + 1),
+                ]
+            )
+
+        # remove last image from stack
+        self.state["image_stack"].pop()
+
+        self.state["image_stack"].extend(images)
+
+    def shuffle(self, _):
+        """
+        Shuffle images on the stack.
+        """
+        random.shuffle(self.state["image_stack"])
+
     def _create_index(self):
         import faiss
 
@@ -516,8 +557,6 @@ class VisionScript:
         import clip
 
         model, preprocess = clip.load("ViT-B/32", device=DEVICE)
-
-        print(label)
 
         with torch.no_grad():
             # if label is a filename, load image
@@ -606,7 +645,7 @@ class VisionScript:
         """
         Count the number of detections in a sv.Detections object.
         """
-        if len(args) == 0:
+        if len(args) == 0 and isinstance(self.state["last"], sv.Detections):
             return len(self.state["last"].xyxy)
         else:
             return len(
@@ -923,7 +962,6 @@ class VisionScript:
         xyxy = detections.xyxy
 
         if os.path.exists(args):
-            print("Replacing with image.")
             picture = cv2.imread(args)
 
             # bgr to rgb
@@ -1056,6 +1094,8 @@ class VisionScript:
         """
         most_recent_detect_or_segment = None
 
+        image = self.state["image_stack"][-1]
+
         if self.state["history"][-2] in ("detect", "segment"):
             most_recent_detect_or_segment = self.state["history"][-2]
 
@@ -1071,11 +1111,62 @@ class VisionScript:
         ):
             print("Image does not exist.")
             return
+        
+        def get_divisors(n):
+            divisors = []
+
+            for i in range(1, n + 1):
+                if n % i == 0:
+                    divisors.append(i)
+
+            return divisors
+        
+        def get_closest_divisor(n):
+            divisors = get_divisors(n)
+
+            return divisors[len(divisors) // 2]
+
+        grid_size = get_closest_divisor(len(self.state["image_stack"]))
+
+        # if there was a grid before a reset
+        last_reset_idx = self.state["history"].index("reset") if "reset" in self.state["history"] else 0
+        last_grid_idx = self.state["history"].index("grid") if "grid" in self.state["history"] else 0
+
+        if last_grid_idx > last_reset_idx:
+            images = []
+
+            for image in self.state["image_stack"]:
+                images.append(np.array(image))
+
+            print(len(images))
+
+            # reassemble
+            # get dims in last image
+            smallest_dims = 3
+
+            for image in images:
+                if len(image.shape) < smallest_dims:
+                    smallest_dims = len(image.shape)
+
+            image = np.zeros((images[0].shape[0] * grid_size, images[0].shape[1] * grid_size, smallest_dims), dtype=np.uint8)
+
+            for i in range(grid_size):
+                for j in range(grid_size):
+                    image[i * images[0].shape[0]:(i + 1) * images[0].shape[0], j * images[0].shape[1]:(j + 1) * images[0].shape[1]] = images[i * grid_size + j]
+
+            # return image
+            cv2.imshow("image", np.array(image))
+            cv2.waitKey(0)
+
+            return
 
         if self.state.get("history", [])[-2] == "search":
             images = []
 
-            grid_size = math.gcd(len(self.state["last"]), len(self.state["last"]))
+            # get closest divisor (i.e. 16 is 4x4)
+            grid_size = math.gcd(
+                len(self.state["image_stack"]), len(self.state["image_stack"])
+            )
 
             if len(self.state["last"]) == len(self.state["detections_stack"]):
                 for image, detections in zip(
@@ -1110,9 +1201,29 @@ class VisionScript:
         elif self.state.get("history", [])[-1] == "compare":
             images = []
 
-            grid_size = math.gcd(
-                len(self.state["image_stack"]), len(self.state["image_stack"])
-            )
+            def get_divisors(n):
+                divisors = []
+
+                for i in range(1, n + 1):
+                    if n % i == 0:
+                        divisors.append(i)
+
+                return divisors
+            
+            def get_closest_divisor(n):
+                divisors = get_divisors(n)
+
+                return divisors[len(divisors) // 2]
+
+            grid_size = get_closest_divisor(len(self.state["image_stack"]))
+
+            # if there was a grid before a reset
+            last_reset_idx = self.state["history"].index("reset") if "reset" in self.state["history"] else 0
+            last_grid_idx = self.state["history"].index("grid") if "grid" in self.state["history"] else 0
+
+            if last_grid_idx > last_reset_idx:
+                for image in self.state["image_stack"]:
+                    images.append(np.array(image))
 
             for image, detections in zip(
                 self.state["image_stack"], self.state["detections_stack"]
@@ -1147,15 +1258,6 @@ class VisionScript:
                 image,
                 detections=self._filter_controller(self.state["detections_stack"][-1]),
             )
-        elif (
-            self.state.get("last_loaded_image") is not None
-            and not self.state.get("history", [])[-1] == "compare"
-        ):
-            image = self.state["image_stack"][-1]
-        else:
-            image = self.state["image_stack"][-1]
-        # elif self.notebook is False:
-        #     image = cv2.imread(self.state["last_loaded_image_name"])
 
         if self.notebook:
             buffer = io.BytesIO()
@@ -1490,17 +1592,31 @@ class VisionScript:
 
                 for file_name in self.state["ctx"]["in"]:
                     # must be image
-                    if not file_name.endswith((".jpg", ".png", ".jpeg")):
+                    if not file_name.endswith((".jpg", ".png", ".jpeg", ".mov", ".mp4")):
                         continue
-                    
-                    self.state["ctx"]["active_file"] = os.path.join(
-                        literal_eval(node.children[0]), file_name
-                    )
-                    # ignore first 2, then do rest
-                    context = node.children[3:]
 
-                    for item in context:
-                        self.parse_tree(item)
+                    if file_name.endswith((".mov", "mp4")):
+                        video_info = sv.VideoInfo.from_video_path(video_path=file_name)
+
+                        with sv.VideoSink(target_path='result.mp4', video_info=video_info) as sink:
+                            for frame in sv.get_video_frames_generator(source_path='source_video.mp4', stride=2):
+                                # ignore first 2, then do rest
+                                context = node.children[3:]
+
+                                for item in context:
+                                    self.state["ctx"]["active_file"] = frame
+                                    self.parse_tree(item)
+                                    sink.write_frame(self.state["last"])
+                    else:
+                        self.state["ctx"]["active_file"] = os.path.join(
+                            literal_eval(node.children[0]), file_name
+                        )
+
+                        # ignore first 2, then do rest
+                        context = node.children[3:]
+
+                        for item in context:
+                            self.parse_tree(item)
 
                 del self.state["ctx"]
 
