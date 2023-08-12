@@ -42,6 +42,8 @@ language_grammar_reference = {
     "Rotate": "Rotate the image",
     "Exit": "Exit the program",
     "Make": "Make a function",
+    "True": "True",
+    "False": "False",
 }
 
 lowercase_language_grammar_reference = [

@@ -45,7 +45,6 @@ def fast_sam_base(self, text_prompt) -> sv.Detections:
 
     logging.disable(logging.CRITICAL)
     # get current path
-    import os
 
     current_path = os.getcwd()
 

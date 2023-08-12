@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL | EOF | " ")*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop)
+expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -30,7 +30,9 @@ make: "Make" literal ("[" args "]")? EOL (INDENT (expr+))* EOL
 caption: "Caption" ("[" "]")?
 size: "Size" ("[" "]")?
 import: "Import" "[" STRING "]"
-run: "Run" "[" STRING "]"
+run: "Run" "[" "]"
+shuffle: "Shuffle" ("[" "]")?
+grid: "Grid" ("[" INT "]")?
 show: "Show" ("[" "]")?
 select: "Select" ("[" "]")? | "Select" "[" INT "]"
 paste: "Paste" "[" INT "," INT "]"

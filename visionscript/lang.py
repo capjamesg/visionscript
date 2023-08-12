@@ -11,6 +11,7 @@ import os
 import random
 import string
 import time
+import shutil
 
 import click
 import cv2
@@ -22,6 +23,8 @@ import torch
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from spellchecker import SpellChecker
+import watchdog
+from watchdog.observers import Observer
 
 from visionscript.grammar import grammar
 from visionscript.usage import (
@@ -53,7 +56,32 @@ class InputNotProvided:
     pass
 
 
-def handle_unexpected_characters(e, code):
+def handle_unexpected_characters(e, code, interactive = False):
+    # if line doesn't end with ], add it
+    if not code.strip().endswith("]"):
+        code += "]"
+
+        return
+
+    # if space between statement and [, remove it
+    # get position of [
+    position = code.find("[")
+
+    if code[position - 1] == " ":
+        code = code[:position - 1] + code[position:]
+
+        return
+    
+    # replace all “ with "
+    code = code.replace("“", '"')
+    code = code.replace("”", '"')
+
+    # raise error if character not in grammar
+    if e.char not in ["[", "]", "'", '"', ",", " ", '"', '"', "\n", "\t", "\r"]:
+        print(f"Syntax error on line {e.line}, column {e.column}.")
+        print(f"Unexpected character: {e.char!r}")
+        exit(1)
+
     # raise error if class doesn't exist
     line = e.line
     column = e.column
@@ -81,23 +109,25 @@ def handle_unexpected_characters(e, code):
     print("-" * 10)
 
     for item in list(alternatives):
-        if item in lowercase_language_grammar_reference:
+        if item.lower() in lowercase_language_grammar_reference:
             print(
                 list(language_grammar_reference.keys())[
                     lowercase_language_grammar_reference.index(item.lower())
                 ]
             )
 
-    exit(1)
+    if interactive is False:
+        exit(1)
 
 
-def handle_unexpected_token(e):
+def handle_unexpected_token(e, interactive = False):
     line = e.line
     column = e.column
 
     print(f"Syntax error on line {line}, column {column}.")
     print(f"Unexpected token: {e.token!r}")
-    exit(1)
+    if interactive is False:
+        exit(1)
 
 
 def literal_eval(string):
@@ -221,6 +251,7 @@ class VisionScript:
             "crop": lambda x: self.crop(x),
             "shuffle": lambda x: self.shuffle(x),
             "grid": lambda x: self.grid(x),
+            "run": lambda x: self.parse_tree(parser.parse(self.state["last"])),
         }
 
     def filter_by_class(self, args):
@@ -637,6 +668,26 @@ class VisionScript:
                 "".join(random.choice(string.ascii_letters) for _ in range(10)),
             )
 
+        if self.state.get("history", None) and "camera" in self.state["history"]:
+            video = cv2.VideoWriter(
+                filename + ".avi",
+                cv2.VideoWriter_fourcc(*"MJPG"),
+                10,
+                (640, 480),
+            )
+
+            for image in self.state["image_stack"]:
+                video.write(image)
+
+            video.release()
+
+            # check if ffmpeg is installed
+            # if it is, convert to mp4
+            if shutil.which("ffmpeg"):
+                os.system(
+                    f"ffmpeg -i {filename}.avi -vcodec h264 -acodec mp2 {filename}.mp4 > /dev/null 2>&1"
+                )
+
         self.state["image_stack"].save(filename)
 
         self.state["output"] = {"text": "Saved to " + filename}
@@ -702,6 +753,20 @@ class VisionScript:
 
         reader = easyocr.Reader(["en"])
         result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
+        
+        # run through pytesseract
+        # print(result)
+        import pytesseract
+
+        result = pytesseract.image_to_string(self.state["last_loaded_image_name"], config='--user-patterns patterns.txt')
+
+        result = result.replace("“", '"')
+        result = result.replace("”", '"')
+
+        print(result, "result")
+
+        self.state["output"] = {"text": result}
+        self.state["last"] = result
 
         return result
 
@@ -1315,7 +1380,10 @@ class VisionScript:
 
             return
 
-        sv.plot_image(image, (8, 8))
+        if self.state.get("ctx", None) and self.state["ctx"].get("camera", None):
+            cv2.imshow("image", image)
+        else:
+            sv.plot_image(image, (8, 8))
 
     def get_func(self, x):
         self.state["last"] = self.state["last"][x]
@@ -1534,20 +1602,6 @@ class VisionScript:
             if token.value == None:
                 continue
 
-            if token.value == "run":
-                function_name = node.children[0].value
-
-                if function_name not in self.state["functions"]:
-                    print(f"Function {function_name} does not exist.")
-                    exit(1)
-
-                function_args = self.state["functions"][function_name]
-
-                for item in function_args:
-                    self.parse_tree(item)
-
-                continue
-
             if token.value == "literal":
                 func = self.state["functions"][node.children[0].value]
             else:
@@ -1591,6 +1645,12 @@ class VisionScript:
                 }
 
                 for file_name in self.state["ctx"]["in"]:
+                    # if file_name == "camera", load camera in context
+                    if file_name == "camera":
+                        self.state["ctx"]["active_file"] = "camera"
+                        self.state["ctx"]["camera"] = cv2.VideoCapture(0)
+                        continue
+
                     # must be image
                     if not file_name.endswith((".jpg", ".png", ".jpeg", ".mov", ".mp4")):
                         continue
@@ -1614,6 +1674,14 @@ class VisionScript:
 
                         # ignore first 2, then do rest
                         context = node.children[3:]
+
+                        if file_name == "camera":
+                            while True:
+                                _, frame = self.state["ctx"]["camera"].read()
+
+                                for item in context:
+                                    self.state["ctx"]["active_file"] = frame
+                                    self.parse_tree(item)
 
                         for item in context:
                             self.parse_tree(item)
@@ -1660,12 +1728,17 @@ def activate_console(parser):
     while True:
         code = input(">>> ")
 
+        tree = None
+
         try:
-            tree = parser.parse(code.lstrip())
+            tree = parser.parse(code + "\n") #.lstrip())
         except UnexpectedCharacters as e:
-            handle_unexpected_characters(e, code.lstrip())
+            handle_unexpected_characters(e, code + "\n", interactive=True)#.lstrip())
         except UnexpectedToken as e:
-            handle_unexpected_token(e)
+            handle_unexpected_token(e, interactive=True)
+        finally:
+            if tree is None:
+                continue
 
         session.parse_tree(tree)
 
@@ -1695,6 +1768,7 @@ def activate_console(parser):
     help="API url for deploying your app",
     default="http://localhost:6999/create",
 )
+@click.option("--live", help="Live mode", default=False)
 def main(
     validate,
     ref,
@@ -1708,6 +1782,7 @@ def main(
     description,
     api_key,
     api_url,
+    live
 ) -> None:
     if validate:
         print("Script is a valid VisionScript program.")
@@ -1778,6 +1853,40 @@ def main(
                 print("App deployed to", deploy_request.json()["url"])
 
             return
+
+        if live:
+            session.parse_tree(tree)
+
+            observer = Observer()
+
+            event_handler = watchdog.events.FileSystemEventHandler()
+
+            # when file changes, run code
+            def on_modified(event):
+                if event.src_path == os.path.abspath(file):
+                    print("Running code...")
+                    tree = parser.parse(code.lstrip())
+
+                    session.parse_tree(tree)
+
+            event_handler.on_modified = on_modified
+
+            observer.schedule(
+                event_handler,
+                os.path.dirname(os.path.abspath(file)),
+                recursive=True,
+            )
+
+            observer.start()
+
+            try:
+                while True:
+                    time.sleep(1)
+            finally:
+                observer.stop()
+                observer.join()
+
+                exit()
 
         session.parse_tree(tree)
 
