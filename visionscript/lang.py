@@ -59,6 +59,8 @@ STACK_MAXIMUM = {
     }
 }
 
+CONCURRENT_MAXIMUM = 10
+
 
 class InputNotProvided:
     pass
@@ -190,7 +192,9 @@ def init_state():
         "load_queue": [],
         "stack_size": {
             "image_stack": 0
-        }
+        },
+        "show_text_count": 0,
+        "in_concurrent_context": False,
     }
 
 
@@ -264,6 +268,7 @@ class VisionScript:
             "shuffle": lambda x: self.shuffle(x),
             "grid": lambda x: self.grid(x),
             "run": lambda x: self.parse_tree(parser.parse(self.state["last"])),
+            "showtext": lambda x: self.show_text(x),
         }
 
     def filter_by_class(self, args):
@@ -742,11 +747,12 @@ class VisionScript:
         """
         Count the number of detections in a sv.Detections object.
         """
-        if len(args) == 0 and isinstance(self.state["last"], sv.Detections):
-            return len(self.state["last"].xyxy)
+        
+        if len(args) == 0 and isinstance(self.state["last"], sv.detection.core.Detections):
+            return len(self.state["last"].confidence)
         else:
             return len(
-                [item for item in self.state["last"].class_id if item == args[0]]
+                [item for item in self.state["last"].class_id]# if item == args[0]]
             )
 
     def greyscale(self, _):
@@ -935,10 +941,19 @@ class VisionScript:
             self.state["current_active_model"]
         ](self, classes)
 
-        results = results[np.isin(results.class_id, classes)]
+        # swap keys and values
+        inference_classes_as_idx = {
+            v: k for k, v in inference_classes.items()
+        }
+
+        class_idxes = [inference_classes_as_idx.get(i, -1) for i in classes.split(",")]
+
+        results = results[np.isin(results.class_id, class_idxes)]
 
         self.state["detections_stack"].append(results)
-        self.state["last_classes"] = inference_classes
+        self.state["last_classes"] = [inference_classes[i] for i in class_idxes if i != -1]
+
+        print(results)
 
         return results
 
@@ -1029,13 +1044,14 @@ class VisionScript:
 
             return statement
 
-        return self.state["last"]
+        return str(self.state["last"])
 
     def say(self, statement):
         """
         Print a statement to the console, or create a text representation of a statement for use
         in a notebook.
         """
+        print(statement)
         if isinstance(self.state["last"], np.ndarray):
             self.show(None)
             return
@@ -1054,14 +1070,14 @@ class VisionScript:
 
             self.state["output"] = {"text": output}
 
-            return
+            return statement.strip()
 
         if isinstance(statement, int) or isinstance(statement, float):
             statement = str(statement)
 
         if statement and isinstance(statement, str):
             print(statement.strip())
-            return
+            return statement.strip()
 
         if isinstance(self.state["last"], sv.Detections):
             last_args = self.state["last_function_args"]
@@ -1080,6 +1096,48 @@ class VisionScript:
             print(statement.strip())
 
         self.state["output"] = {"text": statement}
+        self.state["last"] = statement
+
+    def show_text(self, text):
+        if not text and isinstance(self.state["last"], str):
+            text = self.state["last"]
+
+        # add text to the last frame
+        image = self._get_item(-1, "image_stack")
+
+        print("x", text)
+
+        # put at 20, or self.state["show_text_count"] + 20
+        # put at 20, 10% of image height
+        position = (20, image.shape[0] // 10)
+
+        if self.state["show_text_count"] > 0:
+            position = (self.state["show_text_count"] + 20, position[1])
+
+        # create background box
+        image = cv2.rectangle(
+            image,
+            (position[0], position[1] - 30),
+            (position[0] + len(text) * 20, position[1] + 10),
+            (0, 0, 0),
+            -1,
+        )
+
+        image = cv2.putText(
+            image,
+            text,
+            position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+        if text and len(text) > 0:
+            self.state["show_text_count"] = len(text)
+
+        self._add_to_stack("image_stack", image)
 
     def blur(self, args):
         """
@@ -1280,29 +1338,18 @@ class VisionScript:
         """
         most_recent_detect_or_segment = None
 
-        # if in context, show with cv2
-        if self.state.get("in", None):
-            # image is cv2 array
-            image = self.state["ctx"]["in"]["active_file"]
-            cv2.imshow("image", image)
-            cv2.waitKey(0)
-
-
         image = self._get_item(-1, "image_stack")
 
-        if self.state["history"][-2] in ("detect", "segment"):
-            most_recent_detect_or_segment = self.state["history"][-2]
-
-        if most_recent_detect_or_segment == "detect":
+        if "detect" in self.state["history"]:
             annotator = sv.BoxAnnotator()
-        elif most_recent_detect_or_segment == "segment":
+        elif "segment" in self.state["history"]:
             annotator = sv.MaskAnnotator()
         else:
             annotator = None
 
-        if self.state.get("last_loaded_image_name") is None or not os.path.exists(
+        if (self.state.get("last_loaded_image_name") is None or not os.path.exists(
             self.state["last_loaded_image_name"]
-        ):
+        )) and self.state["ctx"].get("in") is None:
             print("Image does not exist.")
             return
         
@@ -1331,8 +1378,6 @@ class VisionScript:
 
             for image in self.state["image_stack"]:
                 images.append(np.array(image))
-
-            print(len(images))
 
             # reassemble
             # get dims in last image
@@ -1413,7 +1458,11 @@ class VisionScript:
             image = annotator.annotate(
                 image,
                 detections=self._filter_controller(self.state["detections_stack"][-1]),
+                labels=self.state["last_classes"],
             )
+
+            # convert to rgb
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         if self.notebook:
             buffer = io.BytesIO()
@@ -1472,7 +1521,11 @@ class VisionScript:
             return
 
         if self.state.get("ctx", None) and self.state["ctx"].get("camera", None):
-            cv2.imshow("image", image)
+            self.state["image_stack"][-1] = image
+
+            # show image
+            
+            # cv2.imshow("image", image)
         else:
             sv.plot_image(image, (8, 8))
 
@@ -1713,11 +1766,11 @@ class VisionScript:
 
             self.state["history"].append(token.value)
 
-            if token.value == "say":
-                value = self.state["last"]
-                func(value)
-                continue
-            elif token.value == "contains":
+            # if token.value == "say":
+            #     value = self.state["last"]
+            #     func(value)
+            #     continue
+            if token.value == "contains":
                 return func(literal_eval(node.children[0]))
             else:
                 # convert children to strings
@@ -1741,12 +1794,14 @@ class VisionScript:
                 
                 if isinstance(node.children[0].value, str) and node.children[0].value == "camera":
                     self.state["ctx"] = {
-                        "in": None
+                        "in": {
+                            "fps": 0
+                        }
                     }
                     self.state["ctx"]["active_file"] = None
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
-                    context = node.children[3:]
+                    context = node.children[2:]
 
                     while True:
                         frame = self.state["ctx"]["camera"].read()[1]
@@ -1754,13 +1809,12 @@ class VisionScript:
                         self.state["ctx"]["active_file"] = frame
                         self._add_to_stack("image_stack", frame)
 
-                        # show frame
-                        cv2.imshow("frame", frame)
-                        cv2.waitKey(1)
-
                         for item in context:
                             # add to image
                             self.parse_tree(item)
+
+                        cv2.imshow("frame", self._get_item(-1, "image_stack"))
+                        cv2.waitKey(1)
                     
                 else:
                     self.state["ctx"] = {
@@ -1776,6 +1830,8 @@ class VisionScript:
                         video_info = sv.VideoInfo.from_video_path(video_path=file_name)
 
                         with sv.VideoSink(target_path='result.mp4', video_info=video_info) as sink:
+                            # make this concurrent if in fast context
+
                             for frame in sv.get_video_frames_generator(source_path='source_video.mp4', stride=2):
                                 # ignore first 2, then do rest
                                 context = node.children[3:]
@@ -1796,6 +1852,9 @@ class VisionScript:
                             self.parse_tree(item)
 
                 del self.state["ctx"]
+
+                # set concurrent context to false
+                self.state["in_concurrent_context"] = False
 
                 continue
 
