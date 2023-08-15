@@ -3,7 +3,10 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
         <title>VisionScript Notebook</title>
+
+        <link rel="icon" href="/static/logo.svg" type="image/svg+xml" />
 
         <link rel="stylesheet" href="/static/styles.css" />
 
@@ -33,8 +36,9 @@
                 VisionScript <span class="hide_on_mobile">Notebook</span>
             </p>
             <ul>
+                <li onclick="switch_paper_mode()"><a id="paper_mode">Paper <span class="hide_on_mobile">Code</span> 📝</a></li>
                 <div id="nav_menu">
-                    <li onclick="switch_mode()"><a id="mode_switch">Use Code Mode 📝</a></li>
+                    <li onclick="switch_mode()"><a id="mode_switch">Code Mode 💻</a></li>
                     <li><a href="https://visionscript.dev/docs" target="_blank">Docs 📚</a></li>
                     <li><a onclick="exportNotebook();">Export 💾</a></li>
                     <li onclick="deploy()"><a>Use as Web App ☁️</a></li>
@@ -131,6 +135,26 @@
                         <p><a onclick="export_vicnb()" style="cursor: pointer">Export your app as a .vicnb file</a>.</p>
                     </ul>
                 </div>
+            </dialog>
+            <dialog id="paper_mode_dialog">
+                <p onclick="this.parentNode.close()" style="float: right; cursor: pointer; color: coral;">Close</p>
+                <h2>Take a photo</h2>
+                <p>Take a photo of VisionScript code to bring it into your notebook.</p>
+                <video id="paper_mode_video" style="width: 100%; min-height: 300px;"></video>
+                <canvas id="paper_mode_canvas" style="display: none;"></canvas>
+                <img id="paper_mode_image" style="display: none;" />
+                <button id="run_paper_mode" onclick="run_paper_code();" style="display: none;">Run code</button>
+                <button id="retake_paper_mode_button" onclick="take_photo();" style="display: none;">Retake photo</button>
+                <button id="paper_mode_button" onclick="take_photo();">Take photo</button>
+            </dialog>
+            <dialog id="fill_inputs">
+                <h2>Prepare your code</h2>
+                <p>Fill in the inputs below to run your code.</p>
+                <form id="fill_inputs_form">
+                    <p id="fill_inputs_message"></p>
+                    <div id="fill_inputs_inputs"></div>
+                    <input type="submit" value="Run Code" id="fill_inputs_submit" />
+                </form>
             </dialog>
             <div id="toast"></div>
         </main>
