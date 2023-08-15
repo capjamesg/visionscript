@@ -26,6 +26,114 @@ function hideFunctionBox () {
     }
 }
 
+function switch_paper_mode () {
+    var dialog = document.getElementById("paper_mode_dialog");
+
+    if (dialog.style.display == "none") {
+        // disable webcam
+        var paper_mode_video = document.getElementById("paper_mode_video");
+        paper_mode_video.pause();
+        paper_mode_video.srcObject = null;
+        
+        dialog.close();
+    } else {
+        dialog.showModal();
+        start_paper_mode_camera();
+    }   
+}
+
+function start_paper_mode_camera () {
+    var paper_mode_video = document.getElementById("paper_mode_video");
+
+    // use front-facing camera
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function (stream) {
+        paper_mode_video.srcObject = stream;
+        paper_mode_video.play();
+        paper_mode_video.style.display = "block";
+    });
+}
+
+function take_photo () {
+    var paper_mode_video = document.getElementById("paper_mode_video");
+    var canvas = document.getElementById("paper_mode_canvas");
+    canvas.width = paper_mode_video.videoWidth;
+    canvas.height = paper_mode_video.videoHeight;
+
+    var context = canvas.getContext("2d");
+    // take full resolution photo
+    context.drawImage(paper_mode_video, 0, 0, canvas.width, canvas.height);
+    // hide video
+    paper_mode_video.style.display = "none";
+    // show canvas
+    canvas.style.display = "block";
+
+    // paint image
+    var image = document.getElementById("paper_mode_image");
+    image.src = canvas.toDataURL("image/png");
+
+    var paper_mode_video = document.getElementById("paper_mode_video");
+    paper_mode_video.style.display = "none";
+
+    // show retake_paper_mode_button
+    var retake_paper_mode_button = document.getElementById("retake_paper_mode_button");
+    retake_paper_mode_button.style.display = "block";
+
+    // hide paper_mode_button
+    var paper_mode_button = document.getElementById("paper_mode_button");
+    paper_mode_button.style.display = "none";
+
+    // show run_paper_mode
+    var run_paper_mode = document.getElementById("run_paper_mode");
+    run_paper_mode.style.display = "block";
+}
+
+// https://stackoverflow.com/questions/16968945/convert-base64-png-data-to-javascript-file-objects
+function dataURLtoFile(dataurl, filename) {
+    var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type:mime});
+}
+
+function run_paper_code () {
+    var paper_mode_image = document.getElementById("paper_mode_image");
+
+    var data = paper_mode_image.src;
+
+    var body = new FormData();
+    body.append('file', dataURLtoFile(data, "paper_mode.png"));
+
+    // set drag_drop_notebook background to image
+    var drag_drop_notebook = document.getElementById("drag_drop_notebook");
+    drag_drop_notebook.style.backgroundImage = `url(${data})`;
+
+    // upload image
+    fetch(`${API_URL}/notebook/upload?state_id=${STATE_ID}`, {
+        method: 'POST',
+        body: body
+    })
+    .then(response => response.json())
+    .then(data => {
+        var file_name = data["file_name"];
+
+        // close modal
+        var dialog = document.getElementById("paper_mode_dialog");
+        dialog.close();
+
+        // add session id to file name
+        // file_name = `tmp/${STATE_ID}/${file_name}`;
+
+        var paper_code_program = `
+        Load["${file_name}"]
+        GetText[]
+        Say[]
+        `;
+        
+        executeCode(paper_code_program, false, "paper_mode");
+    });
+}
 
 function rerun (cell_number) {
     var cells = document.getElementById("cells");
@@ -172,7 +280,7 @@ for (var category in FUNCTIONS) {
         var description = functions[name].description;
         var example = functions[name].example;
         function_box.innerHTML += `
-            <div class="function" draggable="true" id="${name}">
+            <div class="function" draggable="true" id="${name}" data-color="${colors[category]}">
                 <p style="color: ${colors[category]}">${name}[${args.join(", ")}]</p>
                 <p>${description}</p>
             </div>
@@ -432,7 +540,8 @@ notebook.addEventListener("drop", function (event) {
     }
     
     var function_name = event.dataTransfer.getData("text/plain");
-    var function_element = document.getElementById(function_name);
+    
+    var function_element = document.getElementById(function_name) || document.getElementById("Input");
     var color = function_element.firstElementChild.style.color;
 
     var html = "";
@@ -693,6 +802,51 @@ function executeCode (code, comment = false, existing_cell = null) {
 
     var is_text_cell = comment;
 
+    var input_modal_html = ``;
+
+    // if there are any Input[] cells in code, show modal
+    if (code.includes("Input[")) {
+        var fill_inputs_inputs = document.getElementById("fill_inputs_inputs");
+        fill_inputs_inputs.innerHTML = "";
+
+        var inputs = code.match(/Input\[[^\]]*\]/g);
+
+        for (var i = 0; i < inputs.length; i++) {
+            var input = inputs[i];
+            // get text between ""
+            var input_name = input.match(/\"[^\"]*\"/g)[0].replace(/\"/g, "");
+
+            input_modal_html += `<div class="input"><label for="${input_name}">${input_name}</label><input type="text" id="${input_name}" name="${input_name}" /></div>`;
+        }
+
+        fill_inputs_inputs.innerHTML = input_modal_html;
+
+        var fill_inputs = document.getElementById("fill_inputs");
+        fill_inputs.showModal();
+
+        var submit_button = document.getElementById("fill_inputs_submit");
+
+        submit_button.addEventListener("click", function (event) {
+            event.preventDefault();
+
+            // replace input values
+            var inputs = code.match(/Input\[[^\]]*\]/g);
+
+            for (var i = 0; i < inputs.length; i++) {
+                var input = inputs[i];
+                // get text between ""
+                var input_name = input.match(/\"[^\"]*\"/g)[0].replace(/\"/g, "");
+                var input_value = document.getElementById(input_name).value;
+
+                code = code.replace(input, `"${input_value}"`);
+            }
+
+            fill_inputs.close();
+        });
+
+        return false;
+    }
+
     fetch(`${API_URL}/notebook`, {
         method: 'POST',
         headers: {
@@ -724,6 +878,55 @@ function executeCode (code, comment = false, existing_cell = null) {
         loading.style.display = "none";
         clearInterval(timer);
         clearInterval(output_timer);
+
+        console.log(data, existing_cell);
+
+        // if paper mode, take all cells and render them
+        if (existing_cell == "paper_mode") {
+            // update cells with all of the right cells
+            // data.output will be a string delimited by \n
+            
+            if (data.output == "") {
+                data.output = "Your program did not create an output.";
+            }
+
+            var cells = data.output.split("]");
+            var notebook = document.getElementById("drag_drop_notebook");
+            // set background to white
+            notebook.style.background = "white";
+
+            // remove last item
+            cells.pop();
+
+            for (var i = 0; i < cells.length; i++) {
+                var function_name = cells[i].split("[")[0];
+                var cell_count = i + 1;
+                
+                // get data-color of elemtn with id
+                var color = document.getElementById(function_name).getAttribute("data-color");
+
+                if (mapped_functions[function_name].supports_arguments) {
+                    var argument_text = cells[i].split("[")[1].split("]")[0];
+                    // replace " with nothing
+                    argument_text = argument_text.replace(/"/g, "");
+                    html = `
+                        <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: 20px;">
+                            <p>${function_name}[<input type="text" class="argument_block" id="cell_${cell_count}" value="${argument_text}" />]</p>
+                        </div>
+                    `;
+                } else {
+                    html = `
+                        <div class="cell" draggable="true" id="${function_name}_${cell_count}" style="background-color: ${color}; margin-left: 20px;">
+                            <p>${function_name}[]</p>
+                        </div>
+                    `;
+                }
+
+                notebook.appendChild(document.createRange().createContextualFragment(html));
+            }
+
+            return;
+        }
 
         if (existing_cell) {
             var cell = document.getElementById(existing_cell);
@@ -776,6 +979,7 @@ function executeCode (code, comment = false, existing_cell = null) {
         textarea.value = "";
     })
     .catch((error) => {
+        console.error('Error:', error);
         clearInterval(timer);
         clearInterval(output_timer);
         

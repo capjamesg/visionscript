@@ -5,13 +5,13 @@ warnings.filterwarnings("ignore")
 import copy
 import io
 import logging
-import math
 import mimetypes
 import os
 import random
 import string
 import time
 import shutil
+import psutil
 
 import click
 import cv2
@@ -49,6 +49,14 @@ SUPPORTED_INFERENCE_MODELS = {
 SUPPORTED_TRAIN_MODELS = {
     "vit": lambda self, folder: registry.vit_target(self, folder),
     "yolov8": lambda self, folder: registry.yolov8_target(self, folder),
+}
+
+STACK_MAXIMUM = {
+    "image_stack": {
+        # 50% of available memory
+        "maximum": 0.5 * psutil.virtual_memory().available,
+        "also_reset": ["detections_stack"]
+    }
 }
 
 
@@ -179,6 +187,10 @@ def init_state():
         "confidence": 50,
         "active_region": None,
         "active_filters": {"class": None, "region": None},
+        "load_queue": [],
+        "stack_size": {
+            "image_stack": 0
+        }
     }
 
 
@@ -315,6 +327,12 @@ class VisionScript:
 
         self.state["confidence"] = confidence
 
+    def load_queue(self, items):
+        """
+        Load a queue of images into state.
+        """
+        self.state["load_queue"].append(items)
+
     def load(self, filename):
         """
         Load an image or folder of images into state.
@@ -323,11 +341,9 @@ class VisionScript:
         import validators
 
         # if session_id and notebook, concatenate tmp/session_id/ to filename
-        if self.notebook and not validators.url(filename):
-            filename = os.path.join("tmp", self.state["session_id"], filename)
 
         if isinstance(filename, np.ndarray):
-            self.state["image_stack"].append(filename)
+            self._add_to_stack("image_stack", filename)
             # save file
             import uuid
 
@@ -426,20 +442,50 @@ class VisionScript:
 
         filename = filename.strip()
 
-        self.state["last_loaded_image_name"] = filename
+        # if extension is not in jpg, png, jpeg, do fuzzy
+        if not filename.endswith((".jpg", ".png", ".jpeg")):
+            # fuzzy search
+            from fuzzywuzzy import process
+
+            image_filenames = [
+                item
+                for item in os.listdir(".")
+                if item.endswith((".jpg", ".png", ".jpeg"))
+            ]
+
+            if not image_filenames:
+                print("No images found in tmp directory.")
+                return
+
+            image_filenames = [item.split(".")[0] for item in image_filenames]
+
+            image_filename = process.extractOne(filename, image_filenames)[0]
+
+            filename = image_filename + ".png"
+
+            self.state["last_loaded_image_name"] = filename
+
+            print(f"Loading {filename}.")
 
         try:
+            if self.notebook and (not validators.url(filename) or filename.endswith(".png")):
+                print("notebook")
+                filename = os.path.join("tmp", self.state["session_id"], filename)
+
             image = Image.open(filename).convert("RGB")
-        except:
+        except Exception as e:
+            print(e)
             print(f"Could not load image {filename}.")
             return
+        
+        self.state["last_loaded_image_name"] = filename
 
         self.state["output"] = {"image": image}
 
-        return np.array(image)
+        return np.array(image), filename
 
     def size(self, _):
-        return self.state["image_stack"][-1].shape[:2]
+        return self._get_item(-1, "image_stack").shape[:2]
 
     def import_(self, args):
         """
@@ -467,15 +513,15 @@ class VisionScript:
         Cut out a detection from an image.
         """
         x1, y1, x2, y2 = self.state["last"].xyxy[0]
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
         cropped_image = image.crop((x1, y1, x2, y2))
-        self.state["image_stack"].append(cropped_image)
+        self._add_to_stack("image_stack", cropped_image)
 
     def crop(self, args):
         """
         Crop an image.
         """
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         # if ndarray, convert to PIL image
         if isinstance(image, np.ndarray):
@@ -493,7 +539,7 @@ class VisionScript:
 
             image = image.crop((x0, y0, x1, y1))
 
-        self.state["image_stack"].append(image)
+        self._add_to_stack("image_stack", image)
 
     def select(self, args):
         """
@@ -519,8 +565,8 @@ class VisionScript:
         Paste an image onto another image.
         """
         x, y = args
-        self.state["image_stack"].append(
-            self.state["image_stack"][-2].paste(self.state["image_stack"][-1], (x, y))
+        self._add_to_stack("image_stack", 
+            self.state["image_stack"][-2].paste(self._get_item(-1, "image_stack"), (x, y))
         )
 
     def resize(self, args):
@@ -528,9 +574,9 @@ class VisionScript:
         Resize an image.
         """
         width, height = args
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
         image = cv2.resize(image, (width, height))
-        self.state["image_stack"].append(image)
+        self._add_to_stack("image_stack", image)
 
     def grid(self, n):
         """
@@ -539,7 +585,7 @@ class VisionScript:
         if not n:
             n = 9
 
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         height, width, _ = image.shape
 
@@ -649,7 +695,7 @@ class VisionScript:
             break
 
         self.state["image_stack"][-1] = self.state["image_stack"][-2].paste(
-            self.state["image_stack"][-1], (x, y)
+            self._get_item(-1, "image_stack"), (x, y)
         )
 
     def save(self, filename):
@@ -707,13 +753,13 @@ class VisionScript:
         """
         Turn an image to greyscale.
         """
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        self.state["image_stack"].append(image)
+        self._add_to_stack("image_stack", image)
         # save to test.png
 
-        self.state["image_stack"].append(image)
+        self._add_to_stack("image_stack", image)
         self.state["output"] = {"image": image}
 
     def deploy(self, app_name):
@@ -749,21 +795,41 @@ class VisionScript:
         """
         Use OCR to get text from an image.
         """
-        import easyocr
+        # import easyocr
 
-        reader = easyocr.Reader(["en"])
-        result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
+        # reader = easyocr.Reader(["en"])
+        # result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
         
-        # run through pytesseract
-        # print(result)
-        import pytesseract
+        # # run through pytesseract
+        # # print(result)
+        # import pytesseract
 
-        result = pytesseract.image_to_string(self.state["last_loaded_image_name"], config='--user-patterns patterns.txt')
+        # result = pytesseract.image_to_string(self.state["last_loaded_image_name"], config='--user-patterns patterns.txt')
 
-        result = result.replace("“", '"')
-        result = result.replace("”", '"')
+        # result = result.replace("“", '"')
+        # result = result.replace("”", '"')
 
-        print(result, "result")
+        # print(result, "result")
+
+        from google.cloud import vision
+
+        # do handwriting detection
+        client = vision.ImageAnnotatorClient()
+
+        with io.open(self.state["last_loaded_image_name"], "rb") as image_file:
+            content = image_file.read()
+
+        image = vision.Image(content=content)
+
+        response = client.document_text_detection(image=image)
+
+        result = ""
+
+        for page in response.full_text_annotation.pages:
+            for block in page.blocks:
+                for paragraph in block.paragraphs:
+                    for word in paragraph.words:
+                        result += "".join([symbol.text for symbol in word.symbols])
 
         self.state["output"] = {"text": result}
         self.state["last"] = result
@@ -774,7 +840,7 @@ class VisionScript:
         """
         Rotate an image.
         """
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
         # load into cv2
         args = int(args)
         if args == 90:
@@ -787,7 +853,7 @@ class VisionScript:
             image = image
 
         self.state["output"] = {"image": image}
-        self.state["image_stack"].append(image)
+        self._add_to_stack("image_stack", image)
 
     def getcolours(self, k):
         """
@@ -798,7 +864,7 @@ class VisionScript:
 
         from sklearn.cluster import KMeans
 
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         image = np.array(image)
 
@@ -937,6 +1003,16 @@ class VisionScript:
             self, text_prompt
         )
 
+        # load last_loaded_image_name
+        image = cv2.imread(self.state["last_loaded_image_name"])
+
+        # cut out all detections and save them to the state
+        for i, detection in enumerate(detections.xyxy):
+            x1, y1, x2, y2 = detection
+            self._add_to_stack("image_stack", image[y1:y2, x1:x2])
+        
+        self.state["last"] = self._get_item(-1, "image_stack")
+
         self.state["detections_stack"].append(detections)
 
         return detections
@@ -1010,11 +1086,11 @@ class VisionScript:
         Blur an image.
         """
 
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         image = cv2.blur(image, (args[0], args[0]))
 
-        self.state["image_stack"].append(image)
+        self._add_to_stack("image_stack", image)
 
     def replace(self, args):
         """
@@ -1032,7 +1108,7 @@ class VisionScript:
             # bgr to rgb
             picture = picture[:, :, ::-1].copy()
 
-            image_at_top_of_stack = self.state["image_stack"][-1].copy()
+            image_at_top_of_stack = self._get_item(-1, "image_stack").copy()
 
             for i in range(len(xyxy)):
                 x1, y1, x2, y2 = xyxy[i]
@@ -1044,7 +1120,7 @@ class VisionScript:
 
                 image_at_top_of_stack[y1:y2, x1:x2] = picture
 
-            self.state["image_stack"].append(image_at_top_of_stack)
+            self._add_to_stack("image_stack", image_at_top_of_stack)
 
             return
 
@@ -1070,7 +1146,7 @@ class VisionScript:
                 # cast all to int
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
-                self.state["image_stack"][-1][y1:y2, x1:x2] = color_to_rgb
+                self._get_item(-1, "image_stack")[y1:y2, x1:x2] = color_to_rgb
 
     def label(self, args):
         """
@@ -1110,7 +1186,7 @@ class VisionScript:
             "Salesforce/blip-image-captioning-base"
         )
 
-        inputs = processor(self.state["image_stack"][-1], return_tensors="pt")
+        inputs = processor(self._get_item(-1, "image_stack"), return_tensors="pt")
 
         out = model.generate(**inputs)
 
@@ -1144,12 +1220,57 @@ class VisionScript:
         """
         self.greyscale(_)
 
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         sobelxy = cv2.Sobel(image, cv2.CV_64F, 1, 1, ksize=5)
 
-        self.state["image_stack"].append(sobelxy)
+        self._add_to_stack("image_stack", sobelxy)
         self.state["output"] = {"image": sobelxy}
+
+    def _enforce_stack_maximums(self, stack, item = None):
+        # this was built in particular to prevent the image stack from growing too large
+        if item is not None:
+            stack_size = self.state["stack_size"].get(stack, 0)
+
+            # get amount of memory used by item
+            stack_size += item.nbytes
+
+            # if stack size is greater than maximum, remove items from stack
+            if STACK_MAXIMUM.get(stack, None) and stack_size > STACK_MAXIMUM.get(stack)["maximum"]:
+                # remove items from stack until stack size is less than maximum
+                while stack_size > STACK_MAXIMUM.get(stack)["maximum"]:
+                    # remove first last item from stack
+                    removed_item = self.state[stack].pop(0)
+
+                    # subtract size of removed item from stack size
+                    stack_size -= removed_item.nbytes
+
+        if STACK_MAXIMUM.get(stack, None) and len(self.state[stack]) > STACK_MAXIMUM.get(stack)["maximum"]:
+            self.state[stack] = self.state[stack][-STACK_MAXIMUM.get(stack)["maximum"]:]
+
+            for also_reset in STACK_MAXIMUM.get(stack)["also_reset"]:
+                self.state[also_reset] = self.state[also_reset][-STACK_MAXIMUM.get(stack)["maximum"]:]
+
+
+    def _add_to_stack(self, stack, item):
+        self.state[stack].append(item)
+
+        self._enforce_stack_maximums(stack, item)
+
+    def _get_item(self, n = 1, stack = "image_stack"):
+        # get() overwrites n
+
+        if self.state.get("get", None):
+            n = self.state["get"]
+
+        self._enforce_stack_maximums(stack, None)
+
+        # if len() of load_queue > image_stack, load next image
+        if len(self.state["load_queue"]) > len(self.state["image_stack"]):
+            for filename in self.state["load_queue"][len(self.state["image_stack"]):]:
+                self.state["image_stack"].append(cv2.imread(filename))
+
+        return self.state[stack][n]
 
     def show(self, _):
         """
@@ -1159,7 +1280,15 @@ class VisionScript:
         """
         most_recent_detect_or_segment = None
 
-        image = self.state["image_stack"][-1]
+        # if in context, show with cv2
+        if self.state.get("in", None):
+            # image is cv2 array
+            image = self.state["ctx"]["in"]["active_file"]
+            cv2.imshow("image", image)
+            cv2.waitKey(0)
+
+
+        image = self._get_item(-1, "image_stack")
 
         if self.state["history"][-2] in ("detect", "segment"):
             most_recent_detect_or_segment = self.state["history"][-2]
@@ -1225,45 +1354,7 @@ class VisionScript:
 
             return
 
-        if self.state.get("history", [])[-2] == "search":
-            images = []
-
-            # get closest divisor (i.e. 16 is 4x4)
-            grid_size = math.gcd(
-                len(self.state["image_stack"]), len(self.state["image_stack"])
-            )
-
-            if len(self.state["last"]) == len(self.state["detections_stack"]):
-                for image, detections in zip(
-                    self.state["last"], self.state["detections_stack"]
-                ):
-                    detections = self._filter_controller(detections)
-                    if annotator and detections:
-                        image = annotator.annotate(
-                            np.array(image),
-                            detections,
-                            labels=self.state["last_classes"],
-                        )
-                    else:
-                        image = np.array(image)
-
-                    images.append(image)
-            else:
-                for image in self.state["last"]:
-                    images.append(np.array(image))
-
-            if not self.notebook:
-                sv.plot_images_grid(
-                    images=np.array(images),
-                    grid_size=(grid_size, grid_size),
-                    size=(12, 12),
-                )
-
-                return
-
-            image = images[0]
-
-        elif self.state.get("history", [])[-1] == "compare":
+        if self.state.get("history", [])[-1] == "compare":
             images = []
 
             def get_divisors(n):
@@ -1315,8 +1406,8 @@ class VisionScript:
             # image = images[0]
 
         if annotator:
-            # turn (self.state["image_stack"][-1]) into RGB
-            image = np.array(self.state["image_stack"][-1])
+            # turn (self._get_item(-1, "image_stack")) into RGB
+            image = np.array(self._get_item(-1, "image_stack"))
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
             image = annotator.annotate(
@@ -1431,7 +1522,7 @@ class VisionScript:
         """
         Read QR code from last image.
         """
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         data, _, _ = cv2.QRCodeDetector().detectAndDecode(image)
 
@@ -1442,7 +1533,7 @@ class VisionScript:
         Set brightness of last image.
         """
         # brightness is between -100 and 100
-        image = self.state["image_stack"][-1]
+        image = self._get_item(-1, "image_stack")
 
         # use cv2
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -1458,7 +1549,7 @@ class VisionScript:
 
         image = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
 
-        self.state["image_stack"].append(image)
+        self._add_to_stack("image_stack", image)
         self.state["output"] = {"image": image}
 
     def contains(self, statement):
@@ -1612,6 +1703,12 @@ class VisionScript:
                 return func(result)
 
             if token.value == "get":
+                get_value = self.parse_tree(node.children[0])
+
+                if get_value is None:
+                    del self.state["get"]
+                else:
+                    self.state["get"] = get_value
                 continue
 
             self.state["history"].append(token.value)
@@ -1640,17 +1737,37 @@ class VisionScript:
                             item.value = float(item.value)
 
             if token.value == "in":
-                self.state["ctx"] = {
-                    "in": os.listdir(node.children[0].value),
-                }
+                # if file_name == "camera", load camera in context
+                
+                if isinstance(node.children[0].value, str) and node.children[0].value == "camera":
+                    self.state["ctx"] = {
+                        "in": None
+                    }
+                    self.state["ctx"]["active_file"] = None
+                    self.state["ctx"]["camera"] = cv2.VideoCapture(0)
+
+                    context = node.children[3:]
+
+                    while True:
+                        frame = self.state["ctx"]["camera"].read()[1]
+
+                        self.state["ctx"]["active_file"] = frame
+                        self._add_to_stack("image_stack", frame)
+
+                        # show frame
+                        cv2.imshow("frame", frame)
+                        cv2.waitKey(1)
+
+                        for item in context:
+                            # add to image
+                            self.parse_tree(item)
+                    
+                else:
+                    self.state["ctx"] = {
+                        "in": os.listdir(node.children[0].value),
+                    }
 
                 for file_name in self.state["ctx"]["in"]:
-                    # if file_name == "camera", load camera in context
-                    if file_name == "camera":
-                        self.state["ctx"]["active_file"] = "camera"
-                        self.state["ctx"]["camera"] = cv2.VideoCapture(0)
-                        continue
-
                     # must be image
                     if not file_name.endswith((".jpg", ".png", ".jpeg", ".mov", ".mp4")):
                         continue
@@ -1675,14 +1792,6 @@ class VisionScript:
                         # ignore first 2, then do rest
                         context = node.children[3:]
 
-                        if file_name == "camera":
-                            while True:
-                                _, frame = self.state["ctx"]["camera"].read()
-
-                                for item in context:
-                                    self.state["ctx"]["active_file"] = frame
-                                    self.parse_tree(item)
-
                         for item in context:
                             self.parse_tree(item)
 
@@ -1705,15 +1814,16 @@ class VisionScript:
             else:
                 result = func(value)
 
-            if result is not None:
-                self.state["last"] = result
-                self.state["output"] = {"text": result}
-
             self.state["last_function_type"] = token.value
             self.state["last_function_args"] = [value]
 
             if token.value == "load":
-                self.state["image_stack"].append(result)
+                self._add_to_stack("load_queue", result[0])
+                continue
+
+            if result is not None:
+                self.state["last"] = result
+                self.state["output"] = {"text": result}
 
 
 def activate_console(parser):
@@ -1799,7 +1909,7 @@ def main(
 
         # webbrowser.open("http://localhost:5001/notebook?" + str(uuid.uuid4()))
 
-        app.run(debug=True, host="0.0.0.0", port=5001)
+        app.run(debug=True, host="0.0.0.0", port=5001, ssl_context="adhoc")
 
         return
 

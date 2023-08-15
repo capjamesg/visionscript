@@ -49,7 +49,7 @@ def fast_sam_base(self, text_prompt) -> sv.Detections:
     current_path = os.getcwd()
 
     model = FastSAM(os.path.join(current_path, "weights", "FastSAM.pt"))
-
+    
     everything_results = model(
         self.state["last_loaded_image_name"],
         device=DEVICE,
@@ -62,8 +62,16 @@ def fast_sam_base(self, text_prompt) -> sv.Detections:
         self.state["last_loaded_image_name"], everything_results, device=DEVICE
     )
 
-    # text prompt
-    ann = prompt_process.text_prompt(text=text_prompt)
+    if "," in text_prompt:
+        ann = []
+
+        text_prompt = text_prompt.split(",")
+        
+        for prompt in text_prompt:
+            ann.extend(prompt_process.text_prompt(text=prompt))
+    else:
+        ann = prompt_process.text_prompt(text=text_prompt)
+
     logging.disable(logging.NOTSET)
 
     results = []
@@ -84,15 +92,15 @@ def fast_sam_base(self, text_prompt) -> sv.Detections:
         mask=np.array([item.mask[0] for item in results]),
         xyxy=np.array([item.xyxy[0] for item in results]),
         class_id=np.array(class_ids),
-        confidence=np.array([1]),
+        confidence=np.array([1] * len(results)),
     )
 
     return detections
 
 
 def yolov8_target(self, folder):
-    if "autodistill_yolov8" not in sys.modules:
-        from autodistill_yolov8 import YOLOv8
+    # if "autodistill_yolov8" not in sys.modules:
+    #     from autodistill_yolov8 import YOLOv8
 
     base_model = YOLOv8("yolov8n.pt")
 
