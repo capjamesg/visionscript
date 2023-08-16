@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | EOL)
+expr: (in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -9,6 +9,7 @@ use: "Use" "[" STRING "]"
 load: "Load" "[" (STRING | input) "]" | "Load" ("[" "]")?
 save: "Save" "[" STRING "]"
 getfps: "GetFPS" ("[" "]")?
+getdistinctscenes: "GetDistinctScenes" ("[" "]")?
 say: "Say" "[" STRING "]" | "Say" ("[" "]")?
 get_text: "GetText" ("[" "]")?
 camera: "Camera" ("[" "]")?

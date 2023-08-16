@@ -61,6 +61,8 @@ STACK_MAXIMUM = {
 
 CONCURRENT_MAXIMUM = 10
 
+VIDEO_STRIDE = 2
+
 
 class InputNotProvided:
     pass
@@ -277,6 +279,7 @@ class VisionScript:
             "lt": lambda x: x[0] < x[1],
             "lte": lambda x: x[0] <= x[1],
             "track": lambda x: self.track(x),
+            "getdistinctscenes": lambda x: self.get_distinct_scenes(x),
         }
 
     def filter_by_class(self, args):
@@ -340,6 +343,27 @@ class VisionScript:
 
     def track(self, _):
         self.state["tracker"] = sv.ByteTrack()
+
+    def get_distinct_scenes(self, _):
+        if not self.state.get("video_events_from_Classify[]"):
+            return []
+        
+        scenes = self.state["video_events_from_Classify[]"]
+
+        scene_changes = []
+
+        # whenever a "text" value changes for 2 or more frames, we have a scene change
+        for i in range(1, len(scenes)):
+            if len(i) < 2:
+                continue
+
+            last_scene = scenes[i - 1]
+            scene_before_last = scenes[i - 2]
+
+            if last_scene["text"] != scene_before_last["text"]:
+                scene_changes.append(last_scene["frame"])
+        
+        return scene_changes
 
     def load_queue(self, items):
         """
@@ -986,8 +1010,6 @@ class VisionScript:
 
         self.state["last"] = results
 
-        print(results, "eeee")
-
         return results
 
     def classify(self, labels):
@@ -1036,6 +1058,11 @@ class VisionScript:
             label_name = labels[label_idx]
 
         self.state["output"] = {"text": label_name}
+
+        if self.state["ctx"].get("video_events_from_Classify[]"):
+            self.state["ctx"]["video_events_from_Classify[]"].append(
+                {"text": label_name, "frame": self.state["ctx"]["current_frame_count"]}
+            )
 
         return label_name
 
@@ -1959,15 +1986,20 @@ class VisionScript:
                     if file_name.endswith((".mov", "mp4")):
                         video_info = sv.VideoInfo.from_video_path(video_path=file_name)
 
+                        self.state["ctx"]["video_events_from_Classify[]"] = []
+                        self.state["ctx"]["current_frame_count"] = 0
+
                         with sv.VideoSink(
                             target_path="result.mp4", video_info=video_info
                         ) as sink:
                             # make this concurrent if in fast context
 
-                            for frame in sv.get_video_frames_generator(
-                                source_path="source_video.mp4", stride=2
-                            ):
-                                # ignore first 2, then do rest
+                            for i, frame in enumerate(sv.get_video_frames_generator(
+                                source_path="source_video.mp4", stride=VIDEO_STRIDE
+                            )):
+                                self.state["ctx"]["current_frame_count"] = i
+
+                                # ignore first three items, which don't contain instructions
                                 context = node.children[3:]
 
                                 for item in context:
