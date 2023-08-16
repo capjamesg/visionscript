@@ -33,6 +33,10 @@ from visionscript.usage import (
     language_grammar_reference,
     lowercase_language_grammar_reference,
 )
+from visionscript.paper_ocr_correction import (
+    line_processing,
+    syntax_correction,
+)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_FILE_SIZE = 10000000  # 10MB
@@ -196,7 +200,8 @@ def init_state():
         },
         "show_text_count": 0,
         "in_concurrent_context": False,
-        "ctx": {}
+        "ctx": {},
+        "tracker": None,
     }
 
 
@@ -276,6 +281,7 @@ class VisionScript:
             "gte": lambda x: x[0] >= x[1],
             "lt": lambda x: x[0] < x[1],
             "lte": lambda x: x[0] <= x[1],
+            "track": lambda x: self.track(x),
         }
 
     def filter_by_class(self, args):
@@ -336,6 +342,9 @@ class VisionScript:
             return
 
         self.state["confidence"] = confidence
+
+    def track(self, _):
+        self.state["tracker"] = sv.ByteTrack()
 
     def load_queue(self, items):
         """
@@ -814,45 +823,46 @@ class VisionScript:
         """
         Use OCR to get text from an image.
         """
-        # import easyocr
+        # if not in notebook
+        if self.state.get("notebook", False):
+            from google.cloud import vision
 
-        # reader = easyocr.Reader(["en"])
-        # result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
+            # do handwriting detection
+            client = vision.ImageAnnotatorClient()
+
+            with io.open(self.state["last_loaded_image_name"], "rb") as image_file:
+                content = image_file.read()
+
+            image = vision.Image(content=content)
+
+            # Load[Detect[dog]]Show[]
+            # Load[] Detect[dog] Show[]
+            # Load[dog.png] Detect[dog] Show[]
+
+            response = client.document_text_detection(image=image)
+
+            result = ""
+
+            for page in response.full_text_annotation.pages:
+                for block in page.blocks:
+                    for paragraph in block.paragraphs:
+                        for word in paragraph.words:
+                            result += "".join([symbol.text for symbol in word.symbols])
+
+            result = line_processing(result)
+            result = syntax_correction(result)
+
+        else:
+            import easyocr
+
+            reader = easyocr.Reader(["en"])
+            result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
         
-        # # run through pytesseract
-        # # print(result)
         # import pytesseract
 
         # result = pytesseract.image_to_string(self.state["last_loaded_image_name"], config='--user-patterns patterns.txt')
 
-        # result = result.replace("“", '"')
-        # result = result.replace("”", '"')
-
         # print(result, "result")
-
-        from google.cloud import vision
-
-        # do handwriting detection
-        client = vision.ImageAnnotatorClient()
-
-        with io.open(self.state["last_loaded_image_name"], "rb") as image_file:
-            content = image_file.read()
-
-        image = vision.Image(content=content)
-
-        # Load[Detect[dog]]Show[]
-        # Load[] Detect[dog] Show[]
-        # Load[dog.png] Detect[dog] Show[]
-
-        response = client.document_text_detection(image=image)
-
-        result = ""
-
-        for page in response.full_text_annotation.pages:
-            for block in page.blocks:
-                for paragraph in block.paragraphs:
-                    for word in paragraph.words:
-                        result += "".join([symbol.text for symbol in word.symbols])
 
         self.state["output"] = {"text": result}
         self.state["last"] = result
@@ -1036,6 +1046,10 @@ class VisionScript:
         detections = SUPPORTED_INFERENCE_MODELS[self.state["current_active_model"]](
             self, text_prompt
         )
+
+        if self.state["tracker"]:
+            # use bytetrack for object tracking
+            detections = self.state["tracker"].update_with_detections(detections)
 
         # load last_loaded_image_name
         image = cv2.imread(self.state["last_loaded_image_name"])

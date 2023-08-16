@@ -16,12 +16,11 @@ def yolov8_base(self, _) -> sv.Detections:
     else:
         model = YOLO("yolov8n.pt")
 
-    inference_results = model(self.state["image_stack"][-1])[0]
+    inference_results = model(self._get_item(-1, "image_stack"))[0]
     classes = inference_results.names
 
     logging.disable(logging.NOTSET)
 
-    # Inference
     results = sv.Detections.from_yolov8(inference_results)
 
     return results, classes
