@@ -12,6 +12,7 @@ import string
 import time
 import shutil
 import psutil
+import sys
 
 import click
 import cv2
@@ -38,7 +39,7 @@ MAX_FILE_SIZE = 10000000  # 10MB
 
 spell = SpellChecker()
 
-parser = Lark(grammar)
+parser = Lark(grammar, start="start")
 
 SUPPORTED_INFERENCE_MODELS = {
     "groundingdino": lambda self, classes: registry.grounding_dino_base(self, classes),
@@ -195,6 +196,7 @@ def init_state():
         },
         "show_text_count": 0,
         "in_concurrent_context": False,
+        "ctx": {}
     }
 
 
@@ -269,6 +271,11 @@ class VisionScript:
             "grid": lambda x: self.grid(x),
             "run": lambda x: self.parse_tree(parser.parse(self.state["last"])),
             "showtext": lambda x: self.show_text(x),
+            "getfps": lambda x: self.state["ctx"]["in"].get("fps", 0) if self.state["ctx"]["in"] is not None else 0,
+            "gt": lambda x: x[0] > x[1],
+            "gte": lambda x: x[0] >= x[1],
+            "lt": lambda x: x[0] < x[1],
+            "lte": lambda x: x[0] <= x[1],
         }
 
     def filter_by_class(self, args):
@@ -294,8 +301,6 @@ class VisionScript:
             return self.state["input_variables"][literal_eval(key)]
         else:
             return InputNotProvided()
-            # print(f"Input {key} does not exist.")
-            # exit()
 
     def equality(self, args):
         return args[0] == args[1]
@@ -470,8 +475,6 @@ class VisionScript:
 
             self.state["last_loaded_image_name"] = filename
 
-            print(f"Loading {filename}.")
-
         try:
             if self.notebook and (not validators.url(filename) or filename.endswith(".png")):
                 print("notebook")
@@ -517,10 +520,24 @@ class VisionScript:
         """
         Cut out a detection from an image.
         """
+        if len(self.state["last"].xyxy) == 0:
+            return
+        
         x1, y1, x2, y2 = self.state["last"].xyxy[0]
         image = self._get_item(-1, "image_stack")
+        # if image is ndarray, convert to PIL image
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+
         cropped_image = image.crop((x1, y1, x2, y2))
+
+        # convert back to ndarray
+        cropped_image = np.array(cropped_image)
+
         self._add_to_stack("image_stack", cropped_image)
+
+        self.state["output"] = {"image": cropped_image}
+        return [cropped_image]
 
     def crop(self, args):
         """
@@ -751,9 +768,7 @@ class VisionScript:
         if len(args) == 0 and isinstance(self.state["last"], sv.detection.core.Detections):
             return len(self.state["last"].confidence)
         else:
-            return len(
-                [item for item in self.state["last"].class_id]# if item == args[0]]
-            )
+            return len(args)
 
     def greyscale(self, _):
         """
@@ -763,9 +778,7 @@ class VisionScript:
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         self._add_to_stack("image_stack", image)
-        # save to test.png
 
-        self._add_to_stack("image_stack", image)
         self.state["output"] = {"image": image}
 
     def deploy(self, app_name):
@@ -826,6 +839,10 @@ class VisionScript:
             content = image_file.read()
 
         image = vision.Image(content=content)
+
+        # Load[Detect[dog]]Show[]
+        # Load[] Detect[dog] Show[]
+        # Load[dog.png] Detect[dog] Show[]
 
         response = client.document_text_detection(image=image)
 
@@ -950,10 +967,12 @@ class VisionScript:
 
         results = results[np.isin(results.class_id, class_idxes)]
 
-        self.state["detections_stack"].append(results)
+        self._add_to_stack("detections_stack", results)
         self.state["last_classes"] = [inference_classes[i] for i in class_idxes if i != -1]
 
-        print(results)
+        self.state["last"] = results
+
+        print(results, "eeee")
 
         return results
 
@@ -1022,13 +1041,13 @@ class VisionScript:
         image = cv2.imread(self.state["last_loaded_image_name"])
 
         # cut out all detections and save them to the state
-        for i, detection in enumerate(detections.xyxy):
+        for _, detection in enumerate(detections.xyxy):
             x1, y1, x2, y2 = detection
             self._add_to_stack("image_stack", image[y1:y2, x1:x2])
         
         self.state["last"] = self._get_item(-1, "image_stack")
 
-        self.state["detections_stack"].append(detections)
+        self._add_to_stack("detections_stack", detections)
 
         return detections
 
@@ -1051,9 +1070,13 @@ class VisionScript:
         Print a statement to the console, or create a text representation of a statement for use
         in a notebook.
         """
-        print(statement)
+
         if isinstance(self.state["last"], np.ndarray):
             self.show(None)
+            return
+        
+        if isinstance(self.state["last"], int):
+            print(str(self.state["last"]))
             return
 
         if isinstance(self.state["last"], (list, tuple)):
@@ -1105,10 +1128,6 @@ class VisionScript:
         # add text to the last frame
         image = self._get_item(-1, "image_stack")
 
-        print("x", text)
-
-        # put at 20, or self.state["show_text_count"] + 20
-        # put at 20, 10% of image height
         position = (20, image.shape[0] // 10)
 
         if self.state["show_text_count"] > 0:
@@ -1291,7 +1310,21 @@ class VisionScript:
             stack_size = self.state["stack_size"].get(stack, 0)
 
             # get amount of memory used by item
-            stack_size += item.nbytes
+            # if item is a numpy array, get its size in bytes
+            if isinstance(item, np.ndarray):
+                stack_size += item.nbytes
+            elif isinstance(item, list):
+                for i in item:
+                    if isinstance(i, np.ndarray):
+                        stack_size += i.nbytes
+            elif isinstance(item, dict):
+                for i in item.values():
+                    if isinstance(i, np.ndarray):
+                        stack_size += i.nbytes
+            elif isinstance(item, str):
+                stack_size += os.path.getsize(item)
+            else:
+                stack_size += sys.getsizeof(item)
 
             # if stack size is greater than maximum, remove items from stack
             if STACK_MAXIMUM.get(stack, None) and stack_size > STACK_MAXIMUM.get(stack)["maximum"]:
@@ -1336,7 +1369,6 @@ class VisionScript:
 
         If a Detect or Segment function was run previously, this function shows the image with the bounding boxes.
         """
-        most_recent_detect_or_segment = None
 
         image = self._get_item(-1, "image_stack")
 
@@ -1430,9 +1462,13 @@ class VisionScript:
                 self.state["image_stack"], self.state["detections_stack"]
             ):
                 detections = self._filter_controller(detections)
-                if annotator and detections:
+                if annotator and detections and isinstance(annotator, sv.BoxAnnotator):
                     image = annotator.annotate(
                         np.array(image), detections, labels=self.state["last_classes"]
+                    )
+                elif annotator and detections:
+                    image = annotator.annotate(
+                        np.array(image), detections
                     )
                 else:
                     image = np.array(image)
@@ -1455,11 +1491,12 @@ class VisionScript:
             image = np.array(self._get_item(-1, "image_stack"))
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-            image = annotator.annotate(
-                image,
-                detections=self._filter_controller(self.state["detections_stack"][-1]),
-                labels=self.state["last_classes"],
-            )
+            if isinstance(annotator, sv.BoxAnnotator):
+                image = annotator.annotate(
+                    image,
+                    detections=self._filter_controller(self.state["detections_stack"][-1]),
+                    labels=self.state["last_classes"],
+                )
 
             # convert to rgb
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -1628,6 +1665,13 @@ class VisionScript:
                 self.state["input_variables"][node.children[0].value] = "image"
 
     def parse_tree(self, tree):
+        try:
+            self.evaluate_tree(tree)
+        except MemoryError:
+            print("The program has ran out of memory.")
+            exit()
+
+    def evaluate_tree(self, tree):
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
@@ -1639,7 +1683,7 @@ class VisionScript:
                 return literal_eval(tree)
             elif hasattr(tree, "value") and tree.value.isfloat():
                 return float(tree.value)
-
+            
         if hasattr(tree, "children") and tree.data == "input":
             return self.input_(tree.children[0].value)
 
@@ -1674,15 +1718,16 @@ class VisionScript:
             ):
                 node = node
             # if string
-            elif len(node.children) == 1 and hasattr(node.children[0], "value"):
-                return node.children[0].value
-            else:
-                node = node.children[0]
+            # elif len(node.children) == 1 and hasattr(node.children[0], "value"):
+            #     return node.children[0].value
+            # else:
+            #     node = node.children
 
-            if not hasattr(node, "data"):
+            # remove \n
+            if hasattr(node, "value") and node.value == "\n":
                 continue
 
-            token = node.data
+            token = node.data if hasattr(node, "data") else node
 
             if token.value in aliased_functions:
                 token.value = map_alias_to_underlying_function(token.value)
@@ -1719,25 +1764,25 @@ class VisionScript:
 
             if token.value == "if":
                 # copy self.state
-                last_state_before_if = copy.deepcopy(self.state)["last"]
+                if not cv2.VideoCapture(0).isOpened():
+                    last_state_before_if = copy.deepcopy(self.state)["last"]
 
-                self.state["ctx"] = {
-                    "if": True,
-                }
+                if self.state.get("ctx"):
+                    self.state["ctx"]["if"] = True
+                else:
+                    self.state["ctx"] = {"if": True}
 
                 # if equality, check if equal
 
-                statement = node.children[0]
+                statement = self.parse_tree(node.children[0])
 
-                statement = self.parse_tree(statement)
+                statement = self.state["last"]
 
-                if statement is None:
-                    continue
-
-                if statement is False:
+                if statement is None or statement == False or int(statement) == 0:
                     return
 
-                self.state["last"] = last_state_before_if
+                # if not cv2.VideoCapture(0).isOpened():
+                #     self.state["last"] = last_state_before_if
 
             if token.value == "make":
                 self.make(node.children)
@@ -1745,6 +1790,16 @@ class VisionScript:
 
             if token.value == None:
                 continue
+
+            # if gt, lt, gte, lte, etc, call with x as first arg and y as second arg
+            if token.value in ["gt", "lt", "gte", "lte"]:
+                result1 = self.parse_tree(node.children[0])
+                result1 = self.state["last"] if result1 is None else result1
+                result2 = self.parse_tree(node.children[1])
+                result2 = self.state["last"] if result2 is None else result2
+                return self.function_calls[token.value](
+                    [result1, result2]
+                )
 
             if token.value == "literal":
                 func = self.state["functions"][node.children[0].value]
@@ -1758,7 +1813,7 @@ class VisionScript:
             if token.value == "get":
                 get_value = self.parse_tree(node.children[0])
 
-                if get_value is None:
+                if get_value is None and self.state.get("get"):
                     del self.state["get"]
                 else:
                     self.state["get"] = get_value
@@ -1791,17 +1846,20 @@ class VisionScript:
 
             if token.value == "in":
                 # if file_name == "camera", load camera in context
-                
-                if isinstance(node.children[0].value, str) and node.children[0].value == "camera":
-                    self.state["ctx"] = {
-                        "in": {
-                            "fps": 0
-                        }
-                    }
+                # if node.children[0].value is an expr, evaluate it
+                # evaluate all children
+
+                if hasattr(node.children[0], "value") and node.children[0].value == "camera":
+                    self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
                     context = node.children[2:]
+
+                    start_time = time.time()
+                    counter = 0
+
+                    # exit()
 
                     while True:
                         frame = self.state["ctx"]["camera"].read()[1]
@@ -1815,13 +1873,24 @@ class VisionScript:
 
                         cv2.imshow("frame", self._get_item(-1, "image_stack"))
                         cv2.waitKey(1)
-                    
-                else:
-                    self.state["ctx"] = {
-                        "in": os.listdir(node.children[0].value),
-                    }
 
-                for file_name in self.state["ctx"]["in"]:
+                        counter += 1
+
+                        self.state["ctx"]["fps"] = round(counter / (time.time() - start_time))
+
+                        counter = 0
+                        start_time = time.time()
+
+                elif hasattr(node.children[0], "value") and isinstance(node.children[0].value, str):
+                    self.state["ctx"]["in"] = os.listdir(node.children[0].value)
+                # if expression, eval
+                elif hasattr(node.children[0], "value"):
+                    self.state["ctx"]["in"] = self.parse_tree(node.children[0])
+
+                for item in node.children:
+                    self.parse_tree(item)
+
+                for file_name in self.state["ctx"].get("in", []):
                     # must be image
                     if not file_name.endswith((".jpg", ".png", ".jpeg", ".mov", ".mp4")):
                         continue
@@ -1851,7 +1920,9 @@ class VisionScript:
                         for item in context:
                             self.parse_tree(item)
 
-                del self.state["ctx"]
+                if self.state["ctx"].get("in"):
+                    del self.state["ctx"]["in"]
+                    del self.state["ctx"]["active_file"]
 
                 # set concurrent context to false
                 self.state["in_concurrent_context"] = False
@@ -1873,6 +1944,8 @@ class VisionScript:
             else:
                 result = func(value)
 
+            # print("just run", token.value, "with", value, "returning result", result)
+
             self.state["last_function_type"] = token.value
             self.state["last_function_args"] = [value]
 
@@ -1883,6 +1956,8 @@ class VisionScript:
             if result is not None:
                 self.state["last"] = result
                 self.state["output"] = {"text": result}
+
+            # return result
 
 
 def activate_console(parser):

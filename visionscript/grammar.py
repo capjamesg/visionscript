@@ -1,17 +1,19 @@
 grammar = """
-start: (expr | EOL | EOF | " ")*
+start: (expr | EOL)*
 
-expr: (if | in | train | label | detect | countinregion | help | list | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera)
+expr: (in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
 use: "Use" "[" STRING "]"
 load: "Load" "[" (STRING | input) "]" | "Load" ("[" "]")?
 save: "Save" "[" STRING "]"
+getfps: "GetFPS" ("[" "]")?
 say: "Say" "[" STRING "]" | "Say" ("[" "]")?
 get_text: "GetText" ("[" "]")?
 camera: "Camera" ("[" "]")?
-greyscale: "Greyscale" ("[" "]")?
+greyscale: "Greyscale" "[]"
+showtext: "ShowText" ("[" STRING "]")?
 search: "Search" "[" STRING "]"
 deploy: "Deploy" "[" STRING "]"
 getedges: "GetEdges"  ("[" "]")?
@@ -38,27 +40,26 @@ show: "Show" ("[" "]")?
 select: "Select" ("[" "]")? | "Select" "[" INT "]"
 paste: "Paste" "[" INT "," INT "]"
 pasterandom: "PasteRandom" ("[" "]")?
-cutout: "Cutout" ("[" "]")?
+cutout: "Cutout[]"
 crop: "Crop" ("[" (INT | STRING) "," (INT | STRING) "," (INT | STRING) "," (INT | STRING) "]")?
 count: "Count" ("[" "]")?
 input: "Input" ("[" STRING "]")?
 contains: "Contains" "[" STRING "]"
 compare: "Compare" ("[" "]")?
 setbrightness: "SetBrightness" "[" INT "]"
-read: "Read" ("[" "]")?
+read: "Read[]"
 exit: "Exit" ("[" "]")?
 blur: "Blur" ("[" "]")?
 similarity: "Similarity" ("[" (INT | FLOAT) "]")?
 get: "Get" "[" INT "]" EOL
-list: "[" ((STRING | INT | expr) "," | (STRING | INT | expr) )* "]" EOL
 help: "Help" "[" STRING "]"
 end: "End" ("[" "]")?
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
-detect: "Detect" "[" input "]" | "Detect" "[" STRING ("," STRING)* "]" | "Detect" ("[" "]")?
+detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" input "]" | "Detect" ("[" "]")?
 segment: "Segment" "[" STRING "]"
 else: "Else"
-in: "In" "[" STRING "]" EOL (INDENT expr+)* EOL 
-if: "If" "[" (expr+)* "]" EOL (INDENT expr+)* (EOL | EOF) (else EOL (INDENT expr+)* (EOL | EOF | " "))?
+in: "In" "[" (STRING | expr) "]" EOL expr+ "Endin" EOL
+if: "If" "[" comparison_expressions "]" EOL expr+ "End" EOL
 reset: "Reset" ("[" "]")?
 negate: "Not" "[" expr "]"
 OPERAND: "+" | "-" | "*" | "/"
@@ -69,6 +70,13 @@ label: "Label" "[" STRING "," STRING ("," STRING )*  "]"
 literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"
 variable: /[a-zA-Z_][a-zA-Z0-9_]*/
 comment: /#.*?\\n/
+comparison_expressions: gt | lt | gte | lte | equality | not_equality
+gt: expr ">" expr
+lt: expr "<" expr
+gte: expr ">=" expr
+lte: expr "<=" expr
+increment: variable "++"
+decrement: variable "--"
 EOL: "\\n"
 EOF: "\\Z"
 INT: /-?\d+/
