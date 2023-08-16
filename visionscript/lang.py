@@ -8,35 +8,30 @@ import logging
 import mimetypes
 import os
 import random
-import string
-import time
 import shutil
-import psutil
+import string
 import sys
+import time
 
 import click
 import cv2
 import lark
 import numpy as np
-from visionscript import registry
+import psutil
 import supervision as sv
 import torch
+import watchdog
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from spellchecker import SpellChecker
-import watchdog
 from watchdog.observers import Observer
 
+from visionscript import registry
 from visionscript.grammar import grammar
-from visionscript.usage import (
-    USAGE,
-    language_grammar_reference,
-    lowercase_language_grammar_reference,
-)
-from visionscript.paper_ocr_correction import (
-    line_processing,
-    syntax_correction,
-)
+from visionscript.paper_ocr_correction import (line_processing,
+                                               syntax_correction)
+from visionscript.usage import (USAGE, language_grammar_reference,
+                                lowercase_language_grammar_reference)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_FILE_SIZE = 10000000  # 10MB
@@ -60,7 +55,7 @@ STACK_MAXIMUM = {
     "image_stack": {
         # 50% of available memory
         "maximum": 0.5 * psutil.virtual_memory().available,
-        "also_reset": ["detections_stack"]
+        "also_reset": ["detections_stack"],
     }
 }
 
@@ -71,7 +66,7 @@ class InputNotProvided:
     pass
 
 
-def handle_unexpected_characters(e, code, interactive = False):
+def handle_unexpected_characters(e, code, interactive=False):
     # if line doesn't end with ], add it
     if not code.strip().endswith("]"):
         code += "]"
@@ -83,10 +78,10 @@ def handle_unexpected_characters(e, code, interactive = False):
     position = code.find("[")
 
     if code[position - 1] == " ":
-        code = code[:position - 1] + code[position:]
+        code = code[: position - 1] + code[position:]
 
         return
-    
+
     # replace all “ with "
     code = code.replace("“", '"')
     code = code.replace("”", '"')
@@ -135,7 +130,7 @@ def handle_unexpected_characters(e, code, interactive = False):
         exit(1)
 
 
-def handle_unexpected_token(e, interactive = False):
+def handle_unexpected_token(e, interactive=False):
     line = e.line
     column = e.column
 
@@ -195,9 +190,7 @@ def init_state():
         "active_region": None,
         "active_filters": {"class": None, "region": None},
         "load_queue": [],
-        "stack_size": {
-            "image_stack": 0
-        },
+        "stack_size": {"image_stack": 0},
         "show_text_count": 0,
         "in_concurrent_context": False,
         "ctx": {},
@@ -276,7 +269,9 @@ class VisionScript:
             "grid": lambda x: self.grid(x),
             "run": lambda x: self.parse_tree(parser.parse(self.state["last"])),
             "showtext": lambda x: self.show_text(x),
-            "getfps": lambda x: self.state["ctx"]["in"].get("fps", 0) if self.state["ctx"]["in"] is not None else 0,
+            "getfps": lambda x: self.state["ctx"]["in"].get("fps", 0)
+            if self.state["ctx"]["in"] is not None
+            else 0,
             "gt": lambda x: x[0] > x[1],
             "gte": lambda x: x[0] >= x[1],
             "lt": lambda x: x[0] < x[1],
@@ -445,8 +440,10 @@ class VisionScript:
 
         if self.state.get("ctx") and self.state["ctx"].get("in"):
             filename = self.state["ctx"]["active_file"]
-        elif self.state.get("ctx") and self.state["ctx"].get("in") and isinstance(
-            self.state["ctx"]["active_file"], np.ndarray
+        elif (
+            self.state.get("ctx")
+            and self.state["ctx"].get("in")
+            and isinstance(self.state["ctx"]["active_file"], np.ndarray)
         ):
             # if in video context, frame is already loaded
             self.state["output"] = {"image": self.state["ctx"]["active_file"]}
@@ -485,7 +482,9 @@ class VisionScript:
             self.state["last_loaded_image_name"] = filename
 
         try:
-            if self.notebook and (not validators.url(filename) or filename.endswith(".png")):
+            if self.notebook and (
+                not validators.url(filename) or filename.endswith(".png")
+            ):
                 print("notebook")
                 filename = os.path.join("tmp", self.state["session_id"], filename)
 
@@ -494,7 +493,7 @@ class VisionScript:
             print(e)
             print(f"Could not load image {filename}.")
             return
-        
+
         self.state["last_loaded_image_name"] = filename
 
         self.state["output"] = {"image": image}
@@ -531,7 +530,7 @@ class VisionScript:
         """
         if len(self.state["last"].xyxy) == 0:
             return
-        
+
         x1, y1, x2, y2 = self.state["last"].xyxy[0]
         image = self._get_item(-1, "image_stack")
         # if image is ndarray, convert to PIL image
@@ -596,8 +595,11 @@ class VisionScript:
         Paste an image onto another image.
         """
         x, y = args
-        self._add_to_stack("image_stack", 
-            self.state["image_stack"][-2].paste(self._get_item(-1, "image_stack"), (x, y))
+        self._add_to_stack(
+            "image_stack",
+            self.state["image_stack"][-2].paste(
+                self._get_item(-1, "image_stack"), (x, y)
+            ),
         )
 
     def resize(self, args):
@@ -773,8 +775,10 @@ class VisionScript:
         """
         Count the number of detections in a sv.Detections object.
         """
-        
-        if len(args) == 0 and isinstance(self.state["last"], sv.detection.core.Detections):
+
+        if len(args) == 0 and isinstance(
+            self.state["last"], sv.detection.core.Detections
+        ):
             return len(self.state["last"].confidence)
         else:
             return len(args)
@@ -857,7 +861,7 @@ class VisionScript:
 
             reader = easyocr.Reader(["en"])
             result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
-        
+
         # import pytesseract
 
         # result = pytesseract.image_to_string(self.state["last_loaded_image_name"], config='--user-patterns patterns.txt')
@@ -969,16 +973,16 @@ class VisionScript:
         ](self, classes)
 
         # swap keys and values
-        inference_classes_as_idx = {
-            v: k for k, v in inference_classes.items()
-        }
+        inference_classes_as_idx = {v: k for k, v in inference_classes.items()}
 
         class_idxes = [inference_classes_as_idx.get(i, -1) for i in classes.split(",")]
 
         results = results[np.isin(results.class_id, class_idxes)]
 
         self._add_to_stack("detections_stack", results)
-        self.state["last_classes"] = [inference_classes[i] for i in class_idxes if i != -1]
+        self.state["last_classes"] = [
+            inference_classes[i] for i in class_idxes if i != -1
+        ]
 
         self.state["last"] = results
 
@@ -1058,7 +1062,7 @@ class VisionScript:
         for _, detection in enumerate(detections.xyxy):
             x1, y1, x2, y2 = detection
             self._add_to_stack("image_stack", image[y1:y2, x1:x2])
-        
+
         self.state["last"] = self._get_item(-1, "image_stack")
 
         self._add_to_stack("detections_stack", detections)
@@ -1088,7 +1092,7 @@ class VisionScript:
         if isinstance(self.state["last"], np.ndarray):
             self.show(None)
             return
-        
+
         if isinstance(self.state["last"], int):
             print(str(self.state["last"]))
             return
@@ -1318,7 +1322,7 @@ class VisionScript:
         self._add_to_stack("image_stack", sobelxy)
         self.state["output"] = {"image": sobelxy}
 
-    def _enforce_stack_maximums(self, stack, item = None):
+    def _enforce_stack_maximums(self, stack, item=None):
         # this was built in particular to prevent the image stack from growing too large
         if item is not None:
             stack_size = self.state["stack_size"].get(stack, 0)
@@ -1341,7 +1345,10 @@ class VisionScript:
                 stack_size += sys.getsizeof(item)
 
             # if stack size is greater than maximum, remove items from stack
-            if STACK_MAXIMUM.get(stack, None) and stack_size > STACK_MAXIMUM.get(stack)["maximum"]:
+            if (
+                STACK_MAXIMUM.get(stack, None)
+                and stack_size > STACK_MAXIMUM.get(stack)["maximum"]
+            ):
                 # remove items from stack until stack size is less than maximum
                 while stack_size > STACK_MAXIMUM.get(stack)["maximum"]:
                     # remove first last item from stack
@@ -1350,19 +1357,25 @@ class VisionScript:
                     # subtract size of removed item from stack size
                     stack_size -= removed_item.nbytes
 
-        if STACK_MAXIMUM.get(stack, None) and len(self.state[stack]) > STACK_MAXIMUM.get(stack)["maximum"]:
-            self.state[stack] = self.state[stack][-STACK_MAXIMUM.get(stack)["maximum"]:]
+        if (
+            STACK_MAXIMUM.get(stack, None)
+            and len(self.state[stack]) > STACK_MAXIMUM.get(stack)["maximum"]
+        ):
+            self.state[stack] = self.state[stack][
+                -STACK_MAXIMUM.get(stack)["maximum"] :
+            ]
 
             for also_reset in STACK_MAXIMUM.get(stack)["also_reset"]:
-                self.state[also_reset] = self.state[also_reset][-STACK_MAXIMUM.get(stack)["maximum"]:]
-
+                self.state[also_reset] = self.state[also_reset][
+                    -STACK_MAXIMUM.get(stack)["maximum"] :
+                ]
 
     def _add_to_stack(self, stack, item):
         self.state[stack].append(item)
 
         self._enforce_stack_maximums(stack, item)
 
-    def _get_item(self, n = 1, stack = "image_stack"):
+    def _get_item(self, n=1, stack="image_stack"):
         # get() overwrites n
 
         if self.state.get("get", None):
@@ -1372,7 +1385,7 @@ class VisionScript:
 
         # if len() of load_queue > image_stack, load next image
         if len(self.state["load_queue"]) > len(self.state["image_stack"]):
-            for filename in self.state["load_queue"][len(self.state["image_stack"]):]:
+            for filename in self.state["load_queue"][len(self.state["image_stack"]) :]:
                 self.state["image_stack"].append(cv2.imread(filename))
 
         return self.state[stack][n]
@@ -1393,12 +1406,13 @@ class VisionScript:
         else:
             annotator = None
 
-        if (self.state.get("last_loaded_image_name") is None or not os.path.exists(
-            self.state["last_loaded_image_name"]
-        )) and self.state["ctx"].get("in") is None:
+        if (
+            self.state.get("last_loaded_image_name") is None
+            or not os.path.exists(self.state["last_loaded_image_name"])
+        ) and self.state["ctx"].get("in") is None:
             print("Image does not exist.")
             return
-        
+
         def get_divisors(n):
             divisors = []
 
@@ -1407,7 +1421,7 @@ class VisionScript:
                     divisors.append(i)
 
             return divisors
-        
+
         def get_closest_divisor(n):
             divisors = get_divisors(n)
 
@@ -1416,8 +1430,16 @@ class VisionScript:
         grid_size = get_closest_divisor(len(self.state["image_stack"]))
 
         # if there was a grid before a reset
-        last_reset_idx = self.state["history"].index("reset") if "reset" in self.state["history"] else 0
-        last_grid_idx = self.state["history"].index("grid") if "grid" in self.state["history"] else 0
+        last_reset_idx = (
+            self.state["history"].index("reset")
+            if "reset" in self.state["history"]
+            else 0
+        )
+        last_grid_idx = (
+            self.state["history"].index("grid")
+            if "grid" in self.state["history"]
+            else 0
+        )
 
         if last_grid_idx > last_reset_idx:
             images = []
@@ -1433,11 +1455,21 @@ class VisionScript:
                 if len(image.shape) < smallest_dims:
                     smallest_dims = len(image.shape)
 
-            image = np.zeros((images[0].shape[0] * grid_size, images[0].shape[1] * grid_size, smallest_dims), dtype=np.uint8)
+            image = np.zeros(
+                (
+                    images[0].shape[0] * grid_size,
+                    images[0].shape[1] * grid_size,
+                    smallest_dims,
+                ),
+                dtype=np.uint8,
+            )
 
             for i in range(grid_size):
                 for j in range(grid_size):
-                    image[i * images[0].shape[0]:(i + 1) * images[0].shape[0], j * images[0].shape[1]:(j + 1) * images[0].shape[1]] = images[i * grid_size + j]
+                    image[
+                        i * images[0].shape[0] : (i + 1) * images[0].shape[0],
+                        j * images[0].shape[1] : (j + 1) * images[0].shape[1],
+                    ] = images[i * grid_size + j]
 
             # return image
             cv2.imshow("image", np.array(image))
@@ -1456,7 +1488,7 @@ class VisionScript:
                         divisors.append(i)
 
                 return divisors
-            
+
             def get_closest_divisor(n):
                 divisors = get_divisors(n)
 
@@ -1465,8 +1497,16 @@ class VisionScript:
             grid_size = get_closest_divisor(len(self.state["image_stack"]))
 
             # if there was a grid before a reset
-            last_reset_idx = self.state["history"].index("reset") if "reset" in self.state["history"] else 0
-            last_grid_idx = self.state["history"].index("grid") if "grid" in self.state["history"] else 0
+            last_reset_idx = (
+                self.state["history"].index("reset")
+                if "reset" in self.state["history"]
+                else 0
+            )
+            last_grid_idx = (
+                self.state["history"].index("grid")
+                if "grid" in self.state["history"]
+                else 0
+            )
 
             if last_grid_idx > last_reset_idx:
                 for image in self.state["image_stack"]:
@@ -1481,9 +1521,7 @@ class VisionScript:
                         np.array(image), detections, labels=self.state["last_classes"]
                     )
                 elif annotator and detections:
-                    image = annotator.annotate(
-                        np.array(image), detections
-                    )
+                    image = annotator.annotate(np.array(image), detections)
                 else:
                     image = np.array(image)
 
@@ -1508,7 +1546,9 @@ class VisionScript:
             if isinstance(annotator, sv.BoxAnnotator):
                 image = annotator.annotate(
                     image,
-                    detections=self._filter_controller(self.state["detections_stack"][-1]),
+                    detections=self._filter_controller(
+                        self.state["detections_stack"][-1]
+                    ),
                     labels=self.state["last_classes"],
                 )
 
@@ -1575,7 +1615,7 @@ class VisionScript:
             self.state["image_stack"][-1] = image
 
             # show image
-            
+
             # cv2.imshow("image", image)
         else:
             sv.plot_image(image, (8, 8))
@@ -1697,7 +1737,7 @@ class VisionScript:
                 return literal_eval(tree)
             elif hasattr(tree, "value") and tree.value.isfloat():
                 return float(tree.value)
-            
+
         if hasattr(tree, "children") and tree.data == "input":
             return self.input_(tree.children[0].value)
 
@@ -1811,9 +1851,7 @@ class VisionScript:
                 result1 = self.state["last"] if result1 is None else result1
                 result2 = self.parse_tree(node.children[1])
                 result2 = self.state["last"] if result2 is None else result2
-                return self.function_calls[token.value](
-                    [result1, result2]
-                )
+                return self.function_calls[token.value]([result1, result2])
 
             if token.value == "literal":
                 func = self.state["functions"][node.children[0].value]
@@ -1863,7 +1901,10 @@ class VisionScript:
                 # if node.children[0].value is an expr, evaluate it
                 # evaluate all children
 
-                if hasattr(node.children[0], "value") and node.children[0].value == "camera":
+                if (
+                    hasattr(node.children[0], "value")
+                    and node.children[0].value == "camera"
+                ):
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
@@ -1890,12 +1931,16 @@ class VisionScript:
 
                         counter += 1
 
-                        self.state["ctx"]["fps"] = round(counter / (time.time() - start_time))
+                        self.state["ctx"]["fps"] = round(
+                            counter / (time.time() - start_time)
+                        )
 
                         counter = 0
                         start_time = time.time()
 
-                elif hasattr(node.children[0], "value") and isinstance(node.children[0].value, str):
+                elif hasattr(node.children[0], "value") and isinstance(
+                    node.children[0].value, str
+                ):
                     self.state["ctx"]["in"] = os.listdir(node.children[0].value)
                 # if expression, eval
                 elif hasattr(node.children[0], "value"):
@@ -1906,16 +1951,22 @@ class VisionScript:
 
                 for file_name in self.state["ctx"].get("in", []):
                     # must be image
-                    if not file_name.endswith((".jpg", ".png", ".jpeg", ".mov", ".mp4")):
+                    if not file_name.endswith(
+                        (".jpg", ".png", ".jpeg", ".mov", ".mp4")
+                    ):
                         continue
 
                     if file_name.endswith((".mov", "mp4")):
                         video_info = sv.VideoInfo.from_video_path(video_path=file_name)
 
-                        with sv.VideoSink(target_path='result.mp4', video_info=video_info) as sink:
+                        with sv.VideoSink(
+                            target_path="result.mp4", video_info=video_info
+                        ) as sink:
                             # make this concurrent if in fast context
 
-                            for frame in sv.get_video_frames_generator(source_path='source_video.mp4', stride=2):
+                            for frame in sv.get_video_frames_generator(
+                                source_path="source_video.mp4", stride=2
+                            ):
                                 # ignore first 2, then do rest
                                 context = node.children[3:]
 
@@ -1989,9 +2040,9 @@ def activate_console(parser):
         tree = None
 
         try:
-            tree = parser.parse(code + "\n") #.lstrip())
+            tree = parser.parse(code + "\n")  # .lstrip())
         except UnexpectedCharacters as e:
-            handle_unexpected_characters(e, code + "\n", interactive=True)#.lstrip())
+            handle_unexpected_characters(e, code + "\n", interactive=True)  # .lstrip())
         except UnexpectedToken as e:
             handle_unexpected_token(e, interactive=True)
         finally:
@@ -2040,7 +2091,7 @@ def main(
     description,
     api_key,
     api_url,
-    live
+    live,
 ) -> None:
     if validate:
         print("Script is a valid VisionScript program.")
