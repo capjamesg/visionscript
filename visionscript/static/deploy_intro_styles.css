@@ -1,0 +1,128 @@
+
+* {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+    line-height: 1.5;
+}
+html {
+    background-color: #f7f7f7;
+}
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+#cells, .cell {
+    max-width: 40em;
+}
+.cell {
+    background-color: #eee;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+textarea {
+    width: 100%;
+    border: 1px solid #ccc;
+    resize: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    display: block;
+}
+input[type="submit"] {
+    margin-top: 0.5rem;
+    background-color: darkgreen;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    resize: none;
+    overflow: hidden;
+}
+img {
+    max-width: 100%;
+}
+nav {
+    background-color: darkgreen;
+    color: white;
+    width: 100%;
+    padding: 1rem;
+    text-align: center;
+}
+main {
+    padding: 1rem;
+    max-width: 40em;
+    margin: 0 auto;
+}
+#current_count {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+select {
+    margin-bottom: 1rem;
+    display: block;
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+.small_links a {
+    color: grey;
+    font-size: 12px;
+}
+.small_links li {
+    display: inline-block;
+    margin-bottom: 10px;
+}
+h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+#export_vic, #export_vicnb {
+    color: grey;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+#files li {
+    border: 1px solid lightgrey;
+    display: inline-block;
+    padding: 10px;
+    border-radius: 10px;
+}
+#files_section {
+    display: none;
+    margin-bottom: 10px;
+}
+pre {
+    margin-top: 0.5rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+main {
+    min-height: 100vh;
+}
+.cta {
+    border: 3px solid darkgreen;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 10px;
+    display: block;
+    margin-top: 20px;
+}
+.cta a {
+    background-color: darkgreen;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    resize: none;
+    overflow: hidden;
+    text-decoration: none;
+    display: block;
+    margin-top: 20px;
+}

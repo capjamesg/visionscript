@@ -12,6 +12,7 @@ import shutil
 import string
 import sys
 import time
+import csv
 
 import click
 import cv2
@@ -271,7 +272,7 @@ class VisionScript:
             "grid": lambda x: self.grid(x),
             "run": lambda x: self.parse_tree(parser.parse(self.state["last"])),
             "showtext": lambda x: self.show_text(x),
-            "getfps": lambda x: self.state["ctx"]["in"].get("fps", 0)
+            "getfps": lambda x: self.state["ctx"].get("fps", 0)
             if self.state["ctx"]["in"] is not None
             else 0,
             "gt": lambda x: x[0] > x[1],
@@ -280,7 +281,29 @@ class VisionScript:
             "lte": lambda x: x[0] <= x[1],
             "track": lambda x: self.track(x),
             "getdistinctscenes": lambda x: self.get_distinct_scenes(x),
+            "getuniqueappearances": lambda x: self.get_unique_appearances(x),
         }
+
+    def countInRegion(self, class_, x0, y0, x1, y1):
+        """
+        Count the number of detections of a class in a region.
+        """
+        # count predictions from top of stack in region
+
+        predictions = self._get_item(-1, "detections_stack")
+
+        if predictions is None:
+            return 0
+
+        zone = sv.PolygonZone(
+            polygon=[(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
+        )
+
+        detections = sv.Detections(predictions)
+        results = zone.trigger(detections=detections)
+
+        # count number of True values in the "results" list
+        return len([x for x in results if x])
 
     def filter_by_class(self, args):
         """
@@ -352,18 +375,38 @@ class VisionScript:
 
         scene_changes = []
 
+        fps = self.state["ctx"].get("fps", 0)
+
+        # show timestamp in seconds
+
         # whenever a "text" value changes for 2 or more frames, we have a scene change
         for i in range(1, len(scenes)):
             if len(i) < 2:
                 continue
 
-            last_scene = scenes[i - 1]
-            scene_before_last = scenes[i - 2]
+            N = 10
 
-            if last_scene["text"] != scene_before_last["text"]:
-                scene_changes.append(last_scene["frame"])
+            last_n_scenes = scenes[i-N:i]
+
+            last_scene = last_n_scenes[-1]
+
+            # get most common object in last 5 scenes
+            most_common_object = max(set(last_n_scenes), key=last_n_scenes.count)
+
+            if last_scene["text"] != most_common_object:
+                current_frame_in_seconds = i / fps
+                scene_changes.append({"text": last_scene["text"], "frame": i * VIDEO_STRIDE, "time": current_frame_in_seconds})
         
         return scene_changes
+    
+    def get_unique_appearances(self, class_name):
+        if class_name:
+            class_id = self.state["last_classes"].index(class_name)
+            results = self.state["tracker"].tracker_id[self.state["tracker"].class_id == class_id]
+        else:
+            results = self.state["tracker"].tracker_id
+
+        return max(results)
 
     def load_queue(self, items):
         """
@@ -771,6 +814,11 @@ class VisionScript:
                 "".join(random.choice(string.ascii_letters) for _ in range(10)),
             )
 
+        if filename.endswith(".csv"):
+            self.write_to_csv(filename)
+
+            return
+
         if self.state.get("history", None) and "camera" in self.state["history"]:
             video = cv2.VideoWriter(
                 filename + ".avi",
@@ -1011,6 +1059,34 @@ class VisionScript:
         self.state["last"] = results
 
         return results
+    
+    def write_to_csv(self, name):
+        if isinstance(self.state["last"], sv.Detections):
+            xyxy = self.state["last"].xyxy
+            conf = self.state["last"].confidence
+            class_ids = self.state["last"].class_id
+            class_names = [self.state["last_classes"][i] for i in class_ids]
+
+            csv_record = list(zip(xyxy, conf, class_ids, class_names))
+
+            write_header_row = True if not os.path.exists(name) else False
+
+            with open(name, "w") as f:
+                writer = csv.writer(f)
+                if write_header_row:
+                    writer.writerow(
+                        [
+                            "x0",
+                            "y0",
+                            "x1",
+                            "y1",
+                            "confidence",
+                            "class_id",
+                            "class_name",
+                        ]
+                    )
+
+                writer.writerows(csv_record)
 
     def classify(self, labels):
         """
@@ -1817,6 +1893,10 @@ class VisionScript:
                 return self.parse_tree(node.children[0]) == self.parse_tree(
                     node.children[1]
                 )
+            
+            if token == "break":
+                self.state["ctx"]["break"] = True
+                return
 
             if token == "comment":
                 continue
@@ -1923,15 +2003,12 @@ class VisionScript:
                         elif item.type == "FLOAT":
                             item.value = float(item.value)
 
-            if token.value == "in":
+            if token.value == "in" or token.value == "usecamera":
                 # if file_name == "camera", load camera in context
                 # if node.children[0].value is an expr, evaluate it
                 # evaluate all children
 
-                if (
-                    hasattr(node.children[0], "value")
-                    and node.children[0].value == "camera"
-                ):
+                if token.value == "usecamera":
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
@@ -1951,6 +2028,11 @@ class VisionScript:
 
                         for item in context:
                             # add to image
+                            # if ctx break, break
+                            if self.state["ctx"].get("break"):
+                                self.state["ctx"]["break"] = False
+                                break
+
                             self.parse_tree(item)
 
                         cv2.imshow("frame", self._get_item(-1, "image_stack"))
@@ -1974,6 +2056,10 @@ class VisionScript:
                     self.state["ctx"]["in"] = self.parse_tree(node.children[0])
 
                 for item in node.children:
+                    if self.state["ctx"].get("break"):
+                        self.state["ctx"]["break"] = False
+                        break
+
                     self.parse_tree(item)
 
                 for file_name in self.state["ctx"].get("in", []):
@@ -1988,6 +2074,7 @@ class VisionScript:
 
                         self.state["ctx"]["video_events_from_Classify[]"] = []
                         self.state["ctx"]["current_frame_count"] = 0
+                        self.state["ctx"]["fps"] = video_info.fps
 
                         with sv.VideoSink(
                             target_path="result.mp4", video_info=video_info
@@ -2003,6 +2090,9 @@ class VisionScript:
                                 context = node.children[3:]
 
                                 for item in context:
+                                    if self.state["ctx"].get("break"):
+                                        self.state["ctx"]["break"] = False
+                                        break
                                     self.state["ctx"]["active_file"] = frame
                                     self.parse_tree(item)
                                     sink.write_frame(self.state["last"])
@@ -2015,6 +2105,9 @@ class VisionScript:
                         context = node.children[3:]
 
                         for item in context:
+                            if self.state["ctx"].get("break"):
+                                self.state["ctx"]["break"] = False
+                                break
                             self.parse_tree(item)
 
                 if self.state["ctx"].get("in"):

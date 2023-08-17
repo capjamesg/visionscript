@@ -31,7 +31,6 @@ def line_processing(string: str) -> str:
 
     for l in lines:
         if context_level > 0:
-            print("Context level: " + str(context_level))
             l = "\t" * context_level + l
 
         # if Next, -1 context
@@ -44,8 +43,6 @@ def line_processing(string: str) -> str:
             context_level += 1
 
         all_lines.append(l)
-
-    print("\n".join(all_lines))
 
     return "\n".join(all_lines)
 
@@ -70,11 +67,9 @@ def syntax_correction(string: str) -> str:
         else:
             final_string += longest_prefix
             # if ] before next function, then we are done
-            print("String: " + string)
             next_longest_prefix, _ = trie.longest_prefix(string[len(longest_prefix) :])
 
             # if len between longest_prefix and next_longest_prefix is 0, then add a ] and move on
-            print("Longest prefix: " + longest_prefix, next_longest_prefix)
             if next_longest_prefix == None:
                 final_string += string[len(longest_prefix) :]
                 # if not ends with ], then add one
@@ -85,7 +80,7 @@ def syntax_correction(string: str) -> str:
             longest_prefix_idx = string.find(longest_prefix)
             next_longest_prefix_idx = string.find(next_longest_prefix)
 
-            print("Longest prefix idx: " + str(longest_prefix_idx), next_longest_prefix_idx)
+            #print("Longest prefix idx: " + str(longest_prefix_idx), next_longest_prefix_idx)
 
             if (longest_prefix_idx + len(longest_prefix)) == next_longest_prefix_idx:
                 final_string += "]\n"
@@ -93,17 +88,14 @@ def syntax_correction(string: str) -> str:
                 continue
 
             text_between_current_and_next = string[len(longest_prefix) :].split("[")[1]
-            print("Text between current and next: " + text_between_current_and_next)
+            #print("Text between current and next: " + text_between_current_and_next)
 
             text_between_current_and_next = text_between_current_and_next.split("]")[0]
 
-            print("Text between current and next: " + text_between_current_and_next)
+            #print("Text between current and next: " + text_between_current_and_next)
 
             final_string += text_between_current_and_next + "]\n"
             string = string[len(longest_prefix) + len(text_between_current_and_next) + 2 :]
-
-    # print(string)
-    # print("Final code")
 
     final_string = final_string.replace("]", "]\n")
 

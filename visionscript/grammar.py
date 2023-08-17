@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | EOL)
+expr: (in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | make | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" expr
 replace: "Replace" "[" STRING "]"
@@ -10,6 +10,7 @@ load: "Load" "[" (STRING | input) "]" | "Load" ("[" "]")?
 save: "Save" "[" STRING "]"
 getfps: "GetFPS" ("[" "]")?
 getdistinctscenes: "GetDistinctScenes" ("[" "]")?
+getuniqueappearances: "GetUniqueAppearances" ("[" STRING "]")?
 say: "Say" "[" STRING "]" | "Say" ("[" "]")?
 get_text: "GetText" ("[" "]")?
 camera: "Camera" ("[" "]")?
@@ -60,6 +61,7 @@ countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]"
 detect: "Detect" "[" STRING ("," STRING)* "]" | "Detect" "[" input "]" | "Detect" ("[" "]")?
 segment: "Segment" "[" STRING "]"
 else: "Else"
+usecamera: "UseCamera[]" EOL expr+ "Endcamera" EOL
 in: "In" "[" (STRING | expr) "]" EOL expr+ "Endin" EOL
 if: "If" "[" comparison_expressions "]" EOL expr+ "End" EOL
 reset: "Reset" ("[" "]")?
@@ -69,6 +71,7 @@ equality: (INT | STRING | expr | FLOAT) "==" (INT | STRING | expr | FLOAT)
 not_equality: (INT | STRING | expr) "!=" (INT | STRING | expr)
 train: "Train" "[" STRING "," STRING "]" | "Train" "[" STRING "]"
 label: "Label" "[" STRING "," STRING ("," STRING )*  "]"
+break: "Break" ("[" "]")?
 literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"
 variable: /[a-zA-Z_][a-zA-Z0-9_]*/
 comment: /#.*?\\n/
