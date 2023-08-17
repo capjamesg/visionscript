@@ -221,9 +221,10 @@ class VisionScript:
             "segment": lambda x: self.segment(x),
             "cutout": lambda x: self.cutout(x),
             "count": lambda x: self.count(x),
-            "countinregion": lambda x: self.countInRegion(*x),
+            "countinregion": lambda x: self.countInRegion(x),
             "replace": lambda x: self.replace(x),
             "in": lambda x: None,
+            "usecamera": lambda x: None,
             "if": lambda x: None,
             "var": lambda x: None,
             "variable": lambda x: None,
@@ -284,10 +285,68 @@ class VisionScript:
             "getuniqueappearances": lambda x: self.get_unique_appearances(x),
         }
 
-    def countInRegion(self, class_, x0, y0, x1, y1):
+    def countInRegion(self, args):
         """
         Count the number of detections of a class in a region.
         """
+        if isinstance(args, str):
+            corner = args.lower()
+            last_image = self._get_item(-1, "image_stack")
+
+            # return a 4x4 grid of points
+            if corner == "top left":
+                print('top left triggered')
+                points = [
+                    [0, 0],
+                    [last_image.shape[1] / 4, 0],
+                    [0, last_image.shape[0] / 4],
+                    [last_image.shape[1] / 4, last_image.shape[0] / 4],
+                ]
+            elif corner == "top right":
+                points = [
+                    [last_image.shape[1] / 4 * 3, 0],
+                    [last_image.shape[1], 0],
+                    [last_image.shape[1] / 4 * 3, last_image.shape[0] / 4],
+                    [last_image.shape[1], last_image.shape[0] / 4],
+                ]
+            elif corner == "bottom left":
+                points = [
+                    [0, last_image.shape[0] / 4 * 3],
+                    [last_image.shape[1] / 4, last_image.shape[0] / 4 * 3],
+                    [0, last_image.shape[0]],
+                    [last_image.shape[1] / 4, last_image.shape[0]],
+                ]
+            elif corner == "bottom right":
+                points = [
+                    [last_image.shape[1] / 4 * 3, last_image.shape[0] / 4 * 3],
+                    [last_image.shape[1], last_image.shape[0] / 4 * 3],
+                    [last_image.shape[1] / 4 * 3, last_image.shape[0]],
+                    [last_image.shape[1], last_image.shape[0]],
+                ]
+            elif corner == "top half":
+                points = [
+                    [0, 0],
+                    [last_image.shape[1], 0],
+                    [0, last_image.shape[0] / 2],
+                    [last_image.shape[1], last_image.shape[0] / 2],
+                ]
+            elif corner == "bottom half":
+                points = [
+                    [0, last_image.shape[0] / 2],
+                    [last_image.shape[1], last_image.shape[0] / 2],
+                    [0, last_image.shape[0]],
+                    [last_image.shape[1], last_image.shape[0]],
+                ]
+            # if SetRegion[] has been called, use that region
+            elif self.state["region"] is not None:
+                points = self.state["region"]
+            else:
+                return 0
+        elif len(args) == 4:
+            points = args
+
+        points = [[int(p[0]), int(p[1])] for p in points]
+
         # count predictions from top of stack in region
 
         predictions = self._get_item(-1, "detections_stack")
@@ -295,12 +354,18 @@ class VisionScript:
         if predictions is None:
             return 0
 
-        zone = sv.PolygonZone(
-            polygon=[(x0, y0), (x1, y0), (x1, y1), (x0, y1)],
-        )
+        # polygon is polygon (np.ndarray): A polygon represented by a numpy array of shape
+           # `(N, 2)`, containing the `x`, `y` coordinates of the points.
+           # np.array([[x0, y0], [x1, y1]]),
+           # all dots need to be connexted
 
-        detections = sv.Detections(predictions)
-        results = zone.trigger(detections=detections)
+        zone = sv.PolygonZone(
+            polygon=np.array(points),
+            frame_resolution_wh=(last_image.shape[1], last_image.shape[0]),
+            triggering_position=sv.detection.tools.polygon_zone.Position.CENTER,
+        )
+        
+        results = zone.trigger(detections=predictions)
 
         # count number of True values in the "results" list
         return len([x for x in results if x])
@@ -847,7 +912,6 @@ class VisionScript:
         """
         Count the number of detections in a sv.Detections object.
         """
-
         if len(args) == 0 and isinstance(
             self.state["last"], sv.detection.core.Detections
         ):
@@ -859,6 +923,7 @@ class VisionScript:
         """
         Turn an image to greyscale.
         """
+        print('xuys')
         image = self._get_item(-1, "image_stack")
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -1243,16 +1308,16 @@ class VisionScript:
         self.state["last"] = statement
 
     def show_text(self, text):
-        if not text and isinstance(self.state["last"], str):
+        if not text or len(text) == 0:
             text = self.state["last"]
+
+        print(text, self.state["show_text_count"], type(text))
 
         # add text to the last frame
         image = self._get_item(-1, "image_stack")
 
-        position = (20, image.shape[0] // 10)
-
-        if self.state["show_text_count"] > 0:
-            position = (self.state["show_text_count"] + 20, position[1])
+        # keep indenting the text, from the top left to the top right
+        position = (50, 50 + self.state["show_text_count"] * 30)
 
         # create background box
         image = cv2.rectangle(
@@ -1275,9 +1340,11 @@ class VisionScript:
         )
 
         if text and len(text) > 0:
-            self.state["show_text_count"] = len(text)
-
+            self.state["show_text_count"] += 1
+        
         self._add_to_stack("image_stack", image)
+
+        self.state["last"] = image
 
     def blur(self, args):
         """
@@ -1512,7 +1579,7 @@ class VisionScript:
         if (
             self.state.get("last_loaded_image_name") is None
             or not os.path.exists(self.state["last_loaded_image_name"])
-        ) and self.state["ctx"].get("in") is None:
+        ) and self.state["ctx"].get("in") is None and self.state["ctx"].get("camera") is None:
             print("Image does not exist.")
             return
 
@@ -1845,6 +1912,12 @@ class VisionScript:
             return self.input_(tree.children[0].value)
 
         for node in tree.children:
+            # if node is \n, skip
+            # this is here to make the results from the
+            # print(node) statement below easier to read
+            if node == "\n":
+                continue
+
             print(node)
             if node == "True":
                 return True
@@ -2013,7 +2086,9 @@ class VisionScript:
                     self.state["ctx"]["active_file"] = None
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
-                    context = node.children[2:]
+                    print("children", node.children)
+
+                    context = node.children
 
                     start_time = time.time()
                     counter = 0
@@ -2025,6 +2100,8 @@ class VisionScript:
 
                         self.state["ctx"]["active_file"] = frame
                         self._add_to_stack("image_stack", frame)
+
+                        self.state["show_text_count"] = 0
 
                         for item in context:
                             # add to image
@@ -2085,6 +2162,7 @@ class VisionScript:
                                 source_path="source_video.mp4", stride=VIDEO_STRIDE
                             )):
                                 self.state["ctx"]["current_frame_count"] = i
+                                self.state["show_text_count"] = 0
 
                                 # ignore first three items, which don't contain instructions
                                 context = node.children[3:]
@@ -2146,6 +2224,8 @@ class VisionScript:
             if result is not None:
                 self.state["last"] = result
                 self.state["output"] = {"text": result}
+
+                return result
 
             # return result
 
