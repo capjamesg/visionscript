@@ -1,3 +1,5 @@
+![VisionScript logo](https://visionscript.dev/assets/full_logo.svg)
+
 # Contribute to VisionScript
 
 *Before you read on, please read the project README in full. The README explains some additional background on VisionScript you will need before contributing.*
