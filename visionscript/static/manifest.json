@@ -7,5 +7,12 @@
     "display": "standalone",
     "scope": "/",
     "theme_color": "darkgreen",
-    "description": "An interactive VisionScript notebook environment for building computer vision apps."
+    "description": "An interactive VisionScript notebook environment for building computer vision apps.",
+    "icons": [
+        {
+            "src": "https://visionscript.dev/assets/logo.png",
+            "sizes": "any",
+            "type": "image/png"
+        }
+    ]
 }

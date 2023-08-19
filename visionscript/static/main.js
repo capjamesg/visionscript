@@ -526,6 +526,7 @@ notebook.addEventListener("drop", function (event) {
         var color = function_element.firstElementChild.style.color;
 
         var html = "";
+        console.log(mapped_functions[function_name], function_name);
 
         var cell_count = cells.children.length + 1;
 
@@ -547,6 +548,7 @@ notebook.addEventListener("drop", function (event) {
     var html = "";
 
     var cell_count = cells.children.length + 1;
+    console.log(mapped_functions[function_name], function_name);
 
     if (mapped_functions[function_name].supports_arguments) {
         // if it is an if statement, don't add input
@@ -863,6 +865,8 @@ function executeCode (code, comment = false, existing_cell = null) {
         var data = data;
         var is_image = false;
 
+        console.log(data.output, "output");
+
         if (data.output.image) {
             is_image = true;
             data.output = `<img src="data:image/png;base64,${data.output.image}" />`;
@@ -871,8 +875,9 @@ function executeCode (code, comment = false, existing_cell = null) {
         } else if (data.output.text) {
             data.output = data.output.text;
         } else {
-            data.output = data.output;
+            data.output = "Success";
         }
+        console.log(data);
         var time = data.time;
         // hide loading cell
         loading.style.display = "none";

@@ -8,6 +8,7 @@ import logging
 import mimetypes
 import os
 import random
+import copy
 import shutil
 import string
 import sys
@@ -64,10 +65,32 @@ CONCURRENT_MAXIMUM = 10
 
 VIDEO_STRIDE = 2
 
+CACHE_DIRECTORY = os.path.join(os.path.expanduser("~"), ".visionscript")
+
+if not os.path.exists(CACHE_DIRECTORY):
+    os.makedirs(CACHE_DIRECTORY)
+
+# if cache directory does not contain /docs/, do a git clone
+if not os.path.exists(os.path.join(CACHE_DIRECTORY, "docs")):
+    # if git not installed, ask user to install it
+    # turn off logging
+    print("Downloading documentation...")
+
+    if shutil.which("git"):
+        os.system(
+            f"git clone https://github.com/capjamesg/visionscript-docs {os.path.join(CACHE_DIRECTORY, 'docs')}"
+        )
+    else:
+        os.system(
+            f"wget https://github.com/capjamesg/visionscript-docs/archive/refs/tags/latest.zip -O {os.path.join(CACHE_DIRECTORY, 'docs.zip')}"
+        )
+        os.system(
+            f"unzip {os.path.join(CACHE_DIRECTORY, 'docs.zip')} -d {os.path.join(CACHE_DIRECTORY, 'docs')}"
+        )
+
 
 class InputNotProvided:
     pass
-
 
 def handle_unexpected_characters(e, code, interactive=False):
     # if line doesn't end with ], add it
@@ -206,10 +229,12 @@ class VisionScript:
     A VisionScript program.
     """
 
-    def __init__(self, notebook=False):
+    def __init__(self, notebook = False, debug = False):
         self.state = init_state()
         self.notebook = notebook
         self.code = ""
+        self.debug = debug
+        self.run_start_time = time.time()
 
         self.function_calls = {
             "load": lambda x: self.load(x),
@@ -227,7 +252,7 @@ class VisionScript:
             "usecamera": lambda x: None,
             "if": lambda x: None,
             "var": lambda x: None,
-            "variable": lambda x: None,
+            "variable": lambda x: self.variable(x),
             "comment": lambda x: None,
             "expr": lambda x: None,
             "show": lambda x: self.show(x),
@@ -276,14 +301,31 @@ class VisionScript:
             "getfps": lambda x: self.state["ctx"].get("fps", 0)
             if self.state["ctx"]["in"] is not None
             else 0,
-            "gt": lambda x: x[0] > x[1],
-            "gte": lambda x: x[0] >= x[1],
-            "lt": lambda x: x[0] < x[1],
-            "lte": lambda x: x[0] <= x[1],
+            "gt": lambda x: int(x[0]) > int(x[1]),
+            "gte": lambda x: int(x[0]) >= int(x[1]),
+            "lt": lambda x: int(x[0]) < int(x[1]),
+            "lte": lambda x: int(x[0]) <= int(x[1]),
             "track": lambda x: self.track(x),
             "getdistinctscenes": lambda x: self.get_distinct_scenes(x),
             "getuniqueappearances": lambda x: self.get_unique_appearances(x),
+            "breakpoint": lambda x: None,
+            "profile": lambda x: self.profile(x),
+            "increment": lambda x: None,
+            "decrement": lambda x: None,
+            "math": lambda x: self.math(x),
+            "first": lambda x: x[0] if len(x) > 0 else self.state["last"][0],
+            "last": lambda x: x[-1] if len(x) > 0 else self.state["last"][-1],
+            "+": lambda x: x[0] + x[1],
+            "-": lambda x: x[0] - x[1],
+            "*": lambda x: x[0] * x[1],
+            "/": lambda x: x[0] / x[1],
         }
+    
+    def math(self, args):
+        pass
+
+    def profile(self, _):
+        self.state["ctx"]["profile"] = True
 
     def countInRegion(self, args):
         """
@@ -412,7 +454,7 @@ class VisionScript:
         """
         function_name = args[0].children[0].value.strip()
 
-        function_body = lark.Tree("expr", args[1:])
+        function_body = lark.Tree("expr", args[2:])
 
         self.state["functions"][function_name] = function_body
 
@@ -617,7 +659,6 @@ class VisionScript:
             if self.notebook and (
                 not validators.url(filename) or filename.endswith(".png")
             ):
-                print("notebook")
                 filename = os.path.join("tmp", self.state["session_id"], filename)
 
             image = Image.open(filename).convert("RGB")
@@ -639,7 +680,6 @@ class VisionScript:
         """
         Import a module from another file.
         """
-        # this will update self.state for the entire script
 
         file_name = "".join(
             [
@@ -649,8 +689,19 @@ class VisionScript:
             ]
         )
 
-        with open(file_name + ".vic", "r") as f:
-            code = f.read()
+        # inference algorithm:
+        # search in local folder
+        # search in visionscript stdlib
+
+        stdlib = os.path.join(os.path.dirname(__file__), "stdlib")
+        
+        if os.path.exists(os.path.join(stdlib, file_name + ".vic")):
+            code = open(os.path.join(stdlib, file_name + ".vic"), "r").read()
+        elif os.path.exists(file_name + ".vic"):
+            with open(file_name + ".vic", "r") as f:
+                code = f.read()
+        else:
+            code = ""
 
         tree = parser.parse(code.strip() + "\n")
 
@@ -702,6 +753,12 @@ class VisionScript:
             image = image.crop((x0, y0, x1, y1))
 
         self._add_to_stack("image_stack", image)
+
+    def variable(self, args):
+        """
+        Create a variable.
+        """
+        return self.state["functions"][args[0]]
 
     def select(self, args):
         """
@@ -923,7 +980,6 @@ class VisionScript:
         """
         Turn an image to greyscale.
         """
-        print('xuys')
         image = self._get_item(-1, "image_stack")
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -1112,11 +1168,12 @@ class VisionScript:
         # swap keys and values
         inference_classes_as_idx = {v: k for k, v in inference_classes.items()}
 
-        class_idxes = [inference_classes_as_idx.get(i, -1) for i in classes.split(",")]
+        class_idxes = [inference_classes_as_idx.get(i, -1) for i in classes.split(",")] if classes else list(inference_classes_as_idx.values())
 
         results = results[np.isin(results.class_id, class_idxes)]
 
         self._add_to_stack("detections_stack", results)
+
         self.state["last_classes"] = [
             inference_classes[i] for i in class_idxes if i != -1
         ]
@@ -1249,7 +1306,10 @@ class VisionScript:
 
             return statement
 
-        return str(self.state["last"])
+        # the data type cannot be changed here
+        # because bools, etc. may be here and we can't
+        # convert them to strings!
+        return self.state["last"]
 
     def say(self, statement):
         """
@@ -1257,12 +1317,20 @@ class VisionScript:
         in a notebook.
         """
 
+        # if statement, return
+        # if int, convert to str
+        if isinstance(statement, int) or isinstance(statement, float):
+            statement = str(statement)
+
+        if statement:
+            print(statement.strip())
+            return statement.strip()
+
         if isinstance(self.state["last"], np.ndarray):
             self.show(None)
             return
 
         if isinstance(self.state["last"], int):
-            print(str(self.state["last"]))
             return
 
         if isinstance(self.state["last"], (list, tuple)):
@@ -1310,8 +1378,6 @@ class VisionScript:
     def show_text(self, text):
         if not text or len(text) == 0:
             text = self.state["last"]
-
-        print(text, self.state["show_text_count"], type(text))
 
         # add text to the last frame
         image = self._get_item(-1, "image_stack")
@@ -1890,47 +1956,116 @@ class VisionScript:
 
     def parse_tree(self, tree):
         try:
-            self.evaluate_tree(tree)
+            return self.evaluate_tree(tree)
         except MemoryError:
             print("The program has ran out of memory.")
             exit()
+        except KeyboardInterrupt:
+            print("Exiting.")
+            exit()
+        # except:
+        #     print("An unexpected error has occured.")
+        #     exit()
 
     def evaluate_tree(self, tree):
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
-
+        
         if not hasattr(tree, "children"):
             if hasattr(tree, "value") and tree.value.isdigit():
                 return int(tree.value)
+            elif hasattr(tree, "value") and tree.value in (False, "False"):
+                return False
+            elif hasattr(tree, "value") and tree.value in (True, "True"):
+                return True
+            elif isinstance(tree, str) and tree in self.state["functions"]:
+                return self.state["functions"][tree]
             elif isinstance(tree, str):
                 return literal_eval(tree)
             elif hasattr(tree, "value") and tree.value.isfloat():
                 return float(tree.value)
+            # if true or false
 
         if hasattr(tree, "children") and tree.data == "input":
             return self.input_(tree.children[0].value)
+    
 
         for node in tree.children:
             # if node is \n, skip
             # this is here to make the results from the
             # print(node) statement below easier to read
-            if node == "\n":
+            if node == "\n" or node == '    ':
                 continue
 
-            print(node)
+            # print(node)
+
+            # if is variable, return
+            if self.state.get("breakpoint_state"):
+                while True:
+                    user_input = input("[n,p,q,s,r,h] VisionScript Debug Mode > ")
+
+                    if user_input == "q":
+                        self.state["breakpoint_state"] = False
+                        return
+                    elif user_input == "p":
+                        self.state = self.state["breakpoint_state"]
+                        return
+                    elif user_input.startswith("s"):
+                        if user_input == "s":
+                            print(self.state["breakpoint_state"])
+                        else:
+                            state_value = user_input.split(" ")[1]
+                            if state_value in self.state["breakpoint_state"]:
+                                print(self.state["breakpoint_state"][state_value])
+                            else:
+                                print("State value not found.")
+                    elif user_input == "n":
+                        print(tree)
+                        break
+                    elif user_input == "r":
+                        print(sorted(self.state["breakpoint_state"].keys()))
+                    elif user_input == "h":
+                        print(
+"""
+n - next
+p - previous
+q - quit
+s - state
+r - state reference
+h - help
+"""
+                        )
+                    else:
+                        print("Command not recognized.")
+
+            if hasattr(node, "value") and node.value in self.state["functions"]:
+                return self.state["functions"][node.value]
+            
             if node == "True":
                 return True
             elif node == "False":
                 return False
+            # if token, return
+            elif hasattr(node, "type") and node.type == "INT":
+                return node.value
+            # if INT, return
             # if equality, check if equal
             # if rule is input
+            # if variable, return from self.state["functions"]
+            elif hasattr(node, "data") and node.data == "breakpoint":
+                # copy everything other than camera context
+                keys_to_skip = ["camera"]
+
+                self.state["breakpoint_state"] = {k: self.state[k] for k in set(list(self.state.keys())) - set(keys_to_skip)}
+
+                continue
+            elif hasattr(node, "data") and node.data == "variable":
+                return self.state["functions"][node.children[0].value]
             elif hasattr(node, "data") and node.data == "equality":
                 return self.parse_tree(node.children[0]) == self.parse_tree(
                     node.children[1]
                 )
-            elif node is True or node is False:
-                return node
             elif hasattr(node, "data") and node.data == "list":
                 node = node
             elif (hasattr(node, "type") and node.type == "INT") or isinstance(
@@ -1947,17 +2082,35 @@ class VisionScript:
                 self.state["ctx"].get("in") or self.state["ctx"].get("if")
             ):
                 node = node
-            # if string
-            # elif len(node.children) == 1 and hasattr(node.children[0], "value"):
-            #     return node.children[0].value
-            # else:
-            #     node = node.children
+            # if bool, return
+            elif (hasattr(node, "type") and node.type == "BOOL") or isinstance(
+                node, bool
+            ):
+                return bool(node.value)
+            elif node is True or node is False:
+                return node
 
             # remove \n
-            if hasattr(node, "value") and node.value == "\n":
-                continue
+            # if hasattr(node, "value"):
+            #     return node
 
             token = node.data if hasattr(node, "data") else node
+
+            if token == "increment":
+                self.state["functions"][node.children[0].children[0].value] += 1
+                continue
+
+            # if Profile[] command executed, calculate runtime
+            if self.state["ctx"].get("profile"):
+                if not self.state["ctx"].get("profile_command_run_time"):
+                    self.state["ctx"]["profile_command_run_time"] = {}
+
+                if self.state["ctx"].get("last_command"):
+                    self.state["ctx"]["profile_command_run_time"][self.state["ctx"]["last_command"]] = self.state["ctx"]["profile_command_run_time"].get(self.state["ctx"]["last_command"], 0) + (time.time() - self.state["ctx"]["last_profile_time"])
+
+                start_time = time.time()
+                self.state["ctx"]["last_profile_time"] = start_time
+                self.state["ctx"]["last_command"] = token
 
             if token.value in aliased_functions:
                 token.value = map_alias_to_underlying_function(token.value)
@@ -1993,14 +2146,20 @@ class VisionScript:
                 self.state[node.children[0].children[0].value] = self.parse_tree(
                     node.children[1]
                 )
+                self.state["functions"][node.children[0].children[0].value] = self.state[node.children[0].children[0].value]
                 self.state["last"] = self.state[node.children[0].children[0].value]
-                continue
+                return
+            
+            # if __ANON_40, return
+            if token.value == "variable":
+                self.state["last"] = self.state["functions"][token.value]
+                return self.state["functions"][token.value]
+            
+            if token.value == "math":
+                return self.math(node.children)
 
             if token.value == "if":
                 # copy self.state
-                if not cv2.VideoCapture(0).isOpened():
-                    last_state_before_if = copy.deepcopy(self.state)["last"]
-
                 if self.state.get("ctx"):
                     self.state["ctx"]["if"] = True
                 else:
@@ -2010,10 +2169,8 @@ class VisionScript:
 
                 statement = self.parse_tree(node.children[0])
 
-                statement = self.state["last"]
-
-                if statement is None or statement == False or int(statement) == 0:
-                    return
+                if statement is None or statement == False or (isinstance(statement, int) and int(statement) == 0):
+                    continue
 
                 # if not cv2.VideoCapture(0).isOpened():
                 #     self.state["last"] = last_state_before_if
@@ -2021,8 +2178,14 @@ class VisionScript:
             if token.value == "make":
                 self.make(node.children)
                 continue
+            
+            if token.value == "say":
+                # if argyment, parse; otherwise say last value
+                if hasattr(node, "children") and len(node.children) > 0:
+                    self.say(self.parse_tree(node.children[0]))
+                else:
+                    self.say(self.state["last"])
 
-            if token.value == None:
                 continue
 
             # if gt, lt, gte, lte, etc, call with x as first arg and y as second arg
@@ -2031,10 +2194,19 @@ class VisionScript:
                 result1 = self.state["last"] if result1 is None else result1
                 result2 = self.parse_tree(node.children[1])
                 result2 = self.state["last"] if result2 is None else result2
-                return self.function_calls[token.value]([result1, result2])
+
+                self.state["last"] = self.function_calls[token.value]([result1, result2])
+                return self.state["last"]
 
             if token.value == "literal":
-                func = self.state["functions"][node.children[0].value]
+                # evaluate the arguments
+                self.parse_tree(node.children[1])
+
+                self.state["last"] = self.parse_tree(self.state["functions"][node.children[0].value])
+                return self.state["last"]
+                # continue
+            elif token.value in self.state["functions"]:
+                func = self.state["functions"][token.value]
             else:
                 func = self.function_calls[token.value]
 
@@ -2053,13 +2225,9 @@ class VisionScript:
 
             self.state["history"].append(token.value)
 
-            # if token.value == "say":
-            #     value = self.state["last"]
-            #     func(value)
-            #     continue
             if token.value == "contains":
                 return func(literal_eval(node.children[0]))
-            else:
+            elif hasattr(node, "children") and len(node.children) > 0:
                 # convert children to strings
                 for item in node.children:
                     if hasattr(item, "value"):
@@ -2085,8 +2253,6 @@ class VisionScript:
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
-
-                    print("children", node.children)
 
                     context = node.children
 
@@ -2186,6 +2352,7 @@ class VisionScript:
                             if self.state["ctx"].get("break"):
                                 self.state["ctx"]["break"] = False
                                 break
+
                             self.parse_tree(item)
 
                 if self.state["ctx"].get("in"):
@@ -2207,8 +2374,16 @@ class VisionScript:
             else:
                 value = [self.parse_tree(item) for item in node.children]
 
+            if token.value == "load":
+                # get first arg
+                self._add_to_stack("load_queue", value)
+                continue
+
             if token.value == "literal":
-                result = self.parse_tree(self.state["functions"][value])
+                if value[0] is None:
+                    return
+                
+                result = self.parse_tree(value[0])
             else:
                 result = func(value)
 
@@ -2217,17 +2392,11 @@ class VisionScript:
             self.state["last_function_type"] = token.value
             self.state["last_function_args"] = [value]
 
-            if token.value == "load":
-                self._add_to_stack("load_queue", result[0])
-                continue
-
             if result is not None:
                 self.state["last"] = result
                 self.state["output"] = {"text": result}
 
                 return result
-
-            # return result
 
 
 def activate_console(parser):
@@ -2258,13 +2427,15 @@ def activate_console(parser):
 
 
 @click.command()
+@click.argument("file", default=None, required=False)
 @click.option("--validate", default=False, help="")
 @click.option("--ref", default=False, help="Name of the file")
-@click.option("--debug", default=False, help="To debug")
-@click.option("--file", default=None, help="Name of the file")
-@click.option("--repl", default=None, help="To enter to visionscript console")
+@click.option("--debug", default=False, help="Run the VisionScript debugger")
+@click.option("--showtree", default=False, help="Show Abstract Syntax Tree (AST) for program")
+@click.option("--repl", default=None, help="To enter into a VisionScript REPL")
 @click.option("--notebook/--no-notebook", help="Start a notebook environment")
-@click.option("--cloud/--no-cloud", help="Start a cloud deployment environment")
+@click.option("--cloud", default=False, help="Start a cloud deployment environment")
+@click.option("--docs", default=False, help="Open the VisionScript documentation")
 @click.option("--deploy", help="Deploy a .vic file", default=None)
 @click.option(
     "--name",
@@ -2282,15 +2453,17 @@ def activate_console(parser):
     help="API url for deploying your app",
     default="http://localhost:6999/create",
 )
-@click.option("--live", help="Live mode", default=False)
+@click.option("--live", help="Enable live reload", default=False)
 def main(
+    file,
     validate,
     ref,
     debug,
-    file,
+    showtree,
     repl,
     notebook,
     cloud,
+    docs,
     deploy,
     name,
     description,
@@ -2298,6 +2471,25 @@ def main(
     api_url,
     live,
 ) -> None:
+    if docs:
+        # if no network connection, open local
+        import webbrowser
+        import requests
+
+        try:
+            requests.get('https://visionscript.dev', timeout=1)
+
+            webbrowser.open("https://visionscript.dev")
+
+            exit(0)
+        except:
+            if os.path.exists(os.path.join(CACHE_DIRECTORY, "docs", "index.html")):
+                webbrowser.open("file://" + os.path.join(CACHE_DIRECTORY, "docs", "index.html"))
+            else:
+                print("Cannot open documentation. No internet connection and no local documentation were found.")
+
+        exit(0)
+    
     if validate:
         print("Script is a valid VisionScript program.")
         exit(0)
@@ -2330,11 +2522,14 @@ def main(
 
         tree = parser.parse(code.lstrip())
 
-        if debug:
+        if showtree:
             print(tree.pretty())
             exit()
 
         session = VisionScript()
+
+        if debug:
+            session.debug = True
 
         if deploy:
             if not name or not description or not api_key or not api_url:
@@ -2403,6 +2598,25 @@ def main(
                 exit()
 
         session.parse_tree(tree)
+
+        if session.state["ctx"].get("profile"):
+            profile_command_run_time = sorted(
+                session.state["ctx"]["profile_command_run_time"].items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+
+            print("-" * 20)
+            print("Profile:")
+            print("-" * 20)
+
+            for command, runtime in profile_command_run_time:
+                runtime = "{:.2f}".format(runtime)
+                print(command, ":", runtime + "s")
+
+            current_time = time.time()
+
+            print("Total run time:", "{:.2f}s".format(current_time - session.run_start_time))
 
     if repl == "console":
         activate_console(parser)
