@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (var | make | in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | list | EOL)
+expr: (set | var | make | in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | web | associative_array | list | STRING | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 var: variable "=" (expr | STRING | INT)
 replace: "Replace" "[" STRING "]"
@@ -9,9 +9,10 @@ use: "Use" "[" STRING "]"
 load: "Load" "[" (STRING | input) "]" | "Load[]"
 save: "Save" "[" STRING "]"
 getfps: "GetFPS[]"
+is: "Is" "[" (expr | STRING) "]" | "Is[]"
 getdistinctscenes: "GetDistinctScenes[]"
 getuniqueappearances: "GetUniqueAppearances" ("[" STRING "]")?
-say: "Say" "[" (variable | (expr)* | STRING) "]" | "Say[]"
+say: "Say" "[" (STRING | math | variable | expr) "]" | "Say[]"
 get_text: "GetText[]"
 camera: "Camera[]"
 greyscale: "Greyscale" "[]"
@@ -45,16 +46,17 @@ paste: "Paste" "[" INT "," INT "]"
 pasterandom: "PasteRandom[]"
 cutout: "Cutout[]"
 crop: "Crop" ("[" (INT | STRING) "," (INT | STRING) "," (INT | STRING) "," (INT | STRING) "]")?
-count: "Count[]"
+count: "Count" ("[" STRING "]")? | "Count[]"
 input: "Input" ("[" STRING "]")?
 contains: "Contains" "[" STRING "]"
 compare: "Compare[]"
 setbrightness: "SetBrightness" "[" INT "]"
-read: "Read[]"
+read: "Read" "[" STRING "]" | "Read[]"
 exit: "Exit[]"
 blur: "Blur[]"
 similarity: "Similarity" ("[" (INT | FLOAT) "]")?
-get: "Get" "[" INT "]" EOL
+get: "Get" "[" (INT | expr) ("," (STRING))* "]"
+set: "Set" "[" (INT | expr) ("," (STRING))* "]"
 help: "Help" "[" STRING "]"
 end: "End[]"
 track: "Track[]"
@@ -66,6 +68,7 @@ breakpoint: "Breakpoint[]"
 usecamera: "UseCamera[]" EOL expr+ "EndCamera" EOL
 in: "In" "[" (STRING | expr) "]" EOL expr+ "Endin" EOL
 if: "If" "[" comparison_expressions "]" EOL expr+ "End" EOL
+web: "Web" "[" (STRING | expr) ("," (STRING | expr))? "]"
 reset: "Reset[]"
 negate: "Not" "[" expr "]"
 math: expr (OPERAND expr)*
@@ -75,7 +78,9 @@ not_equality: (INT | STRING | expr | BOOL) "!=" (INT | STRING | expr | BOOL)
 train: "Train" "[" STRING "," STRING "]" | "Train" "[" STRING "]"
 label: "Label" "[" STRING "," STRING ("," STRING )*  "]"
 break: "Break[]"
-list: "[" (STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))* "]" | "List[]"
+associative_expr: STRING ":" (STRING | INT | FLOAT | expr)
+associative_array: "[" EOL? (associative_expr ("," EOL? associative_expr)*)? EOL? "]" | "AssociativeArray[]"
+list: "[" EOL? (STRING | INT | FLOAT | expr) ("," EOL? (STRING | INT | FLOAT | expr))*  EOL?"]" | "List[]"
 first: "First[]" | "First" "[" (variable | expr) "]"
 last: "Last[]" | "Last" "[" (variable | expr) "]"
 literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"
@@ -97,4 +102,5 @@ BOOL: "True" | "False"
 %import common.ESCAPED_STRING -> STRING
 %import common.WS_INLINE
 %ignore WS_INLINE
+%ignore EOL
 """

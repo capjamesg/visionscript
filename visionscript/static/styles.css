@@ -301,7 +301,7 @@ nav ul li:last-child {
     display: none;
 }
 .hide_on_mobile {
-    display: block;
+    display: inline;
 }
 .hide_on_desktop {
     display: none;

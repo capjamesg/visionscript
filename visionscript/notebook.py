@@ -6,6 +6,7 @@ import string
 import time
 import uuid
 from io import BytesIO
+import re
 
 import numpy as np
 import qrcode
@@ -96,6 +97,12 @@ def notebook():
 
         start_time = time.time()
 
+        
+        # if Load[] in line, replace content between "" with tmp/{session_id}/{image_name}
+        user_input = re.sub(r"Load\[\s*\"(.*)\"\s*\]", r"Load[\"tmp/" + session_id + r"/\1\"]", user_input)
+
+        user_input = user_input.replace('\\"', '"')
+
         code = parser.parse(user_input.strip() + "\n")
 
         session.check_inputs(code)
@@ -115,7 +122,7 @@ def notebook():
         notebooks[session_id]["output"].append(session.state["output"])
 
         # if output is ndarray, convert to base64 image
-        if isinstance(session.state["output"].get("text"), np.ndarray):
+        if session.state.get("output") and isinstance(session.state["output"].get("text"), np.ndarray):
             import base64
             from io import BytesIO
 
@@ -140,9 +147,12 @@ def notebook():
                 f,
             )
 
-        return jsonify(
-            {"output": notebooks[session_id]["output"][-1], "time": run_time}
-        )
+        if len(notebooks[session_id]["output"]) > 0:
+            return jsonify(
+                {"output": notebooks[session_id]["output"][-1], "time": run_time}
+            )
+        else:
+            return jsonify({"output": "Success", "time": run_time})
 
     if request.args.get("state_id"):
         state_id = request.args.get("state_id")

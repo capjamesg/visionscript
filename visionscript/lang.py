@@ -2,7 +2,6 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-import copy
 import io
 import logging
 import mimetypes
@@ -14,6 +13,7 @@ import string
 import sys
 import time
 import csv
+import tempfile
 
 import click
 import cv2
@@ -51,6 +51,15 @@ SUPPORTED_INFERENCE_MODELS = {
 SUPPORTED_TRAIN_MODELS = {
     "vit": lambda self, folder: registry.vit_target(self, folder),
     "yolov8": lambda self, folder: registry.yolov8_target(self, folder),
+}
+
+DATA_TYPES = {
+    sv.Detections: "Detection",
+    np.ndarray: "Image",
+    torch.Tensor: "Image",
+    Image.Image: "Image",
+    str: "String",
+    int: "Integer",
 }
 
 STACK_MAXIMUM = {
@@ -312,6 +321,7 @@ class VisionScript:
             "profile": lambda x: self.profile(x),
             "increment": lambda x: None,
             "decrement": lambda x: None,
+            "associative_array": lambda x: None,
             "math": lambda x: self.math(x),
             "first": lambda x: x[0] if len(x) > 0 else self.state["last"][0],
             "last": lambda x: x[-1] if len(x) > 0 else self.state["last"][-1],
@@ -319,7 +329,50 @@ class VisionScript:
             "-": lambda x: x[0] - x[1],
             "*": lambda x: x[0] * x[1],
             "/": lambda x: x[0] / x[1],
+            "set": lambda x: None,
+            "is": lambda x: self._is(x),
+            "web": lambda x: self.web(x),
         }
+
+    def web(self, args):
+        import requests
+
+        if isinstance(args, str):
+            url = args
+            body = {}
+        else:
+            url = args[0]
+            body = args[1]
+
+        try:
+            if body:
+                response = requests.post(url, timeout=5, data=body)
+            else:
+                response = requests.get(url, timeout=5)
+        except requests.exceptions.ConnectionError:
+            self.state["last"] = "Could not connect to URL."
+            return
+        except requests.exceptions.ReadTimeout:
+            self.state["last"] = "Timeout."
+            return
+        except:
+            self.state["last"] = "There was an error loading the image."
+            return
+        
+        if response.status_code != 200:
+            self.state["last"] = "There was an error loading the image."
+            return
+        
+        return response.text
+
+    def _is(self, args):
+        if isinstance(args, lark.Tree):
+            args = self.parse_tree(args)
+
+        if not args or len(args) == 0:
+            return DATA_TYPES[type(self.state["last"])]
+        
+        return DATA_TYPES[type(self.parse_tree(args[0]))]
     
     def math(self, args):
         pass
@@ -337,7 +390,6 @@ class VisionScript:
 
             # return a 4x4 grid of points
             if corner == "top left":
-                print('top left triggered')
                 points = [
                     [0, 0],
                     [last_image.shape[1] / 4, 0],
@@ -377,6 +429,20 @@ class VisionScript:
                     [0, last_image.shape[0] / 2],
                     [last_image.shape[1], last_image.shape[0] / 2],
                     [0, last_image.shape[0]],
+                    [last_image.shape[1], last_image.shape[0]],
+                ]
+            elif corner == "left half":
+                points = [
+                    [0, 0],
+                    [last_image.shape[1] / 2, 0],
+                    [0, last_image.shape[0]],
+                    [last_image.shape[1] / 2, last_image.shape[0]],
+                ]
+            elif corner == "right half":
+                points = [
+                    [last_image.shape[1] / 2, 0],
+                    [last_image.shape[1], 0],
+                    [last_image.shape[1] / 2, last_image.shape[0]],
                     [last_image.shape[1], last_image.shape[0]],
                 ]
             # if SetRegion[] has been called, use that region
@@ -534,6 +600,8 @@ class VisionScript:
             self._add_to_stack("image_stack", filename)
             # save file
             import uuid
+            
+            self.state["last"] = filename
 
             name = str(uuid.uuid4()) + ".png"
             cv2.imwrite(name, filename)
@@ -661,7 +729,7 @@ class VisionScript:
             ):
                 filename = os.path.join("tmp", self.state["session_id"], filename)
 
-            image = Image.open(filename).convert("RGB")
+            image = Image.open(filename)#.convert("RGB")
         except Exception as e:
             print(e)
             print(f"Could not load image {filename}.")
@@ -669,8 +737,10 @@ class VisionScript:
 
         self.state["last_loaded_image_name"] = filename
 
+        self.state["last"] = image
         self.state["output"] = {"image": image}
 
+        # convert to rgb
         return np.array(image), filename
 
     def size(self, _):
@@ -969,7 +1039,11 @@ class VisionScript:
         """
         Count the number of detections in a sv.Detections object.
         """
-        if len(args) == 0 and isinstance(
+        # if args is string, run detect
+        if isinstance(args, str):
+            self.detect(args)
+
+        if isinstance(
             self.state["last"], sv.detection.core.Detections
         ):
             return len(self.state["last"].confidence)
@@ -1149,6 +1223,9 @@ class VisionScript:
         # self.state["last"] = results
 
         return results
+    
+    def _order_detections_by_confidence(self, detections):
+        return detections[np.argsort(detections.confidence)[::-1]]
 
     def detect(self, classes):
         """
@@ -1171,6 +1248,8 @@ class VisionScript:
         class_idxes = [inference_classes_as_idx.get(i, -1) for i in classes.split(",")] if classes else list(inference_classes_as_idx.values())
 
         results = results[np.isin(results.class_id, class_idxes)]
+
+        results = self._order_detections_by_confidence(results)
 
         self._add_to_stack("detections_stack", results)
 
@@ -1214,7 +1293,7 @@ class VisionScript:
         """
         Classify an image using provided labels.
         """
-        image = self.state["last"]
+        image = self._get_item(-1, "image_stack")
 
         if self.state.get("model") and self.state["model"].__class__.__name__ == "ViT":
             model = self.state["model"]
@@ -1239,12 +1318,19 @@ class VisionScript:
 
         model, preprocess = clip.load("ViT-B/32", device=DEVICE)
 
-        image = (
-            preprocess(Image.open(self.state["last_loaded_image_name"]))
-            .unsqueeze(0)
-            .to(DEVICE)
-        )
-        text = clip.tokenize(labels).to(DEVICE)
+        # load image into tmp file
+
+        with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            Image.fromarray(image).save(f.name)
+            self.state["last_loaded_image_name"] = f.name
+
+            image = (
+                preprocess(Image.open(self.state["last_loaded_image_name"]))
+                .unsqueeze(0)
+                .to(DEVICE)
+            )
+
+            text = clip.tokenize(labels).to(DEVICE)
 
         with torch.no_grad():
             logits_per_image, _ = model(image, text)
@@ -1294,7 +1380,11 @@ class VisionScript:
 
         return detections
 
-    def read(self, _):
+    def read(self, args):
+        if args:
+            self.state["last"] = args
+            return args
+        
         if self.state.get("last_function_type", None) in ("detect", "segment"):
             last_args = self.state["last_function_args"]
             statement = "".join(
@@ -1319,12 +1409,10 @@ class VisionScript:
 
         # if statement, return
         # if int, convert to str
-        if isinstance(statement, int) or isinstance(statement, float):
+        if isinstance(statement, int) or isinstance(statement, float) or isinstance(statement, str):
             statement = str(statement)
-
-        if statement:
-            print(statement.strip())
-            return statement.strip()
+            print(statement)
+            return
 
         if isinstance(self.state["last"], np.ndarray):
             self.show(None)
@@ -1377,7 +1465,7 @@ class VisionScript:
 
     def show_text(self, text):
         if not text or len(text) == 0:
-            text = self.state["last"]
+            text = str(self.state["last"])
 
         # add text to the last frame
         image = self._get_item(-1, "image_stack")
@@ -1517,7 +1605,12 @@ class VisionScript:
             "Salesforce/blip-image-captioning-base"
         )
 
-        inputs = processor(self._get_item(-1, "image_stack"), return_tensors="pt")
+        image = self._get_item(-1, "image_stack")
+
+        # convert to rgb
+        # image = image[:, :, ::-1].copy()
+
+        inputs = processor(image, return_tensors="pt")
 
         out = model.generate(**inputs)
 
@@ -1622,7 +1715,9 @@ class VisionScript:
         # if len() of load_queue > image_stack, load next image
         if len(self.state["load_queue"]) > len(self.state["image_stack"]):
             for filename in self.state["load_queue"][len(self.state["image_stack"]) :]:
-                self.state["image_stack"].append(cv2.imread(filename))
+                image = cv2.imread(filename)
+                # convert to rgb
+                self.state["image_stack"].append(image)
 
         return self.state[stack][n]
 
@@ -1635,6 +1730,9 @@ class VisionScript:
 
         image = self._get_item(-1, "image_stack")
 
+        if self.notebook:
+            image = image[:, :, ::-1].copy()
+
         if "detect" in self.state["history"]:
             annotator = sv.BoxAnnotator()
         elif "segment" in self.state["history"]:
@@ -1642,12 +1740,9 @@ class VisionScript:
         else:
             annotator = None
 
-        if (
-            self.state.get("last_loaded_image_name") is None
-            or not os.path.exists(self.state["last_loaded_image_name"])
-        ) and self.state["ctx"].get("in") is None and self.state["ctx"].get("camera") is None:
-            print("Image does not exist.")
-            return
+        # if self.state["ctx"].get("in") is None and self.state["ctx"].get("camera") is None:
+        #     print("Image does not exist.")
+        #     return
 
         def get_divisors(n):
             divisors = []
@@ -1777,7 +1872,6 @@ class VisionScript:
         if annotator:
             # turn (self._get_item(-1, "image_stack")) into RGB
             image = np.array(self._get_item(-1, "image_stack"))
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
             if isinstance(annotator, sv.BoxAnnotator):
                 image = annotator.annotate(
@@ -1787,9 +1881,6 @@ class VisionScript:
                     ),
                     labels=self.state["last_classes"],
                 )
-
-            # convert to rgb
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         if self.notebook:
             buffer = io.BytesIO()
@@ -1813,7 +1904,7 @@ class VisionScript:
                 fig.savefig(buffer, format="png")
                 buffer.seek(0)
 
-                image = Image.open(buffer)
+                image = Image.open(buffer).convert("RGB")
 
                 img_str = {"image": base64.b64encode(buffer.getvalue()).decode("utf-8")}
 
@@ -1836,7 +1927,7 @@ class VisionScript:
 
                 # save to either jpeg or png
 
-                if self.state.get("last_loaded_image_name", "").endswith(".jpg"):
+                if self.state.get("last_loaded_image_name") and self.state.get("last_loaded_image_name", "").endswith(".jpg"):
                     image.save(buffered, format="JPEG")
                 else:
                     image.save(buffered, format="PNG")
@@ -1985,6 +2076,8 @@ class VisionScript:
                 return literal_eval(tree)
             elif hasattr(tree, "value") and tree.value.isfloat():
                 return float(tree.value)
+            else:
+                return tree
             # if true or false
 
         if hasattr(tree, "children") and tree.data == "input":
@@ -2040,7 +2133,10 @@ h - help
                         print("Command not recognized.")
 
             if hasattr(node, "value") and node.value in self.state["functions"]:
-                return self.state["functions"][node.value]
+                # literals like in Set[] need to remain literal to be used as keys
+                # print(node.value)
+                return node.value
+                # return self.state["functions"][node.value]
             
             if node == "True":
                 return True
@@ -2133,6 +2229,17 @@ h - help
 
             if token.type == "BOOL":
                 return node.children[0].value == "True"
+            
+            if token == "is":
+                result = self._is(node)
+
+                if result.isdigit():
+                    result = "Integer"
+                elif result is True or result is False:
+                    result = "Boolean"
+
+                self.state["last"] = result
+                return result
 
             if token == "list":
                 results = []
@@ -2149,6 +2256,23 @@ h - help
                 self.state["functions"][node.children[0].children[0].value] = self.state[node.children[0].children[0].value]
                 self.state["last"] = self.state[node.children[0].children[0].value]
                 return
+            elif token == "associative_array":
+                associative_array = {}
+
+                if len(node.children) == 0:
+                    return associative_array
+                
+                node.children = [child for child in node.children if child != "\n"]
+
+                for tree in node.children:
+                    key = tree.children[0]
+                    value = tree.children[1]
+
+                    associative_array[self.parse_tree(key)] = self.parse_tree(value)
+
+                self.state["last"] = associative_array
+
+                return self.state["last"]
             
             # if __ANON_40, return
             if token.value == "variable":
@@ -2200,10 +2324,28 @@ h - help
 
             if token.value == "literal":
                 # evaluate the arguments
-                self.parse_tree(node.children[1])
+                # if len children == 0
+                if len(node.children) == 1:
+                    to_parse = node.children[0]
 
-                self.state["last"] = self.parse_tree(self.state["functions"][node.children[0].value])
-                return self.state["last"]
+                    # if in functions, evaluate the function
+                    if to_parse.value in self.state["functions"]:
+                        self.state["last"] = self.parse_tree(self.state["functions"][to_parse.value])
+                        return self.state["last"]
+
+                    self.parse_tree(to_parse)
+
+                    self.state["last"] = self.state["functions"].get(node.children[0].value, node.children[0].value)
+
+                    return self.state["last"]
+                else:
+                    to_parse = node.children[1]
+
+                    self.parse_tree(to_parse)
+
+                    self.state["last"] = self.parse_tree(self.state["functions"][node.children[0].value])
+
+                    return self.state["last"]
                 # continue
             elif token.value in self.state["functions"]:
                 func = self.state["functions"][token.value]
@@ -2213,15 +2355,46 @@ h - help
             if token.value == "negate" or token.value == "input":
                 result = self.parse_tree(node.children[0])
                 return func(result)
+            
+            if token.value == "set":
+                # three args: associative array, key, and value
+                associative_array = self.parse_tree(node.children[0].children[0])
+                key = self.parse_tree(node.children[1])
+                value = self.parse_tree(node.children[2])
 
+                self.state["functions"][associative_array][key] = value
+
+                self.state["last"] = self.state["functions"][associative_array][key]
+
+                return self.state["last"]
+                
             if token.value == "get":
-                get_value = self.parse_tree(node.children[0])
+                # associative arrays can have one or more children
+                # if one child
+                if len(node.children) == 1:
+                    get_value = self.parse_tree(node.children[0])
 
-                if get_value is None and self.state.get("get"):
-                    del self.state["get"]
-                else:
-                    self.state["get"] = get_value
-                continue
+                    if get_value is None and self.state.get("get"):
+                        del self.state["get"]
+                    else:
+                        self.state["get"] = get_value
+
+                    continue
+                # if two, get from associative array
+                elif len(node.children) == 2:
+                    get_value = self.parse_tree(node.children[0])
+                    get_key = self.parse_tree(node.children[1])
+
+                    if get_value is None and self.state.get("get"):
+                        del self.state["get"]
+                    elif get_key not in get_value:
+                        print(f"{get_key} not found in {get_value}")
+                        exit()
+                    else:
+                        self.state["get"] = get_value[get_key]
+
+                    self.state["last"] = self.state["get"]
+                    return self.state["get"]
 
             self.state["history"].append(token.value)
 
@@ -2248,6 +2421,8 @@ h - help
                 # if file_name == "camera", load camera in context
                 # if node.children[0].value is an expr, evaluate it
                 # evaluate all children
+
+                detection_ctx = False
 
                 if token.value == "usecamera":
                     self.state["ctx"]["fps"] = 0
@@ -2297,8 +2472,63 @@ h - help
                 # if expression, eval
                 elif hasattr(node.children[0], "value"):
                     self.state["ctx"]["in"] = self.parse_tree(node.children[0])
+                # if expr
+                elif isinstance(node.children[0], lark.Tree):
+                    self.state["ctx"]["in"] = self.parse_tree(node.children[0])
+                    detection_ctx = True
 
-                for item in node.children:
+                if detection_ctx:
+                    image = self._get_item(-1, "image_stack").copy()
+
+                    print(type(image))
+
+                    for detection in self.state["ctx"]["in"].xyxy:
+                        # convert to int
+                        detection = [int(item) for item in detection]
+                        # get image in bbox
+                        image_in_ctx = image[
+                            detection[1] : detection[3], detection[0] : detection[2]
+                        ]
+
+                        self._add_to_stack("image_stack", image_in_ctx)
+
+                        # paste result on
+
+                        for item in node.children[1:]:
+                            if self.state["ctx"].get("break"):
+                                break
+
+                            self.parse_tree(item)
+
+                            result = self._get_item(-1, "image_stack")
+
+                            if len(result.shape) == 2:
+                                result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
+
+                            image[
+                                detection[1] : detection[3],
+                                detection[0] : detection[2],
+                            ] = result
+
+                        if self.state["ctx"].get("break"):
+                            self.state["ctx"]["break"] = False
+                            break
+                    
+                    self.state["ctx"]["active_file"] = image
+
+                    self._add_to_stack("image_stack", image)
+
+                    self.state["last"] = self.state["ctx"]["active_file"]
+                    self.state["ctx"]["in"] = None
+                    return self.state["last"]
+
+                    # continue
+
+                print(self.state["ctx"]["in"])
+
+                # first child is expression to evaluate, so skip
+                
+                for item in node.children[1:]:
                     if self.state["ctx"].get("break"):
                         self.state["ctx"]["break"] = False
                         break
@@ -2359,9 +2589,6 @@ h - help
                     del self.state["ctx"]["in"]
                     del self.state["ctx"]["active_file"]
 
-                # set concurrent context to false
-                self.state["in_concurrent_context"] = False
-
                 continue
 
             if len(node.children) == 1:
@@ -2375,8 +2602,10 @@ h - help
                 value = [self.parse_tree(item) for item in node.children]
 
             if token.value == "load":
-                # get first arg
                 self._add_to_stack("load_queue", value)
+                # this blank value ensures that Is[] can
+                # run type inference
+                self.state["last"] = np.ndarray([])
                 continue
 
             if token.value == "literal":
@@ -2408,15 +2637,30 @@ def activate_console(parser):
 
     session = VisionScript()
 
+    buffer = []
+
     while True:
         code = input(">>> ")
+
+        CONTINUATION_STATEMENTS = ["If", "Else", "In", "UseCamera"]
+        END_STATEMENTS = ["End", "Endif", "Endcamera"]
+
+        if (any(code.strip().startswith(statement) for statement in CONTINUATION_STATEMENTS)) and not (any(code.strip().startswith(statement) for statement in END_STATEMENTS)):
+            buffer.append(code)
+            continue
+
+        # if end statement, add to buffer then run code
+        if any(code.strip().startswith(statement) for statement in END_STATEMENTS):
+            buffer.append(code)
+            code = "\n".join(buffer)
+            buffer = []
 
         tree = None
 
         try:
-            tree = parser.parse(code + "\n")  # .lstrip())
+            tree = parser.parse(code + "\n")
         except UnexpectedCharacters as e:
-            handle_unexpected_characters(e, code + "\n", interactive=True)  # .lstrip())
+            handle_unexpected_characters(e, code + "\n", interactive=True)
         except UnexpectedToken as e:
             handle_unexpected_token(e, interactive=True)
         finally:
@@ -2432,7 +2676,7 @@ def activate_console(parser):
 @click.option("--ref", default=False, help="Name of the file")
 @click.option("--debug", default=False, help="Run the VisionScript debugger")
 @click.option("--showtree", default=False, help="Show Abstract Syntax Tree (AST) for program")
-@click.option("--repl", default=None, help="To enter into a VisionScript REPL")
+@click.option("--repl", default=False, help="To enter into a VisionScript REPL")
 @click.option("--notebook/--no-notebook", help="Start a notebook environment")
 @click.option("--cloud", default=False, help="Start a cloud deployment environment")
 @click.option("--docs", default=False, help="Open the VisionScript documentation")
@@ -2618,7 +2862,8 @@ def main(
 
             print("Total run time:", "{:.2f}s".format(current_time - session.run_start_time))
 
-    if repl == "console":
+    # if no file:
+    if not file:
         activate_console(parser)
 
 

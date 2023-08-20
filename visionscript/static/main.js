@@ -122,7 +122,7 @@ function run_paper_code () {
         var dialog = document.getElementById("paper_mode_dialog");
         dialog.close();
 
-        // add session id to file name
+        // // add session id to file name
         // file_name = `tmp/${STATE_ID}/${file_name}`;
 
         var paper_code_program = `
@@ -869,7 +869,11 @@ function executeCode (code, comment = false, existing_cell = null) {
 
         if (data.output.image) {
             is_image = true;
-            data.output = `<img src="data:image/png;base64,${data.output.image}" />`;
+            if (data.output.image.image) {
+                data.output = `<img src="data:image/png;base64,${data.output.image.image}" />`;
+            } else {
+                data.output = `<img src="data:image/png;base64,${data.output.image}" />`;
+            }
         } else if (is_text_cell) {
             data.output = DOMPurify.sanitize(marked.parse(code));
         } else if (data.output.text) {
@@ -1123,7 +1127,8 @@ function resetNotebook() {
     var notebook = document.getElementById("drag_drop_notebook");
     notebook.innerHTML = "";
     // set background back to image
-    document.getElementById("drag_drop_notebook").style.background = "url('/static/drag_and_drop.png')";
+    document.getElementById("drag_drop_notebook").style.background = "url('/static/img/notebook.png')";
+    document.getElementById("drag_drop_notebook").style.backgroundSize = "cover";
 }
 
 function toggle_menu () {

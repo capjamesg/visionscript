@@ -93,7 +93,7 @@ function uploadNotebook (event, mode, file = null) {
         }
 
         files.innerHTML += `
-            <li><img src="${base64}" alt="${file_name}" height=100 width=100 data-filename="${file_name}" style="display: block;">${file_name}</li>
+            <li><img src="${base64}" alt="${file_name}" height=100 width=100 data-filename="${file_name}" style="display: block;"><span class="file_name">${file_name}</span></li>
         `;
         // if dragged over an Load statement, add iamge to the argument block
         
