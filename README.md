@@ -1,4 +1,4 @@
-![A VisionScript Notebook counting people in an image](https://raw.githubusercontent.com/capjamesg/visionscript/main/notebook.png)
+![VisionScript logo](https://visionscript.dev/assets/full_logo.svg)
 
 # VisionScript
 
