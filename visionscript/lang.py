@@ -266,7 +266,7 @@ class VisionScript:
             "expr": lambda x: None,
             "show": lambda x: self.show(x),
             "exit": lambda x: exit(0),
-            "help": lambda x: print(language_grammar_reference[x]),
+            "help": lambda x: print(language_grammar_reference[x]["body"]),
             "train": lambda x: self.train(x),
             "compare": lambda x: self.show(x),
             "read": lambda x: self.read(x),
@@ -2632,7 +2632,7 @@ def activate_console(parser):
     print("Welcome to VisionScript!")
     print("Type 'Exit[]' to exit.")
     print("Read the docs at https://visionscript.org/docs")
-    print("For help, type 'Help[FunctionName]'.")
+    print("""For help, type 'Help["FunctionName"]'.""")
     print("-" * 20)
 
     session = VisionScript()
@@ -2657,11 +2657,15 @@ def activate_console(parser):
 
         tree = None
 
+        print(code)
+
         try:
             tree = parser.parse(code + "\n")
         except UnexpectedCharacters as e:
+            print(e)
             handle_unexpected_characters(e, code + "\n", interactive=True)
         except UnexpectedToken as e:
+            print(e)
             handle_unexpected_token(e, interactive=True)
         finally:
             if tree is None:
