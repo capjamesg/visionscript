@@ -499,8 +499,11 @@ class VisionScript:
     def input_(self, key):
         if self.state["input_variables"].get(literal_eval(key)) is not None:
             return self.state["input_variables"][literal_eval(key)]
-        else:
-            return InputNotProvided()
+        
+        if not self.notebook:
+            return input("Enter a value for {}: ".format(key))
+        
+        return None
 
     def equality(self, args):
         return args[0] == args[1]
@@ -2629,10 +2632,11 @@ h - help
 
 
 def activate_console(parser):
-    print("Welcome to VisionScript!")
-    print("Type 'Exit[]' to exit.")
+    print("Welcome to VisionScript! Make something cool ✨")
+    print()
     print("Read the docs at https://visionscript.org/docs")
     print("""For help, type 'Help["FunctionName"]'.""")
+    print("Type 'Exit[]' to exit.")
     print("-" * 20)
 
     session = VisionScript()
@@ -2642,7 +2646,7 @@ def activate_console(parser):
     while True:
         code = input(">>> ")
 
-        CONTINUATION_STATEMENTS = ["If", "Else", "In", "UseCamera"]
+        CONTINUATION_STATEMENTS = ["If", "Else", "In[", "UseCamera"]
         END_STATEMENTS = ["End", "Endif", "Endcamera"]
 
         if (any(code.strip().startswith(statement) for statement in CONTINUATION_STATEMENTS)) and not (any(code.strip().startswith(statement) for statement in END_STATEMENTS)):
@@ -2657,16 +2661,15 @@ def activate_console(parser):
 
         tree = None
 
-        print(code)
-
         try:
             tree = parser.parse(code + "\n")
         except UnexpectedCharacters as e:
-            print(e)
             handle_unexpected_characters(e, code + "\n", interactive=True)
         except UnexpectedToken as e:
-            print(e)
             handle_unexpected_token(e, interactive=True)
+        except:
+            print("Error parsing code.")
+            continue
         finally:
             if tree is None:
                 continue
@@ -2868,7 +2871,12 @@ def main(
 
     # if no file:
     if not file:
-        activate_console(parser)
+        try:
+            activate_console(parser)
+        except KeyboardInterrupt:
+            print("Exiting...")
+            exit(0)
+
 
 
 if __name__ == "__main__":
