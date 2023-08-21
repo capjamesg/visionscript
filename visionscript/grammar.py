@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (set | var | make | in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | associative_array | list | STRING | EOL)
+expr: (set | var | make | in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | associative_array | list | STRING | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 merge: "Merge" "[" (variable | list | associative_array) ("," (variable | list | associative_array))* "]"
 var: variable "=" (expr | STRING | INT)
@@ -61,6 +61,7 @@ set: "Set" "[" (INT | expr) ("," (STRING))* "]"
 remove: "Remove" "[" (variable) ("," (expr))* "]"
 help: "Help" "[" STRING "]"
 end: "End[]"
+wait: "Wait" "[" (INT | expr) "]"
 track: "Track[]"
 countinregion: "CountInRegion" "[" INT "," INT "," INT "," INT "]" | "CountInRegion" "[" STRING "]"
 detect: "Detect" "[" STRING "]" | "Detect" "[" expr "]" | "Detect[]"
@@ -82,7 +83,7 @@ label: "Label" "[" STRING "," STRING ("," STRING )*  "]"
 break: "Break[]"
 associative_expr: STRING ":" (STRING | INT | FLOAT | expr)
 associative_array: "[" EOL? (associative_expr ("," EOL? associative_expr)*)? EOL? "]" | "AssociativeArray[]"
-list: "[" EOL? (STRING | INT | FLOAT | expr) ("," EOL? (STRING | INT | FLOAT | expr))*  EOL?"]" | "List[]"
+list: "[" EOL? (INT | STRING | FLOAT | expr) ("," EOL? (STRING | INT | FLOAT | expr))*  EOL?"]" | "List[]"
 first: "First[]" | "First" "[" (variable | expr) "]"
 last: "Last[]" | "Last" "[" (variable | expr) "]"
 literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"

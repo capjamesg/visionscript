@@ -332,7 +332,8 @@ class VisionScript:
             "is": lambda x: self._is(x),
             "web": lambda x: self.web(x),
             "merge": lambda x: None,
-            "remove": lambda x: self.remove(x)
+            "remove": lambda x: self.remove(x),
+            "wait": lambda x: time.sleep(self.parse_tree(x[0])),
         }
 
     def web(self, args):
@@ -1232,14 +1233,18 @@ class VisionScript:
         """
         Remove an item from the image stack.
         """
-        print(args)
-        object = self.state["functions"][args[0]]
-        to_remove = args[1]
+        variable = args[0].children[0].value
+        object = self.state["functions"][variable]
+        to_remove = self.parse_tree(args[1])
 
         if isinstance(object, list):
-            self.state["functions"][args].remove(to_remove)
+            if to_remove not in object:
+                print(f"{to_remove} not in {variable}")
+                return
+
+            self.state["functions"][variable].remove(to_remove)
         elif isinstance(object, dict):
-            del self.state["functions"][args][to_remove]
+            del self.state["functions"][variable][to_remove]
     
     def _order_detections_by_confidence(self, detections):
         return detections[np.argsort(detections.confidence)[::-1]]
@@ -2173,7 +2178,7 @@ h - help
                 return False
             # if token, return
             elif hasattr(node, "type") and node.type == "INT":
-                return node.value
+                return int(node.value)
             # if INT, return
             # if equality, check if equal
             # if rule is input
@@ -2333,6 +2338,9 @@ h - help
             
             if token.value == "math":
                 return self.math(node.children)
+            
+            if token.value == "remove":
+                return self.remove(node.children)
 
             if token.value == "if":
                 # copy self.state
