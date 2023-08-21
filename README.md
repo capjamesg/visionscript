@@ -6,6 +6,8 @@
 
 VisionScript is built in Python, offering a simple syntax for running object detection, classification, and segmentation models. [Read the documentation](https://visionscript.dev/docs/).
 
+[View the demo](https://vimeo.com/856043804).
+
 ## Get Started 🚀
 
 First, install VisionScript:
@@ -17,7 +19,7 @@ pip install visionscript
 You can then run VisionScript using:
 
 ```bash
-visionscript --repl
+visionscript
 ```
 
 This will open a VisionScript REPL in which you can type commands.
@@ -87,7 +89,7 @@ Then, make a file ending in `.vic` in which to write your VisionScript code.
 When you have written your code, run:
 
 ```bash
-python3 lang.py --file ./your_file.vic
+visionscript ./your_file.vic
 ```
 
 ### Run in debug mode
@@ -95,7 +97,7 @@ python3 lang.py --file ./your_file.vic
 Running in debug mode shows the full Abstract Syntax Tree (AST) of your code.
 
 ```bash
-python3 lang.py --file ./your_file.vic --debug
+visionscript ./your_file.vic --showtree=True
 ```
 
 Debug mode is useful for debugging code while adding new features to the VisionScript language.
@@ -104,11 +106,12 @@ Debug mode is useful for debugging code while adding new features to the VisionS
 
 The inspiration behind this project was to build a simple way of doing one-off tasks.
 
-Consider a scenario where you want to run zero-shot classification on a folder of images. With VisionScript, you can do this in two lines of code:
+Consider a scenario where you want to run zero-shot classification on a folder of images. With VisionScript, you can do this in three lines of code:
 
 ```
 In["./images"]
     Classify["cat", "dog"]
+    Say[]
 ```
 
 VisionScript is not meant to be a full programming language for all vision tasks, rather an abstract way of doing common tasks.
@@ -161,17 +164,7 @@ pip install -e .
 Now, you can run VisionScript using:
 
 ```bash
-python3 lang.py
-```
-
-### Tests
-
-Tests are run to ensure programs execute in full. Tests do not verify the output of each statement, although this will be added.
-
-For now, you can run all test cases using the following command:
-
-```bash
-python3 test.py
+visionscript
 ```
 
 ## Supported Models 📚
