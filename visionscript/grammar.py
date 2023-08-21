@@ -1,8 +1,9 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (set | var | make | in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | web | associative_array | list | STRING | EOL)
+expr: (set | var | make | in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | associative_array | list | STRING | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
+merge: "Merge" "[" (variable | list | associative_array) ("," (variable | list | associative_array))* "]"
 var: variable "=" (expr | STRING | INT)
 replace: "Replace" "[" STRING "]"
 use: "Use" "[" STRING "]"
@@ -57,6 +58,7 @@ blur: "Blur[]"
 similarity: "Similarity" ("[" (INT | FLOAT) "]")?
 get: "Get" "[" (INT | expr) ("," (STRING))* "]"
 set: "Set" "[" (INT | expr) ("," (STRING))* "]"
+remove: "Remove" "[" (variable) ("," (expr))* "]"
 help: "Help" "[" STRING "]"
 end: "End[]"
 track: "Track[]"

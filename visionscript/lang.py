@@ -7,7 +7,6 @@ import logging
 import mimetypes
 import os
 import random
-import copy
 import shutil
 import string
 import sys
@@ -332,6 +331,8 @@ class VisionScript:
             "set": lambda x: None,
             "is": lambda x: self._is(x),
             "web": lambda x: self.web(x),
+            "merge": lambda x: None,
+            "remove": lambda x: self.remove(x)
         }
 
     def web(self, args):
@@ -1227,6 +1228,19 @@ class VisionScript:
 
         return results
     
+    def remove(self, args):
+        """
+        Remove an item from the image stack.
+        """
+        print(args)
+        object = self.state["functions"][args[0]]
+        to_remove = args[1]
+
+        if isinstance(object, list):
+            self.state["functions"][args].remove(to_remove)
+        elif isinstance(object, dict):
+            del self.state["functions"][args][to_remove]
+    
     def _order_detections_by_confidence(self, detections):
         return detections[np.argsort(detections.confidence)[::-1]]
 
@@ -1259,6 +1273,7 @@ class VisionScript:
         self.state["last_classes"] = [
             inference_classes[i] for i in class_idxes if i != -1
         ]
+        self.state["last_classes_idx"] = inference_classes
 
         self.state["last"] = results
 
@@ -1433,12 +1448,19 @@ class VisionScript:
                     item = ", ".join([str(i) for i in item])
                 elif isinstance(item, int) or isinstance(item, float):
                     item = str(item)
+                elif isinstance(item, str):
+                    item = item.strip()
 
-                output += item + "\n"
+                output += item + ", "
+
+            # remove last comma and space
+            output = output[:-2]
 
             self.state["output"] = {"text": output}
+            
+            print(output)
 
-            return statement.strip()
+            return output
 
         if isinstance(statement, int) or isinstance(statement, float):
             statement = str(statement)
@@ -1448,10 +1470,14 @@ class VisionScript:
             return statement.strip()
 
         if isinstance(self.state["last"], sv.Detections):
-            last_args = self.state["last_function_args"]
+            class_ids_to_names = [
+                self.state["last_classes_idx"][i]
+                for i in self.state["last"].class_id
+            ]
+
             statement = "".join(
                 [
-                    f"{last_args} {self.state['last'].confidence[i]:.2f} {self.state['last'].xyxy[i]}\n"
+                    f"Object found: {class_ids_to_names[i]}\nConfidence: {self.state['last'].confidence[i] * 100:.2f}%\nxyxy Coordinates: {', '.join([str(int(i)) for i in list(self.state['last'].xyxy[i])])}\n\n"
                     for i in range(len(self.state["last"].xyxy))
                 ]
             )
@@ -1503,14 +1529,14 @@ class VisionScript:
 
         self.state["last"] = image
 
-    def blur(self, args):
+    def blur(self, _):
         """
         Blur an image.
         """
 
         image = self._get_item(-1, "image_stack")
 
-        image = cv2.blur(image, (args[0], args[0]))
+        image = cv2.blur(image, (25, 25))
 
         self._add_to_stack("image_stack", image)
 
@@ -2138,8 +2164,8 @@ h - help
             if hasattr(node, "value") and node.value in self.state["functions"]:
                 # literals like in Set[] need to remain literal to be used as keys
                 # print(node.value)
-                return node.value
-                # return self.state["functions"][node.value]
+                # return node.value
+                return self.state["functions"][node.value]
             
             if node == "True":
                 return True
@@ -2243,6 +2269,29 @@ h - help
 
                 self.state["last"] = result
                 return result
+            
+            # if merge, get all args then merge them
+            if token == "merge":
+                # first arg is dict
+                merge_into = self.parse_tree(node.children[0])
+
+                objects_to_merge = node.children[1:]
+
+                for obj in objects_to_merge:
+                    evaluated_object = self.parse_tree(obj)
+
+                    if isinstance(evaluated_object, dict):
+                        merge_into.update(evaluated_object)
+                    else:
+                        merge_into.extend(evaluated_object)
+
+                self.state["functions"][node.children[0].children[0].value] = merge_into
+
+                self.state["last"] = merge_into
+
+                # print(merge_into)
+
+                # return merge_into
 
             if token == "list":
                 results = []
@@ -2634,7 +2683,7 @@ h - help
 def activate_console(parser):
     print("Welcome to VisionScript! Make something cool ✨")
     print()
-    print("Read the docs at https://visionscript.org/docs")
+    print("Read the docs at https://visionscript.dev/docs")
     print("""For help, type 'Help["FunctionName"]'.""")
     print("Type 'Exit[]' to exit.")
     print("-" * 20)
