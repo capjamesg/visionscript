@@ -1,7 +1,9 @@
 # Syntax correction for text run through paper OCR
 
-import pygtrie
 import os
+
+import pygtrie
+
 from visionscript.grammar import grammar
 
 CONTEXT_MANAGERS = ("If[", "In[", "UseCamera[")
@@ -9,9 +11,15 @@ INDENDATION_MANAGER = "Next["
 
 lines = grammar.split("\n")
 
-functions = [l.split(" ")[1].replace('"', "") for l in lines if len(l.split(" ")) > 1 and l.split(" ")[1].istitle()]
+functions = [
+    l.split(" ")[1].replace('"', "")
+    for l in lines
+    if len(l.split(" ")) > 1 and l.split(" ")[1].istitle()
+]
 
-functions = ["".join([c for c in f if c.isalnum() or c == "." or c == "_"]) for f in functions]
+functions = [
+    "".join([c for c in f if c.isalnum() or c == "." or c == "_"]) for f in functions
+]
 
 # if < 2 letters long, remove (these are false positives)
 functions = [f for f in functions if len(f) >= 2]
@@ -21,6 +29,7 @@ trie = pygtrie.CharTrie()
 
 for f in functions:
     trie[f] = True
+
 
 def line_processing(string: str) -> str:
     context_level = 0
@@ -45,6 +54,7 @@ def line_processing(string: str) -> str:
         all_lines.append(l)
 
     return "\n".join(all_lines)
+
 
 def syntax_correction(string: str) -> str:
     string = "Load[Detect[dog]Replace[Calpng]"
@@ -80,7 +90,7 @@ def syntax_correction(string: str) -> str:
             longest_prefix_idx = string.find(longest_prefix)
             next_longest_prefix_idx = string.find(next_longest_prefix)
 
-            #print("Longest prefix idx: " + str(longest_prefix_idx), next_longest_prefix_idx)
+            # print("Longest prefix idx: " + str(longest_prefix_idx), next_longest_prefix_idx)
 
             if (longest_prefix_idx + len(longest_prefix)) == next_longest_prefix_idx:
                 final_string += "]\n"
@@ -88,14 +98,16 @@ def syntax_correction(string: str) -> str:
                 continue
 
             text_between_current_and_next = string[len(longest_prefix) :].split("[")[1]
-            #print("Text between current and next: " + text_between_current_and_next)
+            # print("Text between current and next: " + text_between_current_and_next)
 
             text_between_current_and_next = text_between_current_and_next.split("]")[0]
 
-            #print("Text between current and next: " + text_between_current_and_next)
+            # print("Text between current and next: " + text_between_current_and_next)
 
             final_string += text_between_current_and_next + "]\n"
-            string = string[len(longest_prefix) + len(text_between_current_and_next) + 2 :]
+            string = string[
+                len(longest_prefix) + len(text_between_current_and_next) + 2 :
+            ]
 
     final_string = final_string.replace("]", "]\n")
 

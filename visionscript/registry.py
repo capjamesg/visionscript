@@ -1,11 +1,30 @@
-import supervision as sv
 import logging
-import numpy as np
-import torch
-import sys
 import os
+import sys
+
+import numpy as np
+import supervision as sv
+import torch
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def yolov8_pose_base(self, _) -> list:
+    # returns 1x17 vector
+    from ultralytics import YOLO
+
+    logging.disable(logging.CRITICAL)
+
+    if self.state.get("model") and self.state["current_active_model"].lower() == "yolo":
+        model = model
+    else:
+        model = YOLO("yolov8s-pose.pt")
+
+    inference_results = model(self._get_item(-1, "image_stack"))[0]
+
+    logging.disable(logging.NOTSET)
+
+    return inference_results.keypoints[0]
 
 
 def yolov8_base(self, _) -> sv.Detections:
@@ -48,7 +67,7 @@ def fast_sam_base(self, text_prompt) -> sv.Detections:
     current_path = os.getcwd()
 
     model = FastSAM(os.path.join(current_path, "weights", "FastSAM.pt"))
-    
+
     everything_results = model(
         self.state["last_loaded_image_name"],
         device=DEVICE,
@@ -65,7 +84,7 @@ def fast_sam_base(self, text_prompt) -> sv.Detections:
         ann = []
 
         text_prompt = text_prompt.split(",")
-        
+
         for prompt in text_prompt:
             ann.extend(prompt_process.text_prompt(text=prompt))
     else:

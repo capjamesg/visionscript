@@ -2,6 +2,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+import csv
 import io
 import logging
 import mimetypes
@@ -10,9 +11,9 @@ import random
 import shutil
 import string
 import sys
-import time
-import csv
 import tempfile
+import time
+from dataclasses import dataclass
 
 import click
 import cv2
@@ -24,20 +25,20 @@ import torch
 import watchdog
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
-from spellchecker import SpellChecker
 from watchdog.observers import Observer
 
 from visionscript import registry
+from visionscript.error_handling import (
+    handle_unexpected_characters,
+    handle_unexpected_token,
+)
 from visionscript.grammar import grammar
-from visionscript.paper_ocr_correction import (line_processing,
-                                               syntax_correction)
-from visionscript.usage import (USAGE, language_grammar_reference,
-                                lowercase_language_grammar_reference)
+from visionscript.paper_ocr_correction import line_processing, syntax_correction
+from visionscript.state import init_state
+from visionscript.usage import USAGE, language_grammar_reference
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_FILE_SIZE = 10000000  # 10MB
-
-spell = SpellChecker()
 
 parser = Lark(grammar, start="start")
 
@@ -45,12 +46,24 @@ SUPPORTED_INFERENCE_MODELS = {
     "groundingdino": lambda self, classes: registry.grounding_dino_base(self, classes),
     "yolov8": lambda self, classes: registry.yolov8_base(self, classes),
     "fastsam": lambda self, classes: registry.fast_sam_base(self, classes),
+    "yolov8s-pose": lambda self, _: registry.yolov8_pose_base(self, _),
 }
 
 SUPPORTED_TRAIN_MODELS = {
     "vit": lambda self, folder: registry.vit_target(self, folder),
     "yolov8": lambda self, folder: registry.yolov8_target(self, folder),
 }
+
+
+@dataclass
+class Pose:
+    """
+    A pose.
+    """
+
+    keypoints: list
+    confidence: float
+
 
 DATA_TYPES = {
     sv.Detections: "Detection",
@@ -59,6 +72,7 @@ DATA_TYPES = {
     Image.Image: "Image",
     str: "String",
     int: "Integer",
+    Pose: "Pose",
 }
 
 STACK_MAXIMUM = {
@@ -100,79 +114,6 @@ if not os.path.exists(os.path.join(CACHE_DIRECTORY, "docs")):
 class InputNotProvided:
     pass
 
-def handle_unexpected_characters(e, code, interactive=False):
-    # if line doesn't end with ], add it
-    if not code.strip().endswith("]"):
-        code += "]"
-
-        return
-
-    # if space between statement and [, remove it
-    # get position of [
-    position = code.find("[")
-
-    if code[position - 1] == " ":
-        code = code[: position - 1] + code[position:]
-
-        return
-
-    # replace all “ with "
-    code = code.replace("“", '"')
-    code = code.replace("”", '"')
-
-    # raise error if character not in grammar
-    if e.char not in ["[", "]", "'", '"', ",", " ", '"', '"', "\n", "\t", "\r"]:
-        print(f"Syntax error on line {e.line}, column {e.column}.")
-        print(f"Unexpected character: {e.char!r}")
-        exit(1)
-
-    # raise error if class doesn't exist
-    line = e.line
-    column = e.column
-
-    # check if function name in grammar
-    function_name = code.strip().split("\n")[line - 1].split("[")[0].strip()
-
-    language_grammar_reference_keys = language_grammar_reference.keys()
-
-    if function_name in language_grammar_reference_keys:
-        print(f"Syntax error on line {line}, column {column}.")
-        print(f"Unexpected character: {e.char!r}")
-        exit(1)
-
-    spell.known(lowercase_language_grammar_reference)
-    spell.word_frequency.load_words(lowercase_language_grammar_reference)
-
-    alternatives = spell.candidates(function_name)
-
-    if len(alternatives) == 0:
-        print(f"Function {function_name} does not exist.")
-        exit(1)
-
-    print(f"Function '{function_name}' does not exist. Did you mean one of these?")
-    print("-" * 10)
-
-    for item in list(alternatives):
-        if item.lower() in lowercase_language_grammar_reference:
-            print(
-                list(language_grammar_reference.keys())[
-                    lowercase_language_grammar_reference.index(item.lower())
-                ]
-            )
-
-    if interactive is False:
-        exit(1)
-
-
-def handle_unexpected_token(e, interactive=False):
-    line = e.line
-    column = e.column
-
-    print(f"Syntax error on line {line}, column {column}.")
-    print(f"Unexpected token: {e.token!r}")
-    if interactive is False:
-        exit(1)
-
 
 def literal_eval(string):
     return string[1:-1] if string.startswith('"') and string.endswith('"') else string
@@ -204,40 +145,12 @@ def map_alias_to_underlying_function(alias):
     return aliased_functions.get(alias, alias)
 
 
-def init_state():
-    return {
-        "functions": {},
-        "last_loaded_image": None,
-        "last_loaded_image_name": None,
-        "last": None,
-        "last_function_type": None,
-        "last_function_args": None,
-        "image_stack": [],
-        "detections_stack": [],
-        "history": [],
-        "search_index_stack": [],
-        # "current_active_model": None,
-        "output": None,
-        "input_variables": {},
-        "last_classes": [],
-        "confidence": 50,
-        "active_region": None,
-        "active_filters": {"class": None, "region": None},
-        "load_queue": [],
-        "stack_size": {"image_stack": 0},
-        "show_text_count": 0,
-        "in_concurrent_context": False,
-        "ctx": {},
-        "tracker": None,
-    }
-
-
 class VisionScript:
     """
     A VisionScript program.
     """
 
-    def __init__(self, notebook = False, debug = False):
+    def __init__(self, notebook=False, debug=False):
         self.state = init_state()
         self.notebook = notebook
         self.code = ""
@@ -334,7 +247,14 @@ class VisionScript:
             "merge": lambda x: None,
             "remove": lambda x: self.remove(x),
             "wait": lambda x: time.sleep(self.parse_tree(x[0])),
+            "opposite": lambda x: self.opposite(x),
+            "detectpose": lambda x: self.detectpose(x),
+            "comparepose": lambda x: self.comparepose(x),
         }
+
+    def opposite(self, args):
+        statement = True if args[0] == "True" else False
+        return not statement
 
     def web(self, args):
         import requests
@@ -360,11 +280,11 @@ class VisionScript:
         except:
             self.state["last"] = "There was an error loading the image."
             return
-        
+
         if response.status_code != 200:
             self.state["last"] = "There was an error loading the image."
             return
-        
+
         return response.text
 
     def _is(self, args):
@@ -373,9 +293,9 @@ class VisionScript:
 
         if not args or len(args) == 0:
             return DATA_TYPES[type(self.state["last"])]
-        
+
         return DATA_TYPES[type(self.parse_tree(args[0]))]
-    
+
     def math(self, args):
         pass
 
@@ -465,16 +385,16 @@ class VisionScript:
             return 0
 
         # polygon is polygon (np.ndarray): A polygon represented by a numpy array of shape
-           # `(N, 2)`, containing the `x`, `y` coordinates of the points.
-           # np.array([[x0, y0], [x1, y1]]),
-           # all dots need to be connexted
+        # `(N, 2)`, containing the `x`, `y` coordinates of the points.
+        # np.array([[x0, y0], [x1, y1]]),
+        # all dots need to be connexted
 
         zone = sv.PolygonZone(
             polygon=np.array(points),
             frame_resolution_wh=(last_image.shape[1], last_image.shape[0]),
             triggering_position=sv.detection.tools.polygon_zone.Position.CENTER,
         )
-        
+
         results = zone.trigger(detections=predictions)
 
         # count number of True values in the "results" list
@@ -501,10 +421,10 @@ class VisionScript:
     def input_(self, key):
         if self.state["input_variables"].get(literal_eval(key)) is not None:
             return self.state["input_variables"][literal_eval(key)]
-        
+
         if not self.notebook:
             return input("Enter a value for {}: ".format(key))
-        
+
         return None
 
     def equality(self, args):
@@ -548,7 +468,7 @@ class VisionScript:
     def get_distinct_scenes(self, _):
         if not self.state.get("video_events_from_Classify[]"):
             return []
-        
+
         scenes = self.state["video_events_from_Classify[]"]
 
         scene_changes = []
@@ -564,7 +484,7 @@ class VisionScript:
 
             N = 10
 
-            last_n_scenes = scenes[i-N:i]
+            last_n_scenes = scenes[i - N : i]
 
             last_scene = last_n_scenes[-1]
 
@@ -573,14 +493,22 @@ class VisionScript:
 
             if last_scene["text"] != most_common_object:
                 current_frame_in_seconds = i / fps
-                scene_changes.append({"text": last_scene["text"], "frame": i * VIDEO_STRIDE, "time": current_frame_in_seconds})
-        
+                scene_changes.append(
+                    {
+                        "text": last_scene["text"],
+                        "frame": i * VIDEO_STRIDE,
+                        "time": current_frame_in_seconds,
+                    }
+                )
+
         return scene_changes
-    
+
     def get_unique_appearances(self, class_name):
         if class_name:
             class_id = self.state["last_classes"].index(class_name)
-            results = self.state["tracker"].tracker_id[self.state["tracker"].class_id == class_id]
+            results = self.state["tracker"].tracker_id[
+                self.state["tracker"].class_id == class_id
+            ]
         else:
             results = self.state["tracker"].tracker_id
 
@@ -605,7 +533,7 @@ class VisionScript:
             self._add_to_stack("image_stack", filename)
             # save file
             import uuid
-            
+
             self.state["last"] = filename
 
             name = str(uuid.uuid4()) + ".png"
@@ -734,7 +662,7 @@ class VisionScript:
             ):
                 filename = os.path.join("tmp", self.state["session_id"], filename)
 
-            image = Image.open(filename)#.convert("RGB")
+            image = Image.open(filename)  # .convert("RGB")
         except Exception as e:
             print(e)
             print(f"Could not load image {filename}.")
@@ -769,7 +697,7 @@ class VisionScript:
         # search in visionscript stdlib
 
         stdlib = os.path.join(os.path.dirname(__file__), "stdlib")
-        
+
         if os.path.exists(os.path.join(stdlib, file_name + ".vic")):
             code = open(os.path.join(stdlib, file_name + ".vic"), "r").read()
         elif os.path.exists(file_name + ".vic"):
@@ -1048,9 +976,7 @@ class VisionScript:
         if isinstance(args, str):
             self.detect(args)
 
-        if isinstance(
-            self.state["last"], sv.detection.core.Detections
-        ):
+        if isinstance(self.state["last"], sv.detection.core.Detections):
             return len(self.state["last"].confidence)
         else:
             return len(args)
@@ -1228,7 +1154,7 @@ class VisionScript:
         # self.state["last"] = results
 
         return results
-    
+
     def remove(self, args):
         """
         Remove an item from the image stack.
@@ -1245,9 +1171,38 @@ class VisionScript:
             self.state["functions"][variable].remove(to_remove)
         elif isinstance(object, dict):
             del self.state["functions"][variable][to_remove]
-    
+
     def _order_detections_by_confidence(self, detections):
         return detections[np.argsort(detections.confidence)[::-1]]
+
+    def comparepose(self, args):
+        # comparepose[item, item] or from state
+        if len(args) == 0:
+            # use last two detections
+            item1 = self._get_item(-1, "poses_stack")
+            item2 = self._get_item(-2, "poses_stack")
+        else:
+            item1 = self.parse_tree(args[0])
+            item2 = self.parse_tree(args[1])
+
+        aggregate_similarities = []
+
+        for i1, i2 in zip(item1.keypoints, item2.keypoints):
+            aggregate_similarities.append(torch.cosine_similarity(i1, i2))
+
+        return torch.mean(torch.stack(aggregate_similarities)).item()
+
+    def detectpose(self, _):
+        results = SUPPORTED_INFERENCE_MODELS["yolov8s-pose"](self, [])
+
+        result = Pose(
+            keypoints=results.xy,
+            confidence=results.conf,
+        )
+
+        self._add_to_stack("poses_stack", result)
+
+        return result
 
     def detect(self, classes):
         """
@@ -1267,7 +1222,11 @@ class VisionScript:
         # swap keys and values
         inference_classes_as_idx = {v: k for k, v in inference_classes.items()}
 
-        class_idxes = [inference_classes_as_idx.get(i, -1) for i in classes.split(",")] if classes else list(inference_classes_as_idx.values())
+        class_idxes = (
+            [inference_classes_as_idx.get(i, -1) for i in classes.split(",")]
+            if classes
+            else list(inference_classes_as_idx.values())
+        )
 
         results = results[np.isin(results.class_id, class_idxes)]
 
@@ -1283,7 +1242,7 @@ class VisionScript:
         self.state["last"] = results
 
         return results
-    
+
     def write_to_csv(self, name):
         if isinstance(self.state["last"], sv.Detections):
             xyxy = self.state["last"].xyxy
@@ -1407,7 +1366,7 @@ class VisionScript:
         if args:
             self.state["last"] = args
             return args
-        
+
         if self.state.get("last_function_type", None) in ("detect", "segment"):
             last_args = self.state["last_function_args"]
             statement = "".join(
@@ -1432,7 +1391,11 @@ class VisionScript:
 
         # if statement, return
         # if int, convert to str
-        if isinstance(statement, int) or isinstance(statement, float) or isinstance(statement, str):
+        if (
+            isinstance(statement, int)
+            or isinstance(statement, float)
+            or isinstance(statement, str)
+        ):
             statement = str(statement)
             print(statement)
             return
@@ -1462,7 +1425,7 @@ class VisionScript:
             output = output[:-2]
 
             self.state["output"] = {"text": output}
-            
+
             print(output)
 
             return output
@@ -1476,8 +1439,7 @@ class VisionScript:
 
         if isinstance(self.state["last"], sv.Detections):
             class_ids_to_names = [
-                self.state["last_classes_idx"][i]
-                for i in self.state["last"].class_id
+                self.state["last_classes_idx"][i] for i in self.state["last"].class_id
             ]
 
             statement = "".join(
@@ -1529,7 +1491,7 @@ class VisionScript:
 
         if text and len(text) > 0:
             self.state["show_text_count"] += 1
-        
+
         self._add_to_stack("image_stack", image)
 
         self.state["last"] = image
@@ -1635,9 +1597,15 @@ class VisionScript:
         processor = BlipProcessor.from_pretrained(
             "Salesforce/blip-image-captioning-base"
         )
-        model = BlipForConditionalGeneration.from_pretrained(
-            "Salesforce/blip-image-captioning-base"
-        )
+        if self.state.get("current_active_model") == "blip":
+            model = self.state["model"]
+        else:
+            model = BlipForConditionalGeneration.from_pretrained(
+                "Salesforce/blip-image-captioning-base"
+            )
+
+            self.state["current_active_model"] = "blip"
+            self.state["model"] = model
 
         image = self._get_item(-1, "image_stack")
 
@@ -1771,6 +1739,40 @@ class VisionScript:
             annotator = sv.BoxAnnotator()
         elif "segment" in self.state["history"]:
             annotator = sv.MaskAnnotator()
+        elif "detectpose" in self.state["history"]:
+            # plot myself
+            image = self._get_item(-1, "image_stack")
+
+            print(self.state["last"].keypoints[0])
+
+            for keypoint in self.state["last"].keypoints[0].tolist():
+                keypoint = [int(i) for i in keypoint]
+                cv2.circle(image, tuple(keypoint), 5, (0, 0, 255), -1)
+
+            if self.notebook:
+                image = image[:, :, ::-1].copy()
+
+                # PIL to base64
+                buffered = io.BytesIO()
+
+                if self.state.get("last_loaded_image_name") and self.state.get(
+                    "last_loaded_image_name", ""
+                ).endswith(".jpg"):
+                    image.save(buffered, format="JPEG")
+                else:
+                    image.save(buffered, format="PNG")
+
+                img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+                self.state["output"] = {"image": img_str}
+
+                return
+
+            cv2.imshow("image", image)
+
+            cv2.waitKey(0)
+
+            return
         else:
             annotator = None
 
@@ -1961,7 +1963,9 @@ class VisionScript:
 
                 # save to either jpeg or png
 
-                if self.state.get("last_loaded_image_name") and self.state.get("last_loaded_image_name", "").endswith(".jpg"):
+                if self.state.get("last_loaded_image_name") and self.state.get(
+                    "last_loaded_image_name", ""
+                ).endswith(".jpg"):
                     image.save(buffered, format="JPEG")
                 else:
                     image.save(buffered, format="PNG")
@@ -2096,7 +2100,7 @@ class VisionScript:
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
-        
+
         if not hasattr(tree, "children"):
             if hasattr(tree, "value") and tree.value.isdigit():
                 return int(tree.value)
@@ -2116,13 +2120,12 @@ class VisionScript:
 
         if hasattr(tree, "children") and tree.data == "input":
             return self.input_(tree.children[0].value)
-    
 
         for node in tree.children:
             # if node is \n, skip
             # this is here to make the results from the
             # print(node) statement below easier to read
-            if node == "\n" or node == '    ':
+            if node == "\n" or node == "    ":
                 continue
 
             # print(node)
@@ -2154,7 +2157,7 @@ class VisionScript:
                         print(sorted(self.state["breakpoint_state"].keys()))
                     elif user_input == "h":
                         print(
-"""
+                            """
 n - next
 p - previous
 q - quit
@@ -2171,7 +2174,7 @@ h - help
                 # print(node.value)
                 # return node.value
                 return self.state["functions"][node.value]
-            
+
             if node == "True":
                 return True
             elif node == "False":
@@ -2187,7 +2190,10 @@ h - help
                 # copy everything other than camera context
                 keys_to_skip = ["camera"]
 
-                self.state["breakpoint_state"] = {k: self.state[k] for k in set(list(self.state.keys())) - set(keys_to_skip)}
+                self.state["breakpoint_state"] = {
+                    k: self.state[k]
+                    for k in set(list(self.state.keys())) - set(keys_to_skip)
+                }
 
                 continue
             elif hasattr(node, "data") and node.data == "variable":
@@ -2236,7 +2242,13 @@ h - help
                     self.state["ctx"]["profile_command_run_time"] = {}
 
                 if self.state["ctx"].get("last_command"):
-                    self.state["ctx"]["profile_command_run_time"][self.state["ctx"]["last_command"]] = self.state["ctx"]["profile_command_run_time"].get(self.state["ctx"]["last_command"], 0) + (time.time() - self.state["ctx"]["last_profile_time"])
+                    self.state["ctx"]["profile_command_run_time"][
+                        self.state["ctx"]["last_command"]
+                    ] = self.state["ctx"]["profile_command_run_time"].get(
+                        self.state["ctx"]["last_command"], 0
+                    ) + (
+                        time.time() - self.state["ctx"]["last_profile_time"]
+                    )
 
                 start_time = time.time()
                 self.state["ctx"]["last_profile_time"] = start_time
@@ -2249,7 +2261,7 @@ h - help
                 return self.parse_tree(node.children[0]) == self.parse_tree(
                     node.children[1]
                 )
-            
+
             if token == "break":
                 self.state["ctx"]["break"] = True
                 return
@@ -2263,7 +2275,7 @@ h - help
 
             if token.type == "BOOL":
                 return node.children[0].value == "True"
-            
+
             if token == "is":
                 result = self._is(node)
 
@@ -2274,7 +2286,7 @@ h - help
 
                 self.state["last"] = result
                 return result
-            
+
             # if merge, get all args then merge them
             if token == "merge":
                 # first arg is dict
@@ -2310,7 +2322,9 @@ h - help
                 self.state[node.children[0].children[0].value] = self.parse_tree(
                     node.children[1]
                 )
-                self.state["functions"][node.children[0].children[0].value] = self.state[node.children[0].children[0].value]
+                self.state["functions"][
+                    node.children[0].children[0].value
+                ] = self.state[node.children[0].children[0].value]
                 self.state["last"] = self.state[node.children[0].children[0].value]
                 return
             elif token == "associative_array":
@@ -2318,7 +2332,7 @@ h - help
 
                 if len(node.children) == 0:
                     return associative_array
-                
+
                 node.children = [child for child in node.children if child != "\n"]
 
                 for tree in node.children:
@@ -2330,15 +2344,15 @@ h - help
                 self.state["last"] = associative_array
 
                 return self.state["last"]
-            
+
             # if __ANON_40, return
             if token.value == "variable":
                 self.state["last"] = self.state["functions"][token.value]
                 return self.state["functions"][token.value]
-            
+
             if token.value == "math":
                 return self.math(node.children)
-            
+
             if token.value == "remove":
                 return self.remove(node.children)
 
@@ -2353,7 +2367,11 @@ h - help
 
                 statement = self.parse_tree(node.children[0])
 
-                if statement is None or statement == False or (isinstance(statement, int) and int(statement) == 0):
+                if (
+                    statement is None
+                    or statement == False
+                    or (isinstance(statement, int) and int(statement) == 0)
+                ):
                     continue
 
                 # if not cv2.VideoCapture(0).isOpened():
@@ -2362,7 +2380,7 @@ h - help
             if token.value == "make":
                 self.make(node.children)
                 continue
-            
+
             if token.value == "say":
                 # if argyment, parse; otherwise say last value
                 if hasattr(node, "children") and len(node.children) > 0:
@@ -2379,7 +2397,9 @@ h - help
                 result2 = self.parse_tree(node.children[1])
                 result2 = self.state["last"] if result2 is None else result2
 
-                self.state["last"] = self.function_calls[token.value]([result1, result2])
+                self.state["last"] = self.function_calls[token.value](
+                    [result1, result2]
+                )
                 return self.state["last"]
 
             if token.value == "literal":
@@ -2390,12 +2410,16 @@ h - help
 
                     # if in functions, evaluate the function
                     if to_parse.value in self.state["functions"]:
-                        self.state["last"] = self.parse_tree(self.state["functions"][to_parse.value])
+                        self.state["last"] = self.parse_tree(
+                            self.state["functions"][to_parse.value]
+                        )
                         return self.state["last"]
 
                     self.parse_tree(to_parse)
 
-                    self.state["last"] = self.state["functions"].get(node.children[0].value, node.children[0].value)
+                    self.state["last"] = self.state["functions"].get(
+                        node.children[0].value, node.children[0].value
+                    )
 
                     return self.state["last"]
                 else:
@@ -2403,7 +2427,9 @@ h - help
 
                     self.parse_tree(to_parse)
 
-                    self.state["last"] = self.parse_tree(self.state["functions"][node.children[0].value])
+                    self.state["last"] = self.parse_tree(
+                        self.state["functions"][node.children[0].value]
+                    )
 
                     return self.state["last"]
                 # continue
@@ -2415,7 +2441,7 @@ h - help
             if token.value == "negate" or token.value == "input":
                 result = self.parse_tree(node.children[0])
                 return func(result)
-            
+
             if token.value == "set":
                 # three args: associative array, key, and value
                 associative_array = self.parse_tree(node.children[0].children[0])
@@ -2427,7 +2453,7 @@ h - help
                 self.state["last"] = self.state["functions"][associative_array][key]
 
                 return self.state["last"]
-                
+
             if token.value == "get":
                 # associative arrays can have one or more children
                 # if one child
@@ -2573,7 +2599,7 @@ h - help
                         if self.state["ctx"].get("break"):
                             self.state["ctx"]["break"] = False
                             break
-                    
+
                     self.state["ctx"]["active_file"] = image
 
                     self._add_to_stack("image_stack", image)
@@ -2587,7 +2613,7 @@ h - help
                 print(self.state["ctx"]["in"])
 
                 # first child is expression to evaluate, so skip
-                
+
                 for item in node.children[1:]:
                     if self.state["ctx"].get("break"):
                         self.state["ctx"]["break"] = False
@@ -2614,9 +2640,11 @@ h - help
                         ) as sink:
                             # make this concurrent if in fast context
 
-                            for i, frame in enumerate(sv.get_video_frames_generator(
-                                source_path="source_video.mp4", stride=VIDEO_STRIDE
-                            )):
+                            for i, frame in enumerate(
+                                sv.get_video_frames_generator(
+                                    source_path="source_video.mp4", stride=VIDEO_STRIDE
+                                )
+                            ):
                                 self.state["ctx"]["current_frame_count"] = i
                                 self.state["show_text_count"] = 0
 
@@ -2671,7 +2699,7 @@ h - help
             if token.value == "literal":
                 if value[0] is None:
                     return
-                
+
                 result = self.parse_tree(value[0])
             else:
                 result = func(value)
@@ -2706,7 +2734,14 @@ def activate_console(parser):
         CONTINUATION_STATEMENTS = ["If", "Else", "In[", "UseCamera"]
         END_STATEMENTS = ["End", "Endif", "Endcamera"]
 
-        if (any(code.strip().startswith(statement) for statement in CONTINUATION_STATEMENTS)) and not (any(code.strip().startswith(statement) for statement in END_STATEMENTS)):
+        if (
+            any(
+                code.strip().startswith(statement)
+                for statement in CONTINUATION_STATEMENTS
+            )
+        ) and not (
+            any(code.strip().startswith(statement) for statement in END_STATEMENTS)
+        ):
             buffer.append(code)
             continue
 
@@ -2739,7 +2774,9 @@ def activate_console(parser):
 @click.option("--validate", default=False, help="")
 @click.option("--ref", default=False, help="Name of the file")
 @click.option("--debug", default=False, help="Run the VisionScript debugger")
-@click.option("--showtree", default=False, help="Show Abstract Syntax Tree (AST) for program")
+@click.option(
+    "--showtree", default=False, help="Show Abstract Syntax Tree (AST) for program"
+)
 @click.option("--repl", default=False, help="To enter into a VisionScript REPL")
 @click.option("--notebook/--no-notebook", help="Start a notebook environment")
 @click.option("--cloud", default=False, help="Start a cloud deployment environment")
@@ -2782,22 +2819,27 @@ def main(
     if docs:
         # if no network connection, open local
         import webbrowser
+
         import requests
 
         try:
-            requests.get('https://visionscript.dev', timeout=1)
+            requests.get("https://visionscript.dev", timeout=1)
 
             webbrowser.open("https://visionscript.dev")
 
             exit(0)
         except:
             if os.path.exists(os.path.join(CACHE_DIRECTORY, "docs", "index.html")):
-                webbrowser.open("file://" + os.path.join(CACHE_DIRECTORY, "docs", "index.html"))
+                webbrowser.open(
+                    "file://" + os.path.join(CACHE_DIRECTORY, "docs", "index.html")
+                )
             else:
-                print("Cannot open documentation. No internet connection and no local documentation were found.")
+                print(
+                    "Cannot open documentation. No internet connection and no local documentation were found."
+                )
 
         exit(0)
-    
+
     if validate:
         print("Script is a valid VisionScript program.")
         exit(0)
@@ -2924,7 +2966,10 @@ def main(
 
             current_time = time.time()
 
-            print("Total run time:", "{:.2f}s".format(current_time - session.run_start_time))
+            print(
+                "Total run time:",
+                "{:.2f}s".format(current_time - session.run_start_time),
+            )
 
     # if no file:
     if not file:
@@ -2933,7 +2978,6 @@ def main(
         except KeyboardInterrupt:
             print("Exiting...")
             exit(0)
-
 
 
 if __name__ == "__main__":
