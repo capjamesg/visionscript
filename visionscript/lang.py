@@ -185,7 +185,7 @@ class VisionScript:
             "label": lambda x: self.label(x),
             "list": lambda x: None,
             "get": lambda x: self.get_func(x),
-            "use": lambda x: self.set_state("current_active_model", x),
+            "use": lambda x: self.set_state("current_active_model", x) if x != "background" else self.set_state("run_video_in_background", True),
             "caption": lambda x: self.caption(x),
             "contains": lambda x: self.contains(x),
             "import": lambda x: self.import_(x),
@@ -246,11 +246,16 @@ class VisionScript:
             "web": lambda x: self.web(x),
             "merge": lambda x: None,
             "remove": lambda x: self.remove(x),
-            "wait": lambda x: time.sleep(self.parse_tree(x[0])),
+            "wait": lambda x: time.sleep(self.parse_tree(x)),
             "opposite": lambda x: self.opposite(x),
             "detectpose": lambda x: self.detectpose(x),
             "comparepose": lambda x: self.comparepose(x),
+            "random": lambda x: self.random(x)
         }
+
+    def random(self, args):
+        return random.choice(args)
+        
 
     def opposite(self, args):
         statement = True if args[0] == "True" else False
@@ -1178,9 +1183,12 @@ class VisionScript:
     def comparepose(self, args):
         # comparepose[item, item] or from state
         if len(args) == 0:
-            # use last two detections
+            if len(self.state["poses_stack"]) < 2:
+                return 0
+            
             item1 = self._get_item(-1, "poses_stack")
-            item2 = self._get_item(-2, "poses_stack")
+            # should be -2, 0 for testing
+            item2 = self._get_item(0, "poses_stack")
         else:
             item1 = self.parse_tree(args[0])
             item2 = self.parse_tree(args[1])
@@ -1743,9 +1751,9 @@ class VisionScript:
             # plot myself
             image = self._get_item(-1, "image_stack")
 
-            print(self.state["last"].keypoints[0])
+            # if in usecamera, show keypoints
 
-            for keypoint in self.state["last"].keypoints[0].tolist():
+            for keypoint in self._get_item(-1, "poses_stack").keypoints[0]:
                 keypoint = [int(i) for i in keypoint]
                 cv2.circle(image, tuple(keypoint), 5, (0, 0, 255), -1)
 
@@ -1770,7 +1778,7 @@ class VisionScript:
 
             cv2.imshow("image", image)
 
-            cv2.waitKey(0)
+            cv2.waitKey(1)
 
             return
         else:
@@ -2490,7 +2498,9 @@ h - help
                 # convert children to strings
                 for item in node.children:
                     if hasattr(item, "value"):
-                        if item.value.startswith('"') and item.value.endswith('"'):
+                        if isinstance(item.value, int) or item.value.isdigit():
+                            item.value = int(item.value)
+                        elif item.value.startswith('"') and item.value.endswith('"'):
                             item.value = literal_eval(item.value)
                         elif item.type in ("EOL", "INDENT", "DEDENT"):
                             continue
@@ -2513,6 +2523,8 @@ h - help
                 if token.value == "usecamera":
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
+                    from threading import Thread, Event
+                    
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
                     context = node.children
@@ -2522,7 +2534,10 @@ h - help
 
                     # exit()
 
-                    while True:
+                    thread = None
+                    stop_event = Event()
+
+                    while not stop_event.is_set():
                         frame = self.state["ctx"]["camera"].read()[1]
 
                         self.state["ctx"]["active_file"] = frame
@@ -2530,14 +2545,48 @@ h - help
 
                         self.state["show_text_count"] = 0
 
-                        for item in context:
-                            # add to image
-                            # if ctx break, break
-                            if self.state["ctx"].get("break"):
-                                self.state["ctx"]["break"] = False
-                                break
+                        def process_context(context):
+                            while thread.is_alive():
+                                if self.state["ctx"].get("break") or stop_event.is_set():
+                                    self.state["ctx"]["break"] = True
 
-                            self.parse_tree(item)
+                                    break
+
+                                for item in context:
+                                    # print(item)
+                                    # add to image
+                                    # if ctx break, break
+                                    if self.state["ctx"].get("break") or stop_event.is_set():
+                                        self.state["ctx"]["break"] = True
+
+                                        break
+
+                                    self.parse_tree(item)
+                                    
+                        if self.state["ctx"].get("break"):
+                            print("breaking")
+                            stop_event.set()
+                            # escape thread
+                            self.state["ctx"]["camera"].release()
+                            self.state["ctx"]["camera"] = None
+
+                            self.state["ctx"]["break"] = False
+                            thread.join()
+                            thread = None
+                            # stop camera
+                            break
+                        
+                        if self.state["run_video_in_background"]:
+                            if not thread:
+                                print('starting thread')
+                                new_thread = Thread(target=process_context, args=(context,))
+
+                                thread = new_thread
+
+                                thread.start()
+                        else:
+                            print('not in thread')
+                            process_context(context)
 
                         cv2.imshow("frame", self._get_item(-1, "image_stack"))
                         cv2.waitKey(1)
@@ -2550,6 +2599,8 @@ h - help
 
                         counter = 0
                         start_time = time.time()
+
+                    return
 
                 elif hasattr(node.children[0], "value") and isinstance(
                     node.children[0].value, str
@@ -2609,8 +2660,6 @@ h - help
                     return self.state["last"]
 
                     # continue
-
-                print(self.state["ctx"]["in"])
 
                 # first child is expression to evaluate, so skip
 

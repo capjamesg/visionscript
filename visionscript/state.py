@@ -24,4 +24,5 @@ def init_state():
         "in_concurrent_context": False,
         "ctx": {},
         "tracker": None,
+        "run_video_in_background": True
     }

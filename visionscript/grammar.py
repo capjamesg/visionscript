@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (set | var | make | in | if | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
+expr: (set | var | make | in | if | break | random | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 merge: "Merge" "[" (variable | list | associative_array) ("," (variable | list | associative_array))* "]"
 var: variable "=" (expr | STRING | INT)
@@ -20,7 +20,8 @@ greyscale: "Greyscale" "[]"
 opposite: "Opposite" "[" (BOOL | expr) "]"
 detectpose: "DetectPose[]"
 comparepose: "ComparePose" "[" (expr) "," (expr) "]" | "ComparePose[]"
-showtext: "ShowText[]" | "ShowText" "[" (expr | STRING) "]"
+showtext: "ShowText" "[" (STRING | expr) "]" | "ShowText[]"
+random: "Random" "[" (STRING | expr) ("," (STRING | expr))* "]"
 search: "Search" "[" STRING "]"
 deploy: "Deploy" "[" STRING "]"
 getedges: "GetEdges"  ("[" "]")?
@@ -73,7 +74,7 @@ else: "Else"
 breakpoint: "Breakpoint[]"
 usecamera: "UseCamera[]" EOL expr+ "EndCamera" EOL
 in: "In" "[" (STRING | expr) "]" EOL expr+ "Endin" EOL
-if: "If" "[" comparison_expressions "]" EOL expr+ "End" EOL
+if: "If" "[" comparison_expressions "]" (EOL)? expr+ "End" EOL
 web: "Web" "[" (STRING | expr) ("," (STRING | expr))? "]"
 reset: "Reset[]"
 negate: "Not" "[" expr "]"
