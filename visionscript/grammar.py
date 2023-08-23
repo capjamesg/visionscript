@@ -1,13 +1,13 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (set | var | make | in | if | break | random | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
+expr: (set | var | make | in | if | break | random | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | apply | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 merge: "Merge" "[" (variable | list | associative_array) ("," (variable | list | associative_array))* "]"
 var: variable "=" (expr | STRING | INT)
 replace: "Replace" "[" STRING "]"
 use: "Use" "[" STRING "]"
-load: "Load" "[" (STRING | input) "]" | "Load[]"
+load: "Load[]" | "Load" "[" (STRING | input) "]"
 save: "Save" "[" STRING "]"
 getfps: "GetFPS[]"
 is: "Is" "[" (expr | STRING) "]" | "Is[]"
@@ -74,7 +74,7 @@ else: "Else"
 breakpoint: "Breakpoint[]"
 usecamera: "UseCamera[]" EOL expr+ "EndCamera" EOL
 in: "In" "[" (STRING | expr) "]" EOL expr+ "Endin" EOL
-if: "If" "[" comparison_expressions "]" (EOL)? expr+ "End" EOL
+if: "If" "[" comparison_expressions "]" EOL expr+ "End" EOL
 web: "Web" "[" (STRING | expr) ("," (STRING | expr))? "]"
 reset: "Reset[]"
 negate: "Not" "[" expr "]"
@@ -90,6 +90,7 @@ associative_array: "[" EOL? (associative_expr ("," EOL? associative_expr)*)? EOL
 list: "[" EOL? (INT | STRING | FLOAT | expr) ("," EOL? (STRING | INT | FLOAT | expr))*  EOL?"]" | "List[]"
 first: "First[]" | "First" "[" (variable | expr) "]"
 last: "Last[]" | "Last" "[" (variable | expr) "]"
+apply: "Apply" "[" (variable | expr) "," expr "]"
 literal: /([a-z][a-zA-Z0-9_]*)/ ( "[" (STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))* "]" )? | /([a-z][a-zA-Z0-9_]*)/ "[" "]"
 variable: /[a-zA-Z_][a-zA-Z0-9_]*/
 comment: /#.*?\\n/

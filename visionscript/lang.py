@@ -92,6 +92,10 @@ CACHE_DIRECTORY = os.path.join(os.path.expanduser("~"), ".visionscript")
 if not os.path.exists(CACHE_DIRECTORY):
     os.makedirs(CACHE_DIRECTORY)
 
+# if clip not installed
+if not shutil.which("clip"):
+    os.system("pip install git+https://github.com/openai/CLIP.git")
+
 # if cache directory does not contain /docs/, do a git clone
 if not os.path.exists(os.path.join(CACHE_DIRECTORY, "docs")):
     # if git not installed, ask user to install it
@@ -131,7 +135,6 @@ def _get_colour_name(rgb_triplet):
         min_colours[(rd + gd + bd)] = key
 
     return min_colours[min(min_colours.keys())]
-
 
 aliased_functions = {
     "isita": "classify",
@@ -251,6 +254,7 @@ class VisionScript:
             "detectpose": lambda x: self.detectpose(x),
             "comparepose": lambda x: self.comparepose(x),
             "random": lambda x: self.random(x)
+            "apply": lambda x: self.apply(x),
         }
 
     def random(self, args):
@@ -270,7 +274,7 @@ class VisionScript:
         else:
             url = args[0]
             body = args[1]
-
+        
         try:
             if body:
                 response = requests.post(url, timeout=5, data=body)
@@ -525,6 +529,27 @@ class VisionScript:
         """
         self.state["load_queue"].append(items)
 
+    def apply(self, args):
+        print("xyz", args[1])
+        object = args[0].children[0].value.strip()
+        print(object)
+        function = self.state["functions"][args[1].children[0].children[0].value.strip()]
+
+        reassembled_list = []
+
+        for item in self.state["functions"][object]:
+            self.state["last"] = item
+            self.parse_tree(function)
+
+            reassembled_list.append(self.state["last"])
+
+        self.state["output"] = reassembled_list
+        self.state["last"] = reassembled_list
+        self.state["functions"][object] = reassembled_list
+
+        return reassembled_list
+
+
     def load(self, filename):
         """
         Load an image or folder of images into state.
@@ -533,6 +558,10 @@ class VisionScript:
         import validators
 
         # if session_id and notebook, concatenate tmp/session_id/ to filename
+
+        # if no filename, read from stack
+        if not filename:
+            filename = self.state["last"]
 
         if isinstance(filename, np.ndarray):
             self._add_to_stack("image_stack", filename)
@@ -1371,6 +1400,7 @@ class VisionScript:
         return detections
 
     def read(self, args):
+        print("reading!", self.state["last"])
         if args:
             self.state["last"] = args
             return args
@@ -2077,6 +2107,46 @@ class VisionScript:
             return statement in self.state["last"]
         else:
             return False
+        
+    def _process_detector_iterator_context(self, iterator, image, node):
+        for detection in iterator.xyxy:
+            # convert to int
+            detection = [int(item) for item in detection]
+            # get image in bbox
+            image_in_ctx = image[
+                detection[1] : detection[3], detection[0] : detection[2]
+            ]
+
+            self._add_to_stack("image_stack", image_in_ctx)
+
+            # paste result on
+
+            for item in node.children[1:]:
+                if self.state["ctx"].get("break"):
+                    break
+
+                self.parse_tree(item)
+
+                result = self._get_item(-1, "image_stack")
+
+                if len(result.shape) == 2:
+                    result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
+
+                image[
+                    detection[1] : detection[3],
+                    detection[0] : detection[2],
+                ] = result
+
+            if self.state["ctx"].get("break"):
+                self.state["ctx"]["break"] = False
+                break
+        
+        self.state["ctx"]["active_file"] = image
+
+        self._add_to_stack("image_stack", image)
+
+        self.state["last"] = self.state["ctx"]["active_file"]
+        self.state["ctx"]["in"] = None
 
     def check_inputs(self, tree):
         # get all INPUT tokens and save them to state
@@ -2136,7 +2206,11 @@ class VisionScript:
             if node == "\n" or node == "    ":
                 continue
 
-            # print(node)
+            print(node)
+
+            # if node is apply, defer to apply()
+            if hasattr(node, "data") and node.data == "apply":
+                return self.apply(node.children)
 
             # if is variable, return
             if self.state.get("breakpoint_state"):
@@ -2609,7 +2683,6 @@ h - help
                 # if expression, eval
                 elif hasattr(node.children[0], "value"):
                     self.state["ctx"]["in"] = self.parse_tree(node.children[0])
-                # if expr
                 elif isinstance(node.children[0], lark.Tree):
                     self.state["ctx"]["in"] = self.parse_tree(node.children[0])
                     detection_ctx = True
@@ -2617,19 +2690,20 @@ h - help
                 if detection_ctx:
                     image = self._get_item(-1, "image_stack").copy()
 
-                    print(type(image))
+                    print('cookiiees!', self.state["ctx"]["in"], type(self.state["ctx"]["in"]))
 
-                    for detection in self.state["ctx"]["in"].xyxy:
-                        # convert to int
-                        detection = [int(item) for item in detection]
-                        # get image in bbox
-                        image_in_ctx = image[
-                            detection[1] : detection[3], detection[0] : detection[2]
-                        ]
-
-                        self._add_to_stack("image_stack", image_in_ctx)
-
-                        # paste result on
+                    if isinstance(self.state["ctx"]["in"], list):
+                        for item in self.state["ctx"]["in"]:
+                            self.state["last"] = item
+                            self._process_detector_iterator_context(
+                                item, image, node
+                            )
+                    
+                        return self.state["last"]
+                    
+                    self._process_detector_iterator_context(
+                        self.state["ctx"]["in"], image, node
+                    )
 
                         for item in node.children[1:]:
                             if self.state["ctx"].get("break"):
@@ -2650,7 +2724,7 @@ h - help
                         if self.state["ctx"].get("break"):
                             self.state["ctx"]["break"] = False
                             break
-
+                    
                     self.state["ctx"]["active_file"] = image
 
                     self._add_to_stack("image_stack", image)
@@ -2739,6 +2813,9 @@ h - help
                 value = [self.parse_tree(item) for item in node.children]
 
             if token.value == "load":
+                # if value is none, load from last
+
+                value = value if node.children != [] else self.state["last"]
                 self._add_to_stack("load_queue", value)
                 # this blank value ensures that Is[] can
                 # run type inference
