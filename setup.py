@@ -1,14 +1,15 @@
+import os
+import re
+import subprocess
+
 import setuptools
 from setuptools import find_packages
-import re
-import os
-import subprocess
 
 with open("./visionscript/__init__.py", 'r') as f:
     content = f.read()
     # from https://www.py4u.net/discuss/139845
     version = re.search(r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]', content).group(1)
-    
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -28,7 +29,7 @@ def install_fast_sam_for_segmentation() -> None:
     for command in commands:
         subprocess.run(f"cd {HOME} && {command}", shell=True)
 
-    
+
 setuptools.setup(
     name="visionscript",
     version=version,

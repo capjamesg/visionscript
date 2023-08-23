@@ -1,6 +1,8 @@
-import visionscript as lang
 import os
+
 import tqdm
+
+import visionscript as lang
 
 TEST_DIR = "./"
 
@@ -9,12 +11,12 @@ tests = os.listdir(TEST_DIR)
 passed = 0
 test_count = len(tests)
 
-for file in tqdm.tqdm(os.listdir(TEST_DIR)): 
+for file in tqdm.tqdm(os.listdir(TEST_DIR)):
     session = lang.VisionScript()
 
     if file.endswith(".vic"):
         print(f"Testing {file}...")
-        
+
         try:
             with open(TEST_DIR + file, "r") as f:
                 session.parse_tree(lang.parser.parse(f.read() + "\n"))

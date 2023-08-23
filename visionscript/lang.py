@@ -28,12 +28,11 @@ from PIL import Image
 from watchdog.observers import Observer
 
 from visionscript import registry
-from visionscript.error_handling import (
-    handle_unexpected_characters,
-    handle_unexpected_token,
-)
+from visionscript.error_handling import (handle_unexpected_characters,
+                                         handle_unexpected_token)
 from visionscript.grammar import grammar
-from visionscript.paper_ocr_correction import line_processing, syntax_correction
+from visionscript.paper_ocr_correction import (line_processing,
+                                               syntax_correction)
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
 
@@ -255,7 +254,7 @@ class VisionScript:
 
     def random(self, args):
         return random.choice(args)
-        
+
 
     def opposite(self, args):
         statement = True if args[0] == "True" else False
@@ -428,7 +427,7 @@ class VisionScript:
             return self.state["input_variables"][literal_eval(key)]
 
         if not self.notebook:
-            return input("Enter a value for {}: ".format(key))
+            return input(f"Enter a value for {key}: ")
 
         return None
 
@@ -1185,7 +1184,7 @@ class VisionScript:
         if len(args) == 0:
             if len(self.state["poses_stack"]) < 2:
                 return 0
-            
+
             item1 = self._get_item(-1, "poses_stack")
             # should be -2, 0 for testing
             item2 = self._get_item(0, "poses_stack")
@@ -2523,8 +2522,8 @@ h - help
                 if token.value == "usecamera":
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
-                    from threading import Thread, Event
-                    
+                    from threading import Event, Thread
+
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
                     context = node.children
@@ -2562,7 +2561,7 @@ h - help
                                         break
 
                                     self.parse_tree(item)
-                                    
+
                         if self.state["ctx"].get("break"):
                             print("breaking")
                             stop_event.set()
@@ -2575,7 +2574,7 @@ h - help
                             thread = None
                             # stop camera
                             break
-                        
+
                         if self.state["run_video_in_background"]:
                             if not thread:
                                 print('starting thread')
@@ -3010,14 +3009,14 @@ def main(
             print("-" * 20)
 
             for command, runtime in profile_command_run_time:
-                runtime = "{:.2f}".format(runtime)
+                runtime = f"{runtime:.2f}"
                 print(command, ":", runtime + "s")
 
             current_time = time.time()
 
             print(
                 "Total run time:",
-                "{:.2f}s".format(current_time - session.run_start_time),
+                f"{current_time - session.run_start_time:.2f}s",
             )
 
     # if no file:
