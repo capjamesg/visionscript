@@ -427,7 +427,7 @@ class VisionScript:
             return self.state["input_variables"][literal_eval(key)]
 
         if not self.notebook:
-            return input("Enter a value for {}: ".format(key))
+            return input(f"Enter a value for {key}: ")
 
         return None
 
@@ -3009,14 +3009,14 @@ def main(
             print("-" * 20)
 
             for command, runtime in profile_command_run_time:
-                runtime = "{:.2f}".format(runtime)
+                runtime = f"{runtime:.2f}"
                 print(command, ":", runtime + "s")
 
             current_time = time.time()
 
             print(
                 "Total run time:",
-                "{:.2f}s".format(current_time - session.run_start_time),
+                f"{current_time - session.run_start_time:.2f}s",
             )
 
     # if no file:
