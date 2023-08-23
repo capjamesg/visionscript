@@ -29,7 +29,7 @@ def install_fast_sam_for_segmentation() -> None:
     for command in commands:
         subprocess.run(f"cd {HOME} && {command}", shell=True)
 
-    
+
 setuptools.setup(
     name="visionscript",
     version=version,

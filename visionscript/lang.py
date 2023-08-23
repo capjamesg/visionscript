@@ -254,7 +254,7 @@ class VisionScript:
 
     def random(self, args):
         return random.choice(args)
-        
+
 
     def opposite(self, args):
         statement = True if args[0] == "True" else False
@@ -1184,7 +1184,7 @@ class VisionScript:
         if len(args) == 0:
             if len(self.state["poses_stack"]) < 2:
                 return 0
-            
+
             item1 = self._get_item(-1, "poses_stack")
             # should be -2, 0 for testing
             item2 = self._get_item(0, "poses_stack")
@@ -2523,7 +2523,7 @@ h - help
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
                     from threading import Event, Thread
-                    
+
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
                     context = node.children
@@ -2561,7 +2561,7 @@ h - help
                                         break
 
                                     self.parse_tree(item)
-                                    
+
                         if self.state["ctx"].get("break"):
                             print("breaking")
                             stop_event.set()
@@ -2574,7 +2574,7 @@ h - help
                             thread = None
                             # stop camera
                             break
-                        
+
                         if self.state["run_video_in_background"]:
                             if not thread:
                                 print('starting thread')
