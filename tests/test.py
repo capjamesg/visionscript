@@ -1,6 +1,8 @@
-import visionscript as lang
 import os
+
 import tqdm
+
+import visionscript as lang
 
 TEST_DIR = "./"
 

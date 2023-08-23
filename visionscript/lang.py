@@ -28,12 +28,11 @@ from PIL import Image
 from watchdog.observers import Observer
 
 from visionscript import registry
-from visionscript.error_handling import (
-    handle_unexpected_characters,
-    handle_unexpected_token,
-)
+from visionscript.error_handling import (handle_unexpected_characters,
+                                         handle_unexpected_token)
 from visionscript.grammar import grammar
-from visionscript.paper_ocr_correction import line_processing, syntax_correction
+from visionscript.paper_ocr_correction import (line_processing,
+                                               syntax_correction)
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
 
@@ -2523,7 +2522,7 @@ h - help
                 if token.value == "usecamera":
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
-                    from threading import Thread, Event
+                    from threading import Event, Thread
                     
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
