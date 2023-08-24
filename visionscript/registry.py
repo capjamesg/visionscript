@@ -70,7 +70,9 @@ def use_roboflow_hosted_inference(self, _) -> list:
             model["labels"] = [l.lower() for l in model["labels"]]
             project = rf.workspace().project(model["model_id"])
 
-            self.state["last_classes"] = [i.lower() for i in list(sorted(project.classes.keys()))]
+            self.state["last_classes"] = [
+                i.lower() for i in list(sorted(project.classes.keys()))
+            ]
 
             if os.environ.get("ROBOFLOW_INFER_SERVER_DESTINATION"):
                 inference_model = project.version(
@@ -93,20 +95,16 @@ def use_roboflow_hosted_inference(self, _) -> list:
 
         predictions = inference_model.predict("temp.jpg", confidence=0.3)
         predictions = predictions.json()
-        
+
         for p in predictions["predictions"]:
             p["class"] = p["class"].lower()
 
         classes = [i.lower() for i in list(sorted(self.state["last_classes"]))]
         not_sorted_classes = [i.lower() for i in self.state["last_classes"]]
 
-        processed_detections = sv.Detections.from_roboflow(
-            predictions, classes
-        )
+        processed_detections = sv.Detections.from_roboflow(predictions, classes)
 
-        idx_to_class = {
-            idx: item for idx, item in enumerate(not_sorted_classes)
-        }
+        idx_to_class = {idx: item for idx, item in enumerate(not_sorted_classes)}
 
         return processed_detections, idx_to_class, ",".join(model["labels"])
 

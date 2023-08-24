@@ -1,7 +1,9 @@
 from spellchecker import SpellChecker
 
-from visionscript.usage import (language_grammar_reference,
-                                lowercase_language_grammar_reference)
+from visionscript.usage import (
+    language_grammar_reference,
+    lowercase_language_grammar_reference,
+)
 
 spell = SpellChecker()
 

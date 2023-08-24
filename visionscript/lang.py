@@ -8,7 +8,7 @@ import json
 import logging
 import mimetypes
 import os
-import pkgutil
+import subprocess
 import random
 import shutil
 import string
@@ -31,16 +31,31 @@ from PIL import Image
 from watchdog.observers import Observer
 
 from visionscript import registry
-from visionscript.error_handling import (handle_unexpected_characters,
-                                         handle_unexpected_token)
+from visionscript.error_handling import (
+    handle_unexpected_characters,
+    handle_unexpected_token,
+)
 from visionscript.grammar import grammar
-from visionscript.paper_ocr_correction import (line_processing,
-                                               syntax_correction)
+from visionscript.paper_ocr_correction import line_processing, syntax_correction
 from visionscript.rf_models import STANDARD_ROBOFLOW_MODELS
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
 
-CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "visionscript")
+from visionscript.config import (
+    DATA_TYPES,
+    STACK_MAXIMUM,
+    CONCURRENT_MAXIMUM,
+    VIDEO_STRIDE,
+    CACHE_DIRECTORY,
+    FASTSAM_DIR,
+    FASTSAM_WEIGHTS_DIR,
+    CONCURRENT_VIDEO_TRANSFORMATIONS,
+    CACHE_DIR,
+    DEVICE,
+    MAX_FILE_SIZE,
+    SUPPORTED_INFERENCE_MODELS,
+    SUPPORTED_TRAIN_MODELS,
+)
 
 # retrieve rf_models.json from ~/.cache/visionscript
 # this is where the user keeps a registry of custom models
@@ -52,64 +67,7 @@ if not os.path.exists(os.path.join(CACHE_DIR, "rf_models.json")):
     with open(os.path.join(CACHE_DIR, "rf_models.json"), "w") as f:
         json.dump({}, f)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MAX_FILE_SIZE = 10000000  # 10MB
-
 parser = Lark(grammar, start="start")
-
-SUPPORTED_INFERENCE_MODELS = {
-    "groundingdino": lambda self, classes: registry.grounding_dino_base(self, classes),
-    "yolov8": lambda self, classes: registry.yolov8_base(self, classes),
-    "fastsam": lambda self, classes: registry.fast_sam_base(self, classes),
-    "yolov8s-pose": lambda self, _: registry.yolov8_pose_base(self, _),
-    "roboflow": lambda self, _: registry.use_roboflow_hosted_inference(self, _),
-}
-
-SUPPORTED_TRAIN_MODELS = {
-    "vit": lambda self, folder: registry.vit_target(self, folder),
-    "yolov8": lambda self, folder: registry.yolov8_target(self, folder),
-}
-
-
-@dataclass
-class Pose:
-    """
-    A pose.
-    """
-
-    keypoints: list
-    confidence: float
-
-
-DATA_TYPES = {
-    sv.Detections: "Detection",
-    np.ndarray: "Image",
-    torch.Tensor: "Image",
-    Image.Image: "Image",
-    str: "String",
-    int: "Integer",
-    Pose: "Pose",
-}
-
-STACK_MAXIMUM = {
-    "image_stack": {
-        # 50% of available memory
-        "maximum": 0.5 * psutil.virtual_memory().available,
-        "also_reset": ["detections_stack"],
-    }
-}
-
-CONCURRENT_MAXIMUM = 10
-
-VIDEO_STRIDE = 2
-
-CACHE_DIRECTORY = os.path.join(os.path.expanduser("~"), ".visionscript")
-
-CONCURRENT_VIDEO_TRANSFORMATIONS = [
-    "showtext",
-    "greyscale",
-    "show"
-]
 
 if not os.path.exists(CACHE_DIRECTORY):
     os.makedirs(CACHE_DIRECTORY)
@@ -117,6 +75,54 @@ if not os.path.exists(CACHE_DIRECTORY):
 # if clip not installed
 if not importlib.util.find_spec("clip"):
     os.system("pip install git+https://github.com/openai/CLIP.git")
+
+
+def run_command(cmd, directory=None):
+    with subprocess.DEVNULL as DEVNULL:
+        result = subprocess.run(
+            cmd, cwd=directory, stdout=DEVNULL, stderr=subprocess.STDOUT, check=True
+        )
+    if result.returncode != 0:
+        raise ValueError(f"Command '{' '.join(cmd)}' failed to run.")
+
+
+def install_fastsam_dependencies():
+    commands = [
+        (
+            ["git", "-q", "clone", "https://github.com/CASIA-IVA-Lab/FastSAM"],
+            CACHE_DIRECTORY,
+        ),
+        (["pip", "install", "--quiet", "-r", "requirements.txt"], FASTSAM_DIR),
+        (["mkdir", "-p", FASTSAM_WEIGHTS_DIR], None),
+        (
+            [
+                "wget",
+                "-q",
+                "-P",
+                FASTSAM_WEIGHTS_DIR,
+                "https://huggingface.co/spaces/An-619/FastSAM/resolve/main/weights/FastSAM.pt",
+            ],
+            None,
+        ),
+        (
+            [
+                "wget",
+                "-q",
+                "-P",
+                FASTSAM_WEIGHTS_DIR,
+                "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
+            ],
+            None,
+        ),
+    ]
+
+    for cmd, dir in commands:
+        run_command(cmd, dir)
+
+
+if not os.path.exists(FASTSAM_DIR):
+    install_fastsam_dependencies()
+
 
 # if cache directory does not contain /docs/, do a git clone
 if not os.path.exists(os.path.join(CACHE_DIRECTORY, "docs")):
@@ -1949,7 +1955,9 @@ class VisionScript:
                         np.array(image), detections, labels=self.state["last_classes"]
                     )
                 elif annotator and detections:
-                    image = annotator.annotate(np.array(image), detections, labels=self.state["last_classes"])
+                    image = annotator.annotate(
+                        np.array(image), detections, labels=self.state["last_classes"]
+                    )
                 else:
                     image = np.array(image)
 
@@ -1971,12 +1979,13 @@ class VisionScript:
             image = np.array(self._get_item(-1, "image_stack"))
 
             labels = [
-                self.state["last_classes_idx"][i] for i in self._get_item(-1, "detections_stack").class_id
+                self.state["last_classes_idx"][i]
+                for i in self._get_item(-1, "detections_stack").class_id
             ]
 
             if len(self.state["detections_stack"]) > 0:
                 if isinstance(annotator, sv.BoxAnnotator):
-                    
+
                     image = annotator.annotate(
                         image,
                         detections=self._filter_controller(
@@ -1992,7 +2001,6 @@ class VisionScript:
                         ),
                     )
 
-        
         if self.notebook:
             buffer = io.BytesIO()
             import base64
@@ -2198,7 +2206,7 @@ class VisionScript:
             if node.data == "input":
                 self.state["input_variables"][node.children[0].value] = "image"
 
-    def parse_tree(self, tree, main_video_thread = False):
+    def parse_tree(self, tree, main_video_thread=False):
         try:
             return self.evaluate_tree(tree, main_video_thread)
         except MemoryError:
@@ -2211,7 +2219,7 @@ class VisionScript:
         #     print("An unexpected error has occured.")
         #     exit()
 
-    def evaluate_tree(self, tree, main_video_thread = False):
+    def evaluate_tree(self, tree, main_video_thread=False):
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
@@ -2756,7 +2764,7 @@ h - help
 
                         counter = 0
                         start_time = time.time()
-                    
+
                     self.state["concurrent_thread"] = False
 
                     return
@@ -2786,26 +2794,26 @@ h - help
                         self.state["ctx"]["in"], image, node
                     )
 
-                        # for item in node.children[1:]:
-                        #     if self.state["ctx"].get("break"):
-                        #         break
+                    # for item in node.children[1:]:
+                    #     if self.state["ctx"].get("break"):
+                    #         break
 
-                        #     self.parse_tree(item)
+                    #     self.parse_tree(item)
 
-                        #     result = self._get_item(-1, "image_stack")
+                    #     result = self._get_item(-1, "image_stack")
 
-                        #     if len(result.shape) == 2:
-                        #         result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
+                    #     if len(result.shape) == 2:
+                    #         result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
 
-                        #     image[
-                        #         detection[1] : detection[3],
-                        #         detection[0] : detection[2],
-                        #     ] = result
+                    #     image[
+                    #         detection[1] : detection[3],
+                    #         detection[0] : detection[2],
+                    #     ] = result
 
-                        # if self.state["ctx"].get("break"):
-                        #     self.state["ctx"]["break"] = False
-                        #     break
-                    
+                    # if self.state["ctx"].get("break"):
+                    #     self.state["ctx"]["break"] = False
+                    #     break
+
                     self.state["ctx"]["active_file"] = image
 
                     self._add_to_stack("image_stack", image)
