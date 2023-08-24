@@ -3,6 +3,6 @@ STANDARD_ROBOFLOW_MODELS = {
         "workspace_id": "roboflow-58fyf",
         "model_id": "rock-paper-scissors-sxsw",
         "version": 11,
-        "labels": ["Rock", "Paper", "Scissors"],
+        "labels": ["rock", "paper", "scissors"],
     }
 }

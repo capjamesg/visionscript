@@ -554,9 +554,8 @@ class VisionScript:
         self.state["load_queue"].append(items)
 
     def apply(self, args):
-        print("xyz", args[1])
         object = args[0].children[0].value.strip()
-        print(object)
+
         function = self.state["functions"][
             args[1].children[0].children[0].value.strip()
         ]
@@ -1431,7 +1430,6 @@ class VisionScript:
         return detections
 
     def read(self, args):
-        print("reading!", self.state["last"])
         if args:
             self.state["last"] = args
             return args
@@ -1469,10 +1467,6 @@ class VisionScript:
             print(statement)
             return
 
-        if isinstance(self.state["last"], np.ndarray):
-            self.show(None)
-            return
-
         if isinstance(self.state["last"], int):
             return
 
@@ -1494,8 +1488,6 @@ class VisionScript:
             output = output[:-2]
 
             self.state["output"] = {"text": output}
-
-            print(output)
 
             return output
 
@@ -1957,7 +1949,7 @@ class VisionScript:
                         np.array(image), detections, labels=self.state["last_classes"]
                     )
                 elif annotator and detections:
-                    image = annotator.annotate(np.array(image), detections)
+                    image = annotator.annotate(np.array(image), detections, labels=self.state["last_classes"])
                 else:
                     image = np.array(image)
 
@@ -1978,15 +1970,29 @@ class VisionScript:
             # turn (self._get_item(-1, "image_stack")) into RGB
             image = np.array(self._get_item(-1, "image_stack"))
 
-            if isinstance(annotator, sv.BoxAnnotator):
-                image = annotator.annotate(
-                    image,
-                    detections=self._filter_controller(
-                        self.state["detections_stack"][-1]
-                    ),
-                    labels=self.state["last_classes"],
-                )
+            labels = [
+                self.state["last_classes_idx"][i] for i in self._get_item(-1, "detections_stack").class_id
+            ]
 
+            if len(self.state["detections_stack"]) > 0:
+                if isinstance(annotator, sv.BoxAnnotator):
+                    
+                    image = annotator.annotate(
+                        image,
+                        detections=self._filter_controller(
+                            self.state["detections_stack"][-1]
+                        ),
+                        labels=labels,
+                    )
+                else:
+                    image = annotator.annotate(
+                        image,
+                        detections=self._filter_controller(
+                            self.state["detections_stack"][-1]
+                        ),
+                    )
+
+        
         if self.notebook:
             buffer = io.BytesIO()
             import base64
@@ -2672,6 +2678,9 @@ h - help
 
                     context = node.children
 
+                    # look for first tree
+                    trees = [i for i in context if isinstance(i, lark.Tree)]
+
                     start_time = time.time()
                     counter = 0
 
@@ -2698,10 +2707,7 @@ h - help
 
                                     break
 
-                                # print(context)
-
-                                for item in context:
-                                    # print(item)
+                                for statement in trees:
                                     if (
                                         self.state["ctx"].get("break")
                                         or stop_event.is_set()
@@ -2709,8 +2715,8 @@ h - help
                                         self.state["ctx"]["break"] = True
 
                                         break
-                                    # print(item)
-                                    self.parse_tree(item)
+
+                                    self.parse_tree(statement)
 
                         if self.state["ctx"].get("break"):
                             # stop camera and thread
@@ -2733,8 +2739,11 @@ h - help
                                 thread = new_thread
 
                                 thread.start()
-
-                        self.parse_tree(context[2], main_video_thread=True)
+                            for statement in trees:
+                                self.parse_tree(statement, main_video_thread=True)
+                        else:
+                            for statement in trees:
+                                self.parse_tree(statement)
 
                         cv2.imshow("frame", self._get_item(-1, "image_stack"))
                         cv2.waitKey(1)
