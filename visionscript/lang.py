@@ -16,7 +16,7 @@ import sys
 import tempfile
 import importlib
 import time
-from dataclasses import dataclass
+from visionscript.pose import Pose
 
 import click
 import cv2
