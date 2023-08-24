@@ -28,12 +28,11 @@ from PIL import Image
 from watchdog.observers import Observer
 
 from visionscript import registry
-from visionscript.error_handling import (
-    handle_unexpected_characters,
-    handle_unexpected_token,
-)
+from visionscript.error_handling import (handle_unexpected_characters,
+                                         handle_unexpected_token)
 from visionscript.grammar import grammar
-from visionscript.paper_ocr_correction import line_processing, syntax_correction
+from visionscript.paper_ocr_correction import (line_processing,
+                                               syntax_correction)
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
 
@@ -47,6 +46,7 @@ SUPPORTED_INFERENCE_MODELS = {
     "yolov8": lambda self, classes: registry.yolov8_base(self, classes),
     "fastsam": lambda self, classes: registry.fast_sam_base(self, classes),
     "yolov8s-pose": lambda self, _: registry.yolov8_pose_base(self, _),
+    "roboflow": lambda self, _: registry.use_roboflow_hosted_inference(self, _),
 }
 
 SUPPORTED_TRAIN_MODELS = {
@@ -188,7 +188,9 @@ class VisionScript:
             "label": lambda x: self.label(x),
             "list": lambda x: None,
             "get": lambda x: self.get_func(x),
-            "use": lambda x: self.set_state("current_active_model", x) if x != "background" else self.set_state("run_video_in_background", True),
+            "use": lambda x: self.set_state("current_active_model", x)
+            if x != "background"
+            else self.set_state("run_video_in_background", True),
             "caption": lambda x: self.caption(x),
             "contains": lambda x: self.contains(x),
             "import": lambda x: self.import_(x),
@@ -259,7 +261,6 @@ class VisionScript:
 
     def random(self, args):
         return random.choice(args)
-        
 
     def opposite(self, args):
         statement = True if args[0] == "True" else False
@@ -1214,7 +1215,7 @@ class VisionScript:
         if len(args) == 0:
             if len(self.state["poses_stack"]) < 2:
                 return 0
-            
+
             item1 = self._get_item(-1, "poses_stack")
             # should be -2, 0 for testing
             item2 = self._get_item(0, "poses_stack")
@@ -1252,15 +1253,20 @@ class VisionScript:
 
         self.state["current_active_model"] = self.state["current_active_model"].lower()
 
-        results, inference_classes = SUPPORTED_INFERENCE_MODELS[
-            self.state["current_active_model"]
-        ](self, classes)
+        if self.state["current_active_model"].startswith("roboflow"):
+            model = "roboflow"
+        else:
+            model = self.state["current_active_model"]
+
+        results, inference_classes, classes = SUPPORTED_INFERENCE_MODELS[model](
+            self, classes
+        )
 
         # swap keys and values
         inference_classes_as_idx = {v: k for k, v in inference_classes.items()}
 
         class_idxes = (
-            [inference_classes_as_idx.get(i, -1) for i in classes.split(",")]
+            [int(inference_classes_as_idx.get(i, -1)) for i in classes.split(",")]
             if classes
             else list(inference_classes_as_idx.values())
         )
@@ -1272,7 +1278,7 @@ class VisionScript:
         self._add_to_stack("detections_stack", results)
 
         self.state["last_classes"] = [
-            inference_classes[i] for i in class_idxes if i != -1
+            inference_classes[i].lower() for i in class_idxes if i != -1
         ]
         self.state["last_classes_idx"] = inference_classes
 
@@ -1285,7 +1291,7 @@ class VisionScript:
             xyxy = self.state["last"].xyxy
             conf = self.state["last"].confidence
             class_ids = self.state["last"].class_id
-            class_names = [self.state["last_classes"][i] for i in class_ids]
+            class_names = [self.state["last_classes"][i].lower() for i in class_ids]
 
             csv_record = list(zip(xyxy, conf, class_ids, class_names))
 
@@ -1366,6 +1372,8 @@ class VisionScript:
             self.state["ctx"]["video_events_from_Classify[]"].append(
                 {"text": label_name, "frame": self.state["ctx"]["current_frame_count"]}
             )
+
+        self.state["last"] = label_name
 
         return label_name
 
@@ -2264,6 +2272,8 @@ h - help
             # if token, return
             elif hasattr(node, "type") and node.type == "INT":
                 return int(node.value)
+            elif hasattr(node, "type") and node.type == "STRING":
+                node.value = str(node.value).strip('"')
             # if INT, return
             # if equality, check if equal
             # if rule is input
@@ -2429,6 +2439,7 @@ h - help
 
             # if __ANON_40, return
             if token.value == "variable":
+                print("xxxx")
                 self.state["last"] = self.state["functions"][token.value]
                 return self.state["functions"][token.value]
 
@@ -2447,7 +2458,29 @@ h - help
 
                 # if equality, check if equal
 
-                statement = self.parse_tree(node.children[0])
+                expression = node.children[0]
+
+                # if first arg is not a comparison statement
+                if node.children[0].data != "comparison_expression":
+                    # if self.state["last"] is a Detections, get the classes
+                    if isinstance(self.state["last"], sv.Detections):
+                        if self.parse_tree(node.children[0]) not in [
+                            self.state["last_classes"][i]
+                            for i in self.state["last"].class_id
+                        ]:
+                            print("not in classes")
+                            continue
+                        else:
+                            expression = node.children[2]
+                    else:
+                        if self.parse_tree(node.children[0]) != self.state["last"]:
+                            continue
+
+                    expression = node.children[2]
+
+                print("ixp", expression)
+                # else:
+                statement = self.parse_tree(expression)
 
                 if (
                     statement is None
@@ -2517,6 +2550,8 @@ h - help
                 # continue
             elif token.value in self.state["functions"]:
                 func = self.state["functions"][token.value]
+            elif token.value not in self.function_calls:
+                return token.value
             else:
                 func = self.function_calls[token.value]
 
@@ -2595,10 +2630,18 @@ h - help
                 detection_ctx = False
 
                 if token.value == "usecamera":
+                    # if usecamera's first arg is "background", set run_video_in_background to True
+                    if (
+                        len(node.children) > 0
+                        and self.parse_tree(node.children[0]) == "background"
+                    ):
+                        self.state["run_video_in_background"] = True
+
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
-                    from threading import Thread, Event
-                    
+
+                    from threading import Event, Thread
+
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
                     context = node.children
@@ -2621,45 +2664,47 @@ h - help
 
                         def process_context(context):
                             while thread.is_alive():
-                                if self.state["ctx"].get("break") or stop_event.is_set():
+                                if (
+                                    self.state["ctx"].get("break")
+                                    or stop_event.is_set()
+                                ):
                                     self.state["ctx"]["break"] = True
 
                                     break
 
                                 for item in context:
-                                    # print(item)
-                                    # add to image
-                                    # if ctx break, break
-                                    if self.state["ctx"].get("break") or stop_event.is_set():
+                                    if (
+                                        self.state["ctx"].get("break")
+                                        or stop_event.is_set()
+                                    ):
                                         self.state["ctx"]["break"] = True
 
                                         break
 
                                     self.parse_tree(item)
-                                    
+
                         if self.state["ctx"].get("break"):
-                            print("breaking")
+                            # stop camera and thread
                             stop_event.set()
-                            # escape thread
                             self.state["ctx"]["camera"].release()
                             self.state["ctx"]["camera"] = None
 
                             self.state["ctx"]["break"] = False
                             thread.join()
                             thread = None
-                            # stop camera
+
                             break
-                        
+
                         if self.state["run_video_in_background"]:
                             if not thread:
-                                print('starting thread')
-                                new_thread = Thread(target=process_context, args=(context,))
+                                new_thread = Thread(
+                                    target=process_context, args=(context,)
+                                )
 
                                 thread = new_thread
 
                                 thread.start()
                         else:
-                            print('not in thread')
                             process_context(context)
 
                         cv2.imshow("frame", self._get_item(-1, "image_stack"))

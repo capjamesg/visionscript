@@ -1,12 +1,84 @@
+import contextlib
+import io
 import logging
 import os
 import sys
+import tempfile
 
 import numpy as np
 import supervision as sv
 import torch
+from PIL import Image
+from roboflow import Roboflow
+from visionscript.rf_models import ROBOFLOW_MODELS
+
+if os.environ.get("ROBOFLOW_API_KEY"):
+    rf = Roboflow(api_key=os.environ["ROBOFLOW_API_KEY"])
+else:
+    rf = None
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def use_roboflow_hosted_inference(self, _) -> list:
+    with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+        if not rf:
+            return sv.Detections.empty(), [], ""
+
+        # base64 image
+
+        image = self._get_item(-1, "image_stack")
+        # PIL to base64
+        buffered = io.BytesIO()
+
+        # read into PIL
+
+        # bgr to rgb
+        image = image[:, :, ::-1]
+        image = Image.fromarray(image)
+
+        if self.state.get("last_loaded_image_name") and self.state.get(
+            "last_loaded_image_name", ""
+        ).endswith(".jpg"):
+            image.save(buffered, format="JPEG")
+        else:
+            image.save(buffered, format="PNG")
+
+        if self.state.get("model") is None:
+            model = ROBOFLOW_MODELS.get(
+                self.state["current_active_model"].lower().split("roboflow")[1].strip()
+            )
+            project = rf.workspace().project(model["model_id"])
+
+            self.state["last_classes"] = list(sorted(project.classes.keys()))
+
+            if os.environ.get("ROBOFLOW_INFER_SERVER_DESTINATION"):
+                inference_model = project.version(
+                    model["version"],
+                    local=os.environ.get("ROBOFLOW_INFER_SERVER_DESTINATION"),
+                ).model
+            else:
+                inference_model = project.version(model["version"]).model
+
+            self.state["model"] = inference_model
+        else:
+            model = ROBOFLOW_MODELS.get(
+                self.state["current_active_model"].lower().split("roboflow")[1].strip()
+            )
+            inference_model = self.state["model"]
+
+        with open("temp.jpg", "wb") as f:
+            f.write(buffered.getvalue())
+
+        predictions = inference_model.predict("temp.jpg", confidence=0.3)
+
+        processed_detections = sv.Detections.from_roboflow(
+            predictions.json(), list(sorted(self.state["last_classes"]))
+        )
+
+        idx_to_class = {idx: item for idx, item in enumerate(self.state["last_classes"])}
+
+        return processed_detections, idx_to_class, ",".join(model["labels"])
 
 
 def yolov8_pose_base(self, _) -> list:
@@ -42,7 +114,7 @@ def yolov8_base(self, _) -> sv.Detections:
 
     results = sv.Detections.from_yolov8(inference_results)
 
-    return results, classes
+    return results, classes, ",".join(classes)
 
 
 def grounding_dino_base(self, classes) -> sv.Detections:
@@ -113,7 +185,7 @@ def fast_sam_base(self, text_prompt) -> sv.Detections:
         confidence=np.array([1] * len(results)),
     )
 
-    return detections
+    return detections, ["text"], "text"
 
 
 def yolov8_target(self, folder):
@@ -124,7 +196,7 @@ def yolov8_target(self, folder):
 
     model = base_model.train(os.path.join(folder, "data.yaml"), epochs=10)
 
-    return model
+    return model, model.names
 
 
 def vit_target(self, folder):
@@ -135,4 +207,4 @@ def vit_target(self, folder):
 
     model = base_model.train(folder, "ViT-B/32")
 
-    return model
+    return model, model.names

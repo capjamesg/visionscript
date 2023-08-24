@@ -72,7 +72,7 @@ detect: "Detect" "[" STRING "]" | "Detect" "[" expr "]" | "Detect[]"
 segment: "Segment" "[" STRING "]"
 else: "Else"
 breakpoint: "Breakpoint[]"
-usecamera: "UseCamera[]" EOL expr+ "EndCamera" EOL
+usecamera: "UseCamera" "[" (STRING)? "]" EOL expr+ "EndCamera" EOL
 in: "In" "[" (STRING | expr) "]" EOL expr+ "Endin" EOL
 if: "If" "[" comparison_expressions "]" EOL expr+ "End" EOL
 web: "Web" "[" (STRING | expr) ("," (STRING | expr))? "]"
