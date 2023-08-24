@@ -1,11 +1,13 @@
 import os
+
+import numpy as np
+import psutil
 import supervision as sv
 import torch
-import numpy as np
-from visionscript.pose import Pose
 from PIL import Image
-import psutil
+
 from visionscript import registry
+from visionscript.pose import Pose
 
 DATA_TYPES = {
     sv.Detections: "Detection",

@@ -3,20 +3,19 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import csv
+import importlib
 import io
 import json
 import logging
 import mimetypes
 import os
-import subprocess
 import random
 import shutil
 import string
+import subprocess
 import sys
 import tempfile
-import importlib
 import time
-from visionscript.pose import Pose
 
 import click
 import cv2
@@ -31,31 +30,22 @@ from PIL import Image
 from watchdog.observers import Observer
 
 from visionscript import registry
-from visionscript.error_handling import (
-    handle_unexpected_characters,
-    handle_unexpected_token,
-)
+from visionscript.config import (CACHE_DIR, CACHE_DIRECTORY,
+                                 CONCURRENT_MAXIMUM,
+                                 CONCURRENT_VIDEO_TRANSFORMATIONS, DATA_TYPES,
+                                 DEVICE, FASTSAM_DIR, FASTSAM_WEIGHTS_DIR,
+                                 MAX_FILE_SIZE, STACK_MAXIMUM,
+                                 SUPPORTED_INFERENCE_MODELS,
+                                 SUPPORTED_TRAIN_MODELS, VIDEO_STRIDE)
+from visionscript.error_handling import (handle_unexpected_characters,
+                                         handle_unexpected_token)
 from visionscript.grammar import grammar
-from visionscript.paper_ocr_correction import line_processing, syntax_correction
+from visionscript.paper_ocr_correction import (line_processing,
+                                               syntax_correction)
+from visionscript.pose import Pose
 from visionscript.rf_models import STANDARD_ROBOFLOW_MODELS
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
-
-from visionscript.config import (
-    DATA_TYPES,
-    STACK_MAXIMUM,
-    CONCURRENT_MAXIMUM,
-    VIDEO_STRIDE,
-    CACHE_DIRECTORY,
-    FASTSAM_DIR,
-    FASTSAM_WEIGHTS_DIR,
-    CONCURRENT_VIDEO_TRANSFORMATIONS,
-    CACHE_DIR,
-    DEVICE,
-    MAX_FILE_SIZE,
-    SUPPORTED_INFERENCE_MODELS,
-    SUPPORTED_TRAIN_MODELS,
-)
 
 # retrieve rf_models.json from ~/.cache/visionscript
 # this is where the user keeps a registry of custom models
