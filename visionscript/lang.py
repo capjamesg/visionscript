@@ -4,9 +4,11 @@ warnings.filterwarnings("ignore")
 
 import csv
 import io
+import json
 import logging
 import mimetypes
 import os
+import pkgutil
 import random
 import shutil
 import string
@@ -34,8 +36,21 @@ from visionscript.error_handling import (handle_unexpected_characters,
 from visionscript.grammar import grammar
 from visionscript.paper_ocr_correction import (line_processing,
                                                syntax_correction)
+from visionscript.rf_models import STANDARD_ROBOFLOW_MODELS
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
+
+CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "visionscript")
+
+# retrieve rf_models.json from ~/.cache/visionscript
+# this is where the user keeps a registry of custom models
+# which is combined with the standard RF models
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+
+if not os.path.exists(os.path.join(CACHE_DIR, "rf_models.json")):
+    with open(os.path.join(CACHE_DIR, "rf_models.json"), "w") as f:
+        json.dump({}, f)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_FILE_SIZE = 10000000  # 10MB
@@ -142,6 +157,7 @@ def _get_colour_name(rgb_triplet):
         min_colours[(rd + gd + bd)] = key
 
     return min_colours[min(min_colours.keys())]
+
 
 aliased_functions = {
     "isita": "classify",
@@ -282,7 +298,7 @@ class VisionScript:
         else:
             url = args[0]
             body = args[1]
-        
+
         try:
             if body:
                 response = requests.post(url, timeout=5, data=body)
@@ -541,7 +557,9 @@ class VisionScript:
         print("xyz", args[1])
         object = args[0].children[0].value.strip()
         print(object)
-        function = self.state["functions"][args[1].children[0].children[0].value.strip()]
+        function = self.state["functions"][
+            args[1].children[0].children[0].value.strip()
+        ]
 
         reassembled_list = []
 
@@ -557,7 +575,6 @@ class VisionScript:
 
         return reassembled_list
 
-
     def load(self, filename):
         """
         Load an image or folder of images into state.
@@ -566,7 +583,6 @@ class VisionScript:
         import validators
 
         # if session_id and notebook, concatenate tmp/session_id/ to filename
-
         # if no filename, read from stack
         if not filename:
             filename = self.state["last"]
@@ -2122,7 +2138,7 @@ class VisionScript:
             return statement in self.state["last"]
         else:
             return False
-        
+
     def _process_detector_iterator_context(self, iterator, image, node):
         for detection in iterator.xyxy:
             # convert to int
@@ -2155,7 +2171,7 @@ class VisionScript:
             if self.state["ctx"].get("break"):
                 self.state["ctx"]["break"] = False
                 break
-        
+
         self.state["ctx"]["active_file"] = image
 
         self._add_to_stack("image_stack", image)
@@ -2753,12 +2769,10 @@ h - help
                     if isinstance(self.state["ctx"]["in"], list):
                         for item in self.state["ctx"]["in"]:
                             self.state["last"] = item
-                            self._process_detector_iterator_context(
-                                item, image, node
-                            )
-                    
+                            self._process_detector_iterator_context(item, image, node)
+
                         return self.state["last"]
-                    
+
                     self._process_detector_iterator_context(
                         self.state["ctx"]["in"], image, node
                     )
@@ -2983,6 +2997,10 @@ def activate_console(parser):
     default="http://localhost:6999/create",
 )
 @click.option("--live", help="Enable live reload", default=False)
+@click.option("--roboflow", help="Configure a Roboflow model", default=None)
+@click.option(
+    "--roboflow-name", help="Name under which to save a Roboflow model", default=None
+)
 def main(
     file,
     validate,
@@ -2999,7 +3017,57 @@ def main(
     api_key,
     api_url,
     live,
+    roboflow,
+    roboflow_name,
 ) -> None:
+    if roboflow:
+        if not roboflow_name:
+            print("Please provide a name under which to save your Roboflow model.")
+            exit()
+
+        # accept a URL like https://universe.roboflow.com/roboflow-58fyf/rock-paper-scissors-sxsw
+        from urllib.parse import urlparse
+
+        try:
+            url = urlparse(roboflow)
+        except:
+            print("The URL you provided is not valid.")
+            exit()
+
+        if url.netloc not in ("universe.roboflow.com", "app.roboflow.com"):
+            print("The URL you provided does not point to a valid Roboflow model.")
+            exit()
+
+        try:
+            result = requests.get(roboflow, timeout=10)
+        except:
+            print("Could not connect to Roboflow.")
+            exit()
+
+        if not result.ok:
+            print("The URL you provided does not point to a valid Roboflow model.")
+            exit()
+
+        # get the model name
+        workspace_id = url.path.split("/")[-1]
+
+        # get the model id
+        model_id = url.path.split("/")[-2]
+
+        with open(os.path.join(CACHE_DIRECTORY, "rf_models.json"), "r") as f:
+            roboflow_json = json.load(f)
+
+        roboflow_json[model_id] = {
+            "workspace_id": workspace_id,
+            "model_id": model_id,
+        }
+
+        print("Roboflow model configured ✨.")
+        print(
+            f'Add Use["roboflow {roboflow_name}"] to a VisionScript script to use the model in a script.'
+        )
+        exit()
+
     if docs:
         # if no network connection, open local
         import webbrowser

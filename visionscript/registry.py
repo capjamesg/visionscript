@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import logging
 import os
 import sys
@@ -10,7 +11,8 @@ import supervision as sv
 import torch
 from PIL import Image
 from roboflow import Roboflow
-from visionscript.rf_models import ROBOFLOW_MODELS
+
+from visionscript.rf_models import STANDARD_ROBOFLOW_MODELS
 
 if os.environ.get("ROBOFLOW_API_KEY"):
     rf = Roboflow(api_key=os.environ["ROBOFLOW_API_KEY"])
@@ -18,6 +20,23 @@ else:
     rf = None
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "visionscript")
+
+# retrieve rf_models.json from ~/.cache/visionscript
+# this is where the user keeps a registry of custom models
+# which is combined with the standard RF models
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+
+if not os.path.exists(os.path.join(CACHE_DIR, "rf_models.json")):
+    with open(os.path.join(CACHE_DIR, "rf_models.json"), "w") as f:
+        json.dump({}, f)
+
+with open(os.path.join(CACHE_DIR, "rf_models.json"), "r") as f:
+    ROBOFLOW_MODELS = json.load(f)
+
+ROBOFLOW_MODELS = {**ROBOFLOW_MODELS, **STANDARD_ROBOFLOW_MODELS}
 
 
 def use_roboflow_hosted_inference(self, _) -> list:
@@ -76,7 +95,9 @@ def use_roboflow_hosted_inference(self, _) -> list:
             predictions.json(), list(sorted(self.state["last_classes"]))
         )
 
-        idx_to_class = {idx: item for idx, item in enumerate(self.state["last_classes"])}
+        idx_to_class = {
+            idx: item for idx, item in enumerate(self.state["last_classes"])
+        }
 
         return processed_detections, idx_to_class, ",".join(model["labels"])
 
