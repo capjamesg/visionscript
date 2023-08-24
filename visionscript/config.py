@@ -53,3 +53,10 @@ SUPPORTED_TRAIN_MODELS = {
     "vit": lambda self, folder: registry.vit_target(self, folder),
     "yolov8": lambda self, folder: registry.yolov8_target(self, folder),
 }
+
+ALIASED_FUNCTIONS = {
+    "isita": "classify",
+    "find": "detect",
+    "describe": "caption",
+    "getcolors": "getcolours",
+}

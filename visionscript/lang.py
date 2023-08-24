@@ -28,33 +28,31 @@ import watchdog
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from watchdog.observers import Observer
+from threading import Event, Thread
 
-from visionscript import registry
-from visionscript.config import (CACHE_DIR, CACHE_DIRECTORY,
-                                 CONCURRENT_MAXIMUM,
+from visionscript.config import (CACHE_DIRECTORY,
                                  CONCURRENT_VIDEO_TRANSFORMATIONS, DATA_TYPES,
                                  DEVICE, FASTSAM_DIR, FASTSAM_WEIGHTS_DIR,
                                  MAX_FILE_SIZE, STACK_MAXIMUM,
                                  SUPPORTED_INFERENCE_MODELS,
-                                 SUPPORTED_TRAIN_MODELS, VIDEO_STRIDE)
+                                 SUPPORTED_TRAIN_MODELS, VIDEO_STRIDE, ALIASED_FUNCTIONS)
 from visionscript.error_handling import (handle_unexpected_characters,
                                          handle_unexpected_token)
 from visionscript.grammar import grammar
 from visionscript.paper_ocr_correction import (line_processing,
                                                syntax_correction)
 from visionscript.pose import Pose
-from visionscript.rf_models import STANDARD_ROBOFLOW_MODELS
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
 
 # retrieve rf_models.json from ~/.cache/visionscript
 # this is where the user keeps a registry of custom models
 # which is combined with the standard RF models
-if not os.path.exists(CACHE_DIR):
-    os.makedirs(CACHE_DIR)
+if not os.path.exists(CACHE_DIRECTORY):
+    os.makedirs(CACHE_DIRECTORY)
 
-if not os.path.exists(os.path.join(CACHE_DIR, "rf_models.json")):
-    with open(os.path.join(CACHE_DIR, "rf_models.json"), "w") as f:
+if not os.path.exists(os.path.join(CACHE_DIRECTORY, "rf_models.json")):
+    with open(os.path.join(CACHE_DIRECTORY, "rf_models.json"), "w") as f:
         json.dump({}, f)
 
 parser = Lark(grammar, start="start")
@@ -68,18 +66,17 @@ if not importlib.util.find_spec("clip"):
 
 
 def run_command(cmd, directory=None):
-    with subprocess.DEVNULL as DEVNULL:
-        result = subprocess.run(
-            cmd, cwd=directory, stdout=DEVNULL, stderr=subprocess.STDOUT, check=True
-        )
+    result = subprocess.run(
+        cmd, cwd=directory, stderr=subprocess.STDOUT, check=True
+    )
     if result.returncode != 0:
         raise ValueError(f"Command '{' '.join(cmd)}' failed to run.")
 
-
 def install_fastsam_dependencies():
+    print("Installing FastSAM dependencies... (this may take a few minutes)")
     commands = [
         (
-            ["git", "-q", "clone", "https://github.com/CASIA-IVA-Lab/FastSAM"],
+            ["git", "clone", "-q", "https://github.com/CASIA-IVA-Lab/FastSAM"],
             CACHE_DIRECTORY,
         ),
         (["pip", "install", "--quiet", "-r", "requirements.txt"], FASTSAM_DIR),
@@ -155,16 +152,8 @@ def _get_colour_name(rgb_triplet):
     return min_colours[min(min_colours.keys())]
 
 
-aliased_functions = {
-    "isita": "classify",
-    "find": "detect",
-    "describe": "caption",
-    "getcolors": "getcolours",
-}
-
-
 def map_alias_to_underlying_function(alias):
-    return aliased_functions.get(alias, alias)
+    return ALIASED_FUNCTIONS.get(alias, alias)
 
 
 class VisionScript:
@@ -2376,7 +2365,7 @@ h - help
                 self.state["ctx"]["last_profile_time"] = start_time
                 self.state["ctx"]["last_command"] = token
 
-            if token.value in aliased_functions:
+            if token.value in ALIASED_FUNCTIONS:
                 token.value = map_alias_to_underlying_function(token.value)
 
             if token.type == "equality":
@@ -2669,8 +2658,6 @@ h - help
 
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
-
-                    from threading import Event, Thread
 
                     self.state["ctx"]["camera"] = cv2.VideoCapture(0)
 
