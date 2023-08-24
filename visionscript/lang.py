@@ -12,6 +12,7 @@ import shutil
 import string
 import sys
 import tempfile
+import importlib
 import time
 from dataclasses import dataclass
 
@@ -89,11 +90,17 @@ VIDEO_STRIDE = 2
 
 CACHE_DIRECTORY = os.path.join(os.path.expanduser("~"), ".visionscript")
 
+CONCURRENT_VIDEO_TRANSFORMATIONS = [
+    "showtext",
+    "greyscale",
+    "show"
+]
+
 if not os.path.exists(CACHE_DIRECTORY):
     os.makedirs(CACHE_DIRECTORY)
 
 # if clip not installed
-if not shutil.which("clip"):
+if not importlib.util.find_spec("clip"):
     os.system("pip install git+https://github.com/openai/CLIP.git")
 
 # if cache directory does not contain /docs/, do a git clone
@@ -255,7 +262,7 @@ class VisionScript:
             "opposite": lambda x: self.opposite(x),
             "detectpose": lambda x: self.detectpose(x),
             "comparepose": lambda x: self.comparepose(x),
-            "random": lambda x: self.random(x)
+            "random": lambda x: self.random(x),
             "apply": lambda x: self.apply(x),
         }
 
@@ -2169,9 +2176,9 @@ class VisionScript:
             if node.data == "input":
                 self.state["input_variables"][node.children[0].value] = "image"
 
-    def parse_tree(self, tree):
+    def parse_tree(self, tree, main_video_thread = False):
         try:
-            return self.evaluate_tree(tree)
+            return self.evaluate_tree(tree, main_video_thread)
         except MemoryError:
             print("The program has ran out of memory.")
             exit()
@@ -2182,7 +2189,7 @@ class VisionScript:
         #     print("An unexpected error has occured.")
         #     exit()
 
-    def evaluate_tree(self, tree):
+    def evaluate_tree(self, tree, main_video_thread = False):
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
@@ -2214,7 +2221,7 @@ class VisionScript:
             if node == "\n" or node == "    ":
                 continue
 
-            print(node)
+            # print(node)
 
             # if node is apply, defer to apply()
             if hasattr(node, "data") and node.data == "apply":
@@ -2278,6 +2285,9 @@ h - help
             # if equality, check if equal
             # if rule is input
             # if variable, return from self.state["functions"]
+            elif hasattr(node, "data") and main_video_thread is True:
+                if node.data not in CONCURRENT_VIDEO_TRANSFORMATIONS:
+                    continue
             elif hasattr(node, "data") and node.data == "breakpoint":
                 # copy everything other than camera context
                 keys_to_skip = ["camera"]
@@ -2672,7 +2682,10 @@ h - help
 
                                     break
 
+                                # print(context)
+
                                 for item in context:
+                                    # print(item)
                                     if (
                                         self.state["ctx"].get("break")
                                         or stop_event.is_set()
@@ -2680,7 +2693,7 @@ h - help
                                         self.state["ctx"]["break"] = True
 
                                         break
-
+                                    # print(item)
                                     self.parse_tree(item)
 
                         if self.state["ctx"].get("break"):
@@ -2704,8 +2717,8 @@ h - help
                                 thread = new_thread
 
                                 thread.start()
-                        else:
-                            process_context(context)
+
+                        self.parse_tree(context[2], main_video_thread=True)
 
                         cv2.imshow("frame", self._get_item(-1, "image_stack"))
                         cv2.waitKey(1)
@@ -2718,6 +2731,8 @@ h - help
 
                         counter = 0
                         start_time = time.time()
+                    
+                    self.state["concurrent_thread"] = False
 
                     return
 
@@ -2735,8 +2750,6 @@ h - help
                 if detection_ctx:
                     image = self._get_item(-1, "image_stack").copy()
 
-                    print('cookiiees!', self.state["ctx"]["in"], type(self.state["ctx"]["in"]))
-
                     if isinstance(self.state["ctx"]["in"], list):
                         for item in self.state["ctx"]["in"]:
                             self.state["last"] = item
@@ -2750,25 +2763,25 @@ h - help
                         self.state["ctx"]["in"], image, node
                     )
 
-                        for item in node.children[1:]:
-                            if self.state["ctx"].get("break"):
-                                break
+                        # for item in node.children[1:]:
+                        #     if self.state["ctx"].get("break"):
+                        #         break
 
-                            self.parse_tree(item)
+                        #     self.parse_tree(item)
 
-                            result = self._get_item(-1, "image_stack")
+                        #     result = self._get_item(-1, "image_stack")
 
-                            if len(result.shape) == 2:
-                                result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
+                        #     if len(result.shape) == 2:
+                        #         result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
 
-                            image[
-                                detection[1] : detection[3],
-                                detection[0] : detection[2],
-                            ] = result
+                        #     image[
+                        #         detection[1] : detection[3],
+                        #         detection[0] : detection[2],
+                        #     ] = result
 
-                        if self.state["ctx"].get("break"):
-                            self.state["ctx"]["break"] = False
-                            break
+                        # if self.state["ctx"].get("break"):
+                        #     self.state["ctx"]["break"] = False
+                        #     break
                     
                     self.state["ctx"]["active_file"] = image
 
