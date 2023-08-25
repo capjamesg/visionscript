@@ -1,4 +1,5 @@
 var mode = "interactive";
+var highlighted_category = "Input";
 
 function hideFunctionBox () {
     var function_box = document.getElementById("function_box");
@@ -193,10 +194,12 @@ function processSearch() {
     var search = document.getElementById("search");
     var query = search.value.toLowerCase();
     var functions = document.getElementsByClassName("function");
+
     for (var i = 0; i < functions.length; i++) {
         var function_element = functions[i];
         var function_name = function_element.id.toLowerCase();
-        if (function_name.includes(query)) {
+        // and functoin has data-category of category
+        if (function_name.includes(query) && (function_element.dataset.category == highlighted_category || highlighted_category == "All")) {
             function_element.style.display = "block";
         } else {
             function_element.style.display = "none";
@@ -262,27 +265,24 @@ document.addEventListener("keydown", function (event) {
 });
 
 var colors = {
-    "Input": "#a2d2ff",
-    "Process": "#cdb4db",
-    "Find": "#ccd5ae",
-    "Output": "lavender",
-    "Logic": "#ffdf6b"
+    "Input": "#f44336",
+    "Process": "#2196f3",
+    "Find": "#4caf50",
+    "Output": "#ff9800",
+    "Logic": "#ffdf6b",
+    "Deploy": "#3f51b5"
 };
 
 for (var category in FUNCTIONS) {
     var functions = FUNCTIONS[category];
     var function_box = document.getElementById("function_box");
-    function_box.innerHTML += `
-        <h2>${category}</h2>
-    `;
     for (var name in functions) {
         var args = functions[name].args;
         var description = functions[name].description;
         var example = functions[name].example;
         function_box.innerHTML += `
-            <div class="function" draggable="true" id="${name}" data-color="${colors[category]}">
-                <p style="color: ${colors[category]}">${name}[${args.join(", ")}]</p>
-                <p>${description}</p>
+            <div class="function sidebar_cell" draggable="true" id="${name}" data-color="${colors[category]}" data-category="${category}" style="background-color: ${colors[category]}; opacity: 0.8;">
+                <p><b>${name}[${args.join(", ")}]</b>
             </div>
         `;
         functions[name].element = document.getElementById(name);
@@ -323,7 +323,8 @@ for (var i = 0; i < functions.length; i++) {
 
         var function_element = document.getElementById(function_name);
         
-        var color = function_element.firstElementChild.style.color;
+        var category = function_element.dataset.category;
+        var color = colors[category];
 
         var html = "";
 
@@ -523,7 +524,8 @@ notebook.addEventListener("drop", function (event) {
         var function_name = event.dataTransfer.getData("text/plain");
         var function_element = document.getElementById(function_name);
         var code = function_name + "[]";
-        var color = function_element.firstElementChild.style.color;
+        var category = function_element.dataset.category;
+        var color = colors[category];
 
         var html = "";
         console.log(mapped_functions[function_name], function_name);
@@ -549,6 +551,8 @@ notebook.addEventListener("drop", function (event) {
 
     var cell_count = cells.children.length + 1;
     console.log(mapped_functions[function_name], function_name);
+    var category = function_element.dataset.category;
+    var color = colors[category];
 
     if (mapped_functions[function_name].supports_arguments) {
         // if it is an if statement, don't add input
@@ -795,7 +799,7 @@ function executeCode (code, comment = false, existing_cell = null) {
     output.style.display = "block";
 
     var timer = startLoading(loading);
-    var output_timer = startLoading(output);
+    // var output_timer = startLoading(output);
 
     var error_cell = document.getElementById("error");
     
@@ -1139,4 +1143,62 @@ function toggle_menu () {
     } else {
         menu.style.display = "flex";
     }
+}
+
+function showFunctions(category) {
+    // if all, show all
+    if (category == "All") {
+        var functions = document.getElementsByClassName("function");
+        for (var i = 0; i < functions.length; i++) {
+            var function_element = functions[i];
+            console.log(function_element);
+            function_element.style.display = "block";
+        }
+        // apply border on category sidebar
+        var sidebar_item = document.getElementById("sidebar-All");
+        sidebar_item.style.borderLeft = "5px solid #00ff00";
+
+        // remove border on other categories
+        var categories = ["Process", "Find", "Output", "Logic", "Deploy", "Input"];
+
+        for (var i = 0; i < categories.length; i++) {
+            var cat = categories[i];
+            if (cat == category) {
+                continue;
+            }
+            var sidebar_item = document.getElementById("sidebar-" + cat);
+            sidebar_item.style.borderLeft = "none";
+        }
+        return;
+    }
+
+    // show .functions with data-category == category
+    var functions = document.getElementsByClassName("function");
+    for (var i = 0; i < functions.length; i++) {
+        var function_element = functions[i];
+        if (function_element.dataset.category == category) {
+            function_element.style.display = "block";
+            // apply green border
+        } else {
+            function_element.style.display = "none";
+        }
+    }
+
+    // apply border on category sidebar
+    var sidebar_item = document.getElementById("sidebar-" + category);
+    sidebar_item.style.borderLeft = "5px solid #00ff00";
+
+    // remove border on other categories
+    var categories = ["Process", "Find", "Output", "Logic", "Deploy", "All", "Input"];
+
+    for (var i = 0; i < categories.length; i++) {
+        var cat = categories[i];
+        if (cat == category) {
+            continue;
+        }
+        var sidebar_item = document.getElementById("sidebar-" + cat);
+        sidebar_item.style.borderLeft = "none";
+    }
+
+    highlighted_category = category;
 }

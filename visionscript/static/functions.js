@@ -103,6 +103,18 @@ const FUNCTIONS = {
             "supports_arguments": true,
             "argument_default": "\"\""
         },
+        "DetectPose": {
+            "args": ["object"],
+            "description": "Detect a pose in an image",
+            "example": "DetectPose[]",
+            "supports_arguments": false
+        },
+        "ComparePose": {
+            "args": ["object"],
+            "description": "Compare poses in two images",
+            "example": "ComparePose[]",
+            "supports_arguments": false
+        },
         "Segment": {
             "args": ["object"],
             "description": "Segment objects in an image",
@@ -126,8 +138,9 @@ const FUNCTIONS = {
         "Count": {
             "args": ["object"],
             "description": "Count objects in an image",
-            "example": "Count[]",
-            "supports_arguments": false
+            "example": "Count[\"person\"]",
+            "supports_arguments": true,
+            "argument_default": "\"\""
         },
         "ReadQR": {
             "args": [],
@@ -192,6 +205,19 @@ const FUNCTIONS = {
             "example": "Read[]",
             "supports_arguments": false
         },
+        "GetDistinctScenes": {
+            "args": [],
+            "description": "Get the distinct scenes in a video",
+            "example": "GetDistinctScenes[]",
+            "supports_arguments": false
+        },
+        "GetUniqueAppearances": {
+            "args": [],
+            "description": "Get the unique appearances of an object in a video",
+            "example": "GetUniqueAppearances[\"person\"]",
+            "supports_arguments": true,
+            "argument_default": "\"\""
+        }
     },
     "Logic": {
         "If": {
@@ -212,6 +238,13 @@ const FUNCTIONS = {
             "args": ["file"],
             "description": "Specify a model for use",
             "example": "Use[\"groundingdino\"]",
+            "supports_arguments": true,
+            "argument_default": "\"\""
+        },
+        "Web": {
+            "args": ["url"],
+            "description": "Make a web request",
+            "example": "Web[\"https://example.com/turn-on-lights\"]",
             "supports_arguments": true,
             "argument_default": "\"\""
         },

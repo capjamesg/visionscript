@@ -6,7 +6,6 @@ Pillow
 requests
 ultralytics
 autodistill
-autodistill_yolov8
 autodistill_grounded_sam
 autodistill_blip
 autodistill_vit
@@ -15,9 +14,14 @@ validators
 werkzeug
 faiss-cpu
 torch
-clip @ git+https://github.com/openai/CLIP.git
 easyocr
 scikit-learn
 webcolors
 transformers==4.30.2
 matplotlib
+watchdog
+qrcode
+flask
+cryptography
+pygtrie
+roboflow

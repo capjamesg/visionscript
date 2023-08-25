@@ -34,7 +34,7 @@
     <body>
         <nav>
             <p>
-                VisionScript <span class="hide_on_mobile">Notebook</span>
+                <img src="/static/full_logo.svg" alt="VisionScript Logo" height="30" width="200" style="background-color: white; border: 1px solid #ccc; border-radius: 0.5em; height: auto;">
             </p>
             <ul>
                 <li onclick="switch_paper_mode()"><a id="paper_mode">Paper <span class="hide_on_mobile">Code</span> 📝</a></li>
@@ -51,9 +51,62 @@
             </ul>
         </nav>
         <main>
+            <style>
+                #function_choice_box {
+                    padding: 10px;
+                }
+                #function_choice_box ul li {
+                    background-color: white;
+                    padding: 10px;
+                    border-radius: 5px;
+                    padding-right: 30px;
+                    margin-bottom: 10px;
+                }
+                #function_choice_box ul li a {
+                    color: black;
+                    text-decoration: none;
+                    cursor: pointer;
+                }
+                .color_box {
+                    display: inline-block;
+                    margin-right: 10px;
+                }
+            </style>
+            <aside id="function_choice_box">
+                <ul>
+                    <li id="sidebar-All">
+                        <div class="color_box" style="background-color: lavender; height: 20px; width: 20px; border-radius: 5px; margin-right: 10px;"></div>
+                        <a onclick="showFunctions('All')">All</a>
+                    </li>
+                    <li id="sidebar-Input">
+                        <div class="color_box" style="background-color: #f44336; height: 20px; width: 20px; border-radius: 5px; margin-right: 10px;"></div>
+                        <a onclick="showFunctions('Input')">Input</a>
+                    </li>
+                    <li id="sidebar-Process">
+                        <div class="color_box" style="background-color: #2196f3; height: 20px; width: 20px; border-radius: 5px; margin-right: 10px;"></div>
+                        <a onclick="showFunctions('Process')">Process</a>
+                    </li>
+                    <li id="sidebar-Find">
+                        <div class="color_box" style="background-color: #4caf50; height: 20px; width: 20px; border-radius: 5px; margin-right: 10px;"></div>
+                        <a onclick="showFunctions('Find')">Find</a>
+                    </li>
+                    <li id="sidebar-Output">
+                        <div class="color_box" style="background-color: #ff9800; height: 20px; width: 20px; border-radius: 5px; margin-right: 10px;"></div>
+                        <a onclick="showFunctions('Output')">Output</a>
+                    </li>
+                    <li id="sidebar-Logic">
+                        <div class="color_box" style="background-color: #9c27b0; height: 20px; width: 20px; border-radius: 5px; margin-right: 10px;"></div>
+                        <a onclick="showFunctions('Logic')">Logic</a>
+                    </li>
+                    <li id="sidebar-Deploy">
+                        <div class="color_box" style="background-color: #3f51b5; height: 20px; width: 20px; border-radius: 5px; margin-right: 10px;"></div>
+                        <a onclick="showFunctions('Deploy')">Deploy</a>
+                    </li>
+                </ul>
+            </aside>
             <aside id="function_box">
                 <p class="hide_tab hide_on_desktop"><a onclick="hideFunctionBox()" id="hide_function_box">Hide Blocks</a></p>
-                <h2 style="font-size: 24px;">Code Blocks</h2>
+                <h2 style="font-size: 24px;">Blocks</h2>
                 <input type="text" id="search" name="search" placeholder="Search functions" style="width: 100%; padding: 10px; border: 1px solid lightgrey; border-radius: 5px; margin-bottom: 10px;" onkeyup="processSearch()" />
             </aside>
             <div id="notebook">
@@ -61,7 +114,7 @@
                     <h2>Make something cool</h2>
                     <p class="hide_on_mobile">Drag and drop functions in the box below to build your program.</p>
                     <div id="drag_drop_notebook"></div>
-                    <div id="output">Output</div>
+                    <div id="output">Waiting for your first program! ✨</div>
                 </section>
                 <section id="code_mode">
                     <h2>Notebook</h2>

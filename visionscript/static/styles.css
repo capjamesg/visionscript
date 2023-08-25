@@ -21,6 +21,13 @@ ul {
     border-radius: 0.5rem;
     margin-bottom: 1rem;
 }
+.sidebar_cell { 
+    background-color: #eee;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    cursor: grab;
+}
 textarea {
     width: 100%;
     border: 1px solid #ccc;
