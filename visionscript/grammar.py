@@ -73,7 +73,7 @@ segment: "Segment" "[" STRING "]"
 else: "Else"
 breakpoint: "Breakpoint[]"
 usecamera: "UseCamera" "[" (STRING)? "]" EOL expr+ "EndCamera" EOL
-in: "In" "[" (STRING | expr) "]" EOL expr+ "Endin" EOL
+in: "In" "[" (STRING | expr) "]" EOL expr+ "EndIn" EOL
 if: "If" "[" comparison_expressions "]" EOL expr+ "End" EOL
 web: "Web" "[" (STRING | expr) ("," (STRING | expr))? "]"
 reset: "Reset[]"

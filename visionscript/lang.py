@@ -1,3 +1,13 @@
+import signal
+
+from visionscript.constants import KEYBOARD_INTERRUPT_CODE
+
+def signal_handler(signal, frame):
+    print(KEYBOARD_INTERRUPT_CODE, "You stopped the program.")
+    sys.exit(0)
+    
+signal.signal(signal.SIGINT, signal_handler)
+
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -30,12 +40,8 @@ from PIL import Image
 from watchdog.observers import Observer
 from threading import Event, Thread
 
-from visionscript.config import (CACHE_DIRECTORY,
-                                 CONCURRENT_VIDEO_TRANSFORMATIONS, DATA_TYPES,
-                                 DEVICE, FASTSAM_DIR, FASTSAM_WEIGHTS_DIR,
-                                 MAX_FILE_SIZE, STACK_MAXIMUM,
-                                 SUPPORTED_INFERENCE_MODELS,
-                                 SUPPORTED_TRAIN_MODELS, VIDEO_STRIDE, ALIASED_FUNCTIONS)
+from visionscript import registry
+import visionscript.error_handling as error_handling
 from visionscript.error_handling import (handle_unexpected_characters,
                                          handle_unexpected_token)
 from visionscript.grammar import grammar
@@ -64,52 +70,56 @@ if not os.path.exists(CACHE_DIRECTORY):
 if not importlib.util.find_spec("clip"):
     os.system("pip install git+https://github.com/openai/CLIP.git")
 
+CUSTOM_SET_VALUES = ["background"]
 
-def run_command(cmd, directory=None):
-    result = subprocess.run(
-        cmd, cwd=directory, stderr=subprocess.STDOUT, check=True
-    )
-    if result.returncode != 0:
-        raise ValueError(f"Command '{' '.join(cmd)}' failed to run.")
+ALLOWED_SET_FUNCTION_VALUES = list(SUPPORTED_INFERENCE_MODELS.keys()) + list(SUPPORTED_TRAIN_MODELS.keys()) + CUSTOM_SET_VALUES
 
-def install_fastsam_dependencies():
-    print("Installing FastSAM dependencies... (this may take a few minutes)")
-    commands = [
-        (
-            ["git", "clone", "-q", "https://github.com/CASIA-IVA-Lab/FastSAM"],
-            CACHE_DIRECTORY,
-        ),
-        (["pip", "install", "--quiet", "-r", "requirements.txt"], FASTSAM_DIR),
-        (["mkdir", "-p", FASTSAM_WEIGHTS_DIR], None),
-        (
-            [
-                "wget",
-                "-q",
-                "-P",
-                FASTSAM_WEIGHTS_DIR,
-                "https://huggingface.co/spaces/An-619/FastSAM/resolve/main/weights/FastSAM.pt",
-            ],
-            None,
-        ),
-        (
-            [
-                "wget",
-                "-q",
-                "-P",
-                FASTSAM_WEIGHTS_DIR,
-                "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
-            ],
-            None,
-        ),
-    ]
+@dataclass
+class Pose:
+    """
+    A pose.
+    """
 
-    for cmd, dir in commands:
-        run_command(cmd, dir)
+    keypoints: list
+    confidence: float
 
 
-if not os.path.exists(FASTSAM_DIR):
-    install_fastsam_dependencies()
+DATA_TYPES = {
+    sv.Detections: "Detection",
+    np.ndarray: "Image",
+    torch.Tensor: "Image",
+    Image.Image: "Image",
+    str: "String",
+    int: "Integer",
+    Pose: "Pose",
+}
 
+STACK_MAXIMUM = {
+    "image_stack": {
+        # 50% of available memory
+        "maximum": 0.5 * psutil.virtual_memory().available,
+        "also_reset": ["detections_stack"],
+    }
+}
+
+CONCURRENT_MAXIMUM = 10
+
+VIDEO_STRIDE = 2
+
+CACHE_DIRECTORY = os.path.join(os.path.expanduser("~"), ".visionscript")
+
+CONCURRENT_VIDEO_TRANSFORMATIONS = [
+    "showtext",
+    "greyscale",
+    "show"
+]
+
+if not os.path.exists(CACHE_DIRECTORY):
+    os.makedirs(CACHE_DIRECTORY)
+
+# if clip not installed
+if not importlib.util.find_spec("clip"):
+    os.system("pip install git+https://github.com/openai/CLIP.git")
 
 # if cache directory does not contain /docs/, do a git clone
 if not os.path.exists(os.path.join(CACHE_DIRECTORY, "docs")):
@@ -196,9 +206,7 @@ class VisionScript:
             "label": lambda x: self.label(x),
             "list": lambda x: None,
             "get": lambda x: self.get_func(x),
-            "use": lambda x: self.set_state("current_active_model", x)
-            if x != "background"
-            else self.set_state("run_video_in_background", True),
+            "use": lambda x: self.use(x),
             "caption": lambda x: self.caption(x),
             "contains": lambda x: self.contains(x),
             "import": lambda x: self.import_(x),
@@ -267,6 +275,15 @@ class VisionScript:
             "apply": lambda x: self.apply(x),
         }
 
+    def use(self, args):
+        if args[0] not in ALLOWED_SET_FUNCTION_VALUES:
+            raise error_handling.SetFunctionError(args[0])
+        
+        if args[0] == "background":
+            self.set_state("run_video_in_background", True),
+        else:
+            self.set_state("current_active_model", args[0])
+
     def random(self, args):
         return random.choice(args)
 
@@ -327,6 +344,9 @@ class VisionScript:
         if isinstance(args, str):
             corner = args.lower()
             last_image = self._get_item(-1, "image_stack")
+
+            if last_image.shape[0] == 0 or last_image.shape[1] == 0:
+                raise error_handling.ImageOutOfBounds(x=0, y=0)
 
             # return a 4x4 grid of points
             if corner == "top left":
@@ -571,6 +591,10 @@ class VisionScript:
         if not filename:
             filename = self.state["last"]
 
+        # if not file, raise UnexpectedToken
+        if not os.path.exists(filename):
+            raise UnexpectedToken()
+
         if isinstance(filename, np.ndarray):
             self._add_to_stack("image_stack", filename)
             # save file
@@ -790,6 +814,10 @@ class VisionScript:
         else:
             x0, y0, x1, y1 = args
 
+            # if args are out of bounds, raise error
+            if x0 > image.size[0] or x1 > image.size[0]:
+                raise error_handling.OutOfBoundsError(x0, x1)
+
             x0 = int(x0) if isinstance(x0, str) else x0
             y0 = int(y0) if isinstance(y0, str) else y0
             x1 = int(x1) if isinstance(x1, str) else x1
@@ -1006,7 +1034,7 @@ class VisionScript:
                     f"ffmpeg -i {filename}.avi -vcodec h264 -acodec mp2 {filename}.mp4 > /dev/null 2>&1"
                 )
 
-        self.state["image_stack"].save(filename)
+        Image.fromarray(self._get_item(-1, "image_stack")).save(filename)
 
         self.state["output"] = {"text": "Saved to " + filename}
 
@@ -1102,12 +1130,6 @@ class VisionScript:
             reader = easyocr.Reader(["en"])
             result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
 
-        # import pytesseract
-
-        # result = pytesseract.image_to_string(self.state["last_loaded_image_name"], config='--user-patterns patterns.txt')
-
-        # print(result, "result")
-
         self.state["output"] = {"text": result}
         self.state["last"] = result
 
@@ -1118,8 +1140,9 @@ class VisionScript:
         Rotate an image.
         """
         image = self._get_item(-1, "image_stack")
-        # load into cv2
+
         args = int(args)
+
         if args == 90:
             image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
         elif args == 180:
@@ -1717,6 +1740,11 @@ class VisionScript:
                     if isinstance(i, np.ndarray):
                         stack_size += i.nbytes
             elif isinstance(item, str):
+                # if not file, raise UnexpectedToken
+                if not os.path.exists(item):
+                    sys.tracebacklimit = 0
+
+                    raise error_handling.PathNotExists(item)
                 stack_size += os.path.getsize(item)
             else:
                 stack_size += sys.getsizeof(item)
@@ -1766,6 +1794,9 @@ class VisionScript:
                 image = cv2.imread(filename)
                 # convert to rgb
                 self.state["image_stack"].append(image)
+
+        if len(self.state[stack]) == 0:
+            raise error_handling.StackEmpty(stack)
 
         return self.state[stack][n]
 
@@ -2085,7 +2116,10 @@ class VisionScript:
         # cast tensor to float
         as_float = similarity.item()
 
+        print('x', as_float)
+
         self.state["last"] = as_float
+        self.state["output"]["text"] = as_float
 
         return as_float
 
@@ -2659,7 +2693,12 @@ h - help
                     self.state["ctx"]["fps"] = 0
                     self.state["ctx"]["active_file"] = None
 
-                    self.state["ctx"]["camera"] = cv2.VideoCapture(0)
+                    from threading import Event, Thread
+
+                    try:
+                        self.state["ctx"]["camera"] = cv2.VideoCapture(0)
+                    except:
+                        raise error_handling.CameraNotAccessible()
 
                     context = node.children
 
@@ -2668,8 +2707,6 @@ h - help
 
                     start_time = time.time()
                     counter = 0
-
-                    # exit()
 
                     thread = None
                     stop_event = Event()
@@ -2896,8 +2933,6 @@ h - help
             else:
                 result = func(value)
 
-            # print("just run", token.value, "with", value, "returning result", result)
-
             self.state["last_function_type"] = token.value
             self.state["last_function_args"] = [value]
 
@@ -2950,6 +2985,7 @@ def activate_console(parser):
         except UnexpectedCharacters as e:
             handle_unexpected_characters(e, code + "\n", interactive=True)
         except UnexpectedToken as e:
+            print(e)
             handle_unexpected_token(e, interactive=True)
         except:
             print("Error parsing code.")
@@ -3116,7 +3152,10 @@ def main(
         with open(file, "r") as f:
             code = f.read() + "\n"
 
-        tree = parser.parse(code.lstrip())
+        try:
+            tree = parser.parse(code.lstrip())
+        except UnexpectedCharacters as e:
+            handle_unexpected_characters(e, code.lstrip())
 
         if showtree:
             print(tree.pretty())

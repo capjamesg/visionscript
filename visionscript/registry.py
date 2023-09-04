@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import sys
-import tempfile
 
 import numpy as np
 import supervision as sv
@@ -127,7 +126,7 @@ def yolov8_pose_base(self, _) -> list:
     return inference_results.keypoints[0]
 
 
-def yolov8_base(self, _) -> sv.Detections:
+def yolov8_base(self, user_classes) -> sv.Detections:
     from ultralytics import YOLO
 
     if self.state.get("model") and self.state["current_active_model"].lower() == "yolo":
@@ -142,7 +141,7 @@ def yolov8_base(self, _) -> sv.Detections:
 
     results = sv.Detections.from_yolov8(inference_results)
 
-    return results, classes, ""
+    return results, classes, user_classes
 
 
 def grounding_dino_base(self, classes) -> sv.Detections:
