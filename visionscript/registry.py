@@ -158,61 +158,16 @@ def grounding_dino_base(self, classes) -> sv.Detections:
 
 
 def fast_sam_base(self, text_prompt) -> sv.Detections:
-    from .FastSAM.fastsam import FastSAM, FastSAMPrompt
+    from autodistill_fastsam import FastSAM
+    from autodistill.detection import CaptionOntology
 
-    logging.disable(logging.CRITICAL)
-    # get current path
+    mapped_items = {item: item for item in text_prompt}
 
-    current_path = os.getcwd()
+    base_model = FastSAM(CaptionOntology(mapped_items))
 
-    model = FastSAM(os.path.join(current_path, "weights", "FastSAM.pt"))
+    inference_results = base_model.predict(self.state["last_loaded_image_name"])
 
-    everything_results = model(
-        self.state["last_loaded_image_name"],
-        device=DEVICE,
-        retina_masks=True,
-        imgsz=1024,
-        conf=0.4,
-        iou=0.9,
-    )
-    prompt_process = FastSAMPrompt(
-        self.state["last_loaded_image_name"], everything_results, device=DEVICE
-    )
-
-    if "," in text_prompt:
-        ann = []
-
-        text_prompt = text_prompt.split(",")
-
-        for prompt in text_prompt:
-            ann.extend(prompt_process.text_prompt(text=prompt))
-    else:
-        ann = prompt_process.text_prompt(text=text_prompt)
-
-    logging.disable(logging.NOTSET)
-
-    results = []
-    class_ids = []
-
-    for mask in ann:
-        results.append(
-            sv.Detections(
-                mask=np.array([mask]),
-                xyxy=sv.mask_to_xyxy(np.array([mask])),
-                class_id=np.array([0]),
-                confidence=np.array([1]),
-            )
-        )
-        class_ids.append(0)
-
-    detections = sv.Detections(
-        mask=np.array([item.mask[0] for item in results]),
-        xyxy=np.array([item.xyxy[0] for item in results]),
-        class_id=np.array(class_ids),
-        confidence=np.array([1] * len(results)),
-    )
-
-    return detections, ["text"], "text"
+    return inference_results, text_prompt
 
 
 def yolov8_target(self, folder):

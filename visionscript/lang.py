@@ -22,7 +22,6 @@ import os
 import random
 import shutil
 import string
-import subprocess
 import sys
 import tempfile
 import time
@@ -39,9 +38,14 @@ from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from watchdog.observers import Observer
 from threading import Event, Thread
+from dataclasses import dataclass
 
-from visionscript import registry
-import visionscript.error_handling as error_handling
+from visionscript.config import (CACHE_DIRECTORY,
+                                 CONCURRENT_VIDEO_TRANSFORMATIONS, DATA_TYPES,
+                                 DEVICE, FASTSAM_DIR, FASTSAM_WEIGHTS_DIR,
+                                 MAX_FILE_SIZE, STACK_MAXIMUM,
+                                 SUPPORTED_INFERENCE_MODELS,
+                                 SUPPORTED_TRAIN_MODELS, VIDEO_STRIDE, ALIASED_FUNCTIONS)
 from visionscript.error_handling import (handle_unexpected_characters,
                                          handle_unexpected_token)
 from visionscript.grammar import grammar
@@ -50,6 +54,9 @@ from visionscript.paper_ocr_correction import (line_processing,
 from visionscript.pose import Pose
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
+import visionscript.error_handling as error_handling
+
+
 
 # retrieve rf_models.json from ~/.cache/visionscript
 # this is where the user keeps a registry of custom models

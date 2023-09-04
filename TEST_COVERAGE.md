@@ -4,47 +4,51 @@ The VisionScript Language is the language used to write VisionScript programs. T
 
 This document pertains only to the VisionScript Language and runtime, not Notebooks or Cloud.
 
+This document does not say which tests are passing. It only says whether a function has tests.
+
+To run the tests, run `pytest tests/` in the root directory of this repository.
+
 ## Functions
 
-- [ ] `Blur[]`
+- [X] `Blur[]`
 - [ ] `Break[]`
 - [ ] `Breakpoint[]`
-- [ ] `Caption[]`
+- [X] `Caption[]`
 - [X] `Classify[]`
 - [ ] `Compare[]`
 - [ ] `ComparePose[]`
-- [ ] `Count[]`
+- [X] `Count[]`
 - [ ] `CountInRegion[]`
 - [ ] `Cutout[]`
-- [ ] `Describe[]`
+- [X] `Describe[]`
 - [X] `Detect[]`
 - [ ] `DetectPose[]`
 - [ ] `Exit[]`
 - [ ] `FilterByClass[]`
 - [ ] `Find[]`
-- [ ] `First[]`
+- [X] `First[]`
 - [ ] `GetDistinctScenes[]`
 - [ ] `GetEdges[]`
 - [ ] `GetFPS[]`
 - [ ] `GetText[]`
-- [ ] `Greyscale[]`
+- [X] `Greyscale[]`
 - [ ] `If[]`
-- [ ] `Import[]`
+- [X] `Import[]`
 - [X] `In[]` (folder of images)
 - [ ] `In[]` (video file)
 - [ ] `Input[]`
-- [ ] `Last[]`
+- [X] `Last[]`
 - [X] `Load[]`
 - [ ] `Make[]`
-- [ ] `Not[]`
+- [X] `Not[]`
 - [ ] `Paste[]`
 - [ ] `PasteRandom[]`
 - [ ] `Profile[]`
-- [ ] `Random[]`
+- [X] `Random[]`
 - [ ] `Read[]`
 - [ ] `ReadQR[]`
 - [ ] `Replace[]`
-- [ ] `Reset[]`
+- [X] `Reset[]`
 - [ ] `Resize[]`
 - [ ] `Rotate[]`
 - [ ] `Save[]`
@@ -58,6 +62,6 @@ This document pertains only to the VisionScript Language and runtime, not Notebo
 - [ ] `ShowText[]`
 - [X] `Similarity[]`
 - [ ] `Size[]`
-- [ ] `Use[]`
+- [X] `Use[]`
 - [ ] `UseCamera[]`
 - [ ] `Web[]`
