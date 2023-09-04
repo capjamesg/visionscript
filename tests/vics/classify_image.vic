@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+Classify["apple", "banana"]
+# Read[]

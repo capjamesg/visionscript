@@ -1,0 +1,4 @@
+Load["./tests/images/bus.jpg"]
+Load["./tests/images/cans.png"]
+
+Similarity[]

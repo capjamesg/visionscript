@@ -1,0 +1,5 @@
+In["./images"]
+    Load[]
+    Detect["person"]
+    Say[]
+EndIn

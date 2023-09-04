@@ -1,0 +1,16 @@
+Object found: person
+Confidence: 86.90%
+xyxy Coordinates: 48, 399, 244, 902
+
+Object found: person
+Confidence: 85.36%
+xyxy Coordinates: 670, 380, 809, 875
+
+Object found: person
+Confidence: 81.93%
+xyxy Coordinates: 221, 405, 344, 857
+
+Object found: person
+Confidence: 30.13%
+xyxy Coordinates: 0, 551, 67, 873
+

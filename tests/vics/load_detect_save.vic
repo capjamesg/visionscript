@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+Detect["person"]
+Save["./bus1.jpg"]
