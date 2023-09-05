@@ -1,7 +1,8 @@
 counter = 0
 
 In["./tests/images"]
+    Load[]
     counter++
 EndIn
 
-Read[]
+Say[counter]

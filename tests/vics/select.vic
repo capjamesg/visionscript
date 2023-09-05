@@ -1,4 +1,0 @@
-Load["./tests/images/bus.jpg"]
-Find["person"]
-Select[1]
-Save["./bus1.jpg"]

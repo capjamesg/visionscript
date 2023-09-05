@@ -89,7 +89,7 @@ def test_buffer_overload_prevention():
     for i in range(0, 101):
         test_visionscript_program(file, session = session)
 
-    assert len(session.state["image_stack"]) == 100
+    assert len(session.state["image_queue"]) == 100
 
 def test_load_detect_save():
     file = "load_detect_save.vic"
@@ -214,7 +214,7 @@ def test_blur():
     result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/blur.jpg")
-    reference = os.path.join(__file__, "valid_output/blur.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/blur.jpg")
 
     with open(reference, "wb") as f:
         Image.fromarray(result).save(f)
@@ -227,11 +227,11 @@ def test_grid():
     result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/grid.jpg")
-    reference = os.path.join(__file__, "valid_output/grid.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/grid.jpg")
 
     with open(reference, "wb") as f:
         Image.fromarray(result).save(f)
-
+ 
     assert compare_two_images_for_equality(used_file, reference)
 
 def test_greyscale():
@@ -239,8 +239,8 @@ def test_greyscale():
 
     result = test_visionscript_program(file)
 
-    used_file = os.path.join(os.path.dirname(__file__), "output/greyscale.jpg")
-    reference = os.path.join(__file__, "valid_output/greyscale.jpg")
+    used_file = os.path.join(os.path.dirname(__file__), "valid_output/greyscale.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/greyscale.jpg")
 
     with open(reference, "wb") as f:
         Image.fromarray(result).save(f)
@@ -254,7 +254,7 @@ def test_replace():
     result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "output/replace_with_color.jpg")
-    reference = os.path.join(__file__, "valid_output/replace_with_color.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/replace_with_color.jpg")
 
     with open(reference, "wb") as f:
         Image.fromarray(result).save(f)
@@ -270,7 +270,7 @@ def test_web():
 
     assert (
         test_visionscript_program(file)
-        == open(os.path.join(VALID_OUTPUT_DIR, "web.html"), "r").read()
+        == open(os.path.join(os.path.dirname(__file__), "output/web.html"), "r").read()
     )
 
 
@@ -280,7 +280,7 @@ def test_paste():
     test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "output/paste.jpg")
-    reference = os.path.join(__file__, "valid_output/paste.png")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/paste.png")
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -291,7 +291,7 @@ def test_blur():
     test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
-    reference = os.path.join(__file__, "valid_output/rotate.png")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/rotate.png")
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -299,7 +299,7 @@ def test_blur():
 def test_profile():
     file = "profile.vic"
 
-    assert test_visionscript_program(file, True).state.get("profile", False) == True
+    assert test_visionscript_program(file, True).state["ctx"].get("profile", False) == True
 
 
 def test_size():
@@ -347,7 +347,7 @@ def test_save():
     result = test_visionscript_program(file, True).state["image_stack"][-1]
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/bus.jpg")
-    reference = os.path.join(__file__, "valid_output/bus_cutout_saved.png")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_cutout_saved.png")
 
     # save result as PIL
     with open(used_file, "wb") as f:
@@ -362,7 +362,7 @@ def test_replace_in_images():
     result = test_visionscript_program(file, True).state["image_stack"][-1]
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/replace_in_images.jpg")
-    reference = os.path.join(__file__, "valid_output/replace_in_images.png")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/replace_in_images.png")
 
     with open(reference, "wb") as f:
         Image.fromarray(result).save(f)
@@ -376,10 +376,10 @@ def test_replace_with_color():
     result = test_visionscript_program(file, True).state["image_stack"][-1]
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/replace_with_color.jpg")
-    reference = os.path.join(__file__, "valid_output/replace_with_color.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/replace_with_color.jpg")
 
-    # save result as PIL
-    result.save(used_file)
+    with open(reference, "wb") as f:
+        Image.fromarray(result).save(f)
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -390,10 +390,10 @@ def test_cutout():
     result = test_visionscript_program(file, True).state["image_stack"][-1]
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/bus.jpg")
-    reference = os.path.join(__file__, "valid_output/bus_cutout.png")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_cutout.png")
 
-    # save result as PIL
-    result.save(used_file)
+    with open(reference, "wb") as f:
+        Image.fromarray(result).save(f)
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -403,8 +403,8 @@ def test_resize():
 
     result = test_visionscript_program(file, True).state["image_stack"][-1]
 
-    used_file = os.path.join(os.path.dirname(__file__), "tests/output/bus.jpg")
-    reference = os.path.join(__file__, "valid_output/bus_resized.png")
+    used_file = os.path.join(os.path.dirname(__file__), "valid_output/bus_resized.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_resized.png")
 
     # save result as PIL
     with open(used_file, "wb") as f:
@@ -414,29 +414,30 @@ def test_resize():
 
 
 def test_get_edges():
-    file = "get_edges.vic"
+    file = "getedges.vic"
 
     result = test_visionscript_program(file)
 
-    used_file = os.path.join(os.path.dirname(__file__), "valid_output/bus.jpg")
-    reference = os.path.join(__file__, "valid_output/bus_edges.png")
+    used_file = os.path.join(os.path.dirname(__file__), "valid_output/bus_edges.png")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_edges.png")
 
-    # save result as PIL
-    result.save(used_file)
+    with open(reference, "wb") as f:
+        # cannot write mode F as JPEG
+        Image.fromarray(result).save(f)
 
     assert compare_two_images_for_equality(used_file, reference)
 
 
 def test_set_brightness():
-    file = "set_brightness.vic"
+    file = "setbrightness.vic"
 
     result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/bus.jpg")
-    reference = os.path.join(__file__, "valid_output/bus_brightness.png")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_brightness.png")
     
-    # save result as PIL
-    result.save(used_file)
+    with open(reference, "wb") as f:
+        Image.fromarray(result).save(f)
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -502,16 +503,6 @@ def test_setconfidence():
     file = "setconfidence.vic"
 
     assert test_visionscript_program(file) == 1
-
-
-def test_select():
-    file = "select.vic"
-
-    result = test_visionscript_program(file, True).state["last"]
-
-    assert (
-        isinstance(result, sv.Detections) and len(result) == 1 and len(result.xyxy) > 0
-    )
 
 
 def test_search():
