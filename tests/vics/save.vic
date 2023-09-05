@@ -1,0 +1,4 @@
+Load["./tests/images/bus.jpg"]
+Detect["bus"]
+Cutout[]
+Save["./tests/output/bus_cutout_saved.jpg"]

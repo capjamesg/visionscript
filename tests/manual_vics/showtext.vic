@@ -1,0 +1,5 @@
+UseCamera[]
+    Load[]
+    Count["person"]
+    ShowText[]
+EndCamera

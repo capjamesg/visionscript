@@ -1,0 +1,7 @@
+counter = 0
+
+In["./images"]
+    counter += 1
+EndIn
+
+Read[]

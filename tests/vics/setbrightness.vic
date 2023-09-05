@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+SetBrightness[100]
+Save["./tests/output/bus_brightness.jpg"]

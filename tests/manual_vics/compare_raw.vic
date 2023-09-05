@@ -1,0 +1,3 @@
+Load["./tests/images/pose.jpg"]
+Load["./tests/images/bus.jpg"]
+Compare[]

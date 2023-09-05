@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+Find["person"]
+Save["./bus1.jpg"]

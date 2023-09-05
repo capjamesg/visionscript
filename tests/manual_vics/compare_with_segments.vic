@@ -1,0 +1,5 @@
+Load["./tests/images/pose.jpg"]
+Segment[]
+Load["./tests/images/bus.jpg"]
+Segment[]
+Compare[]

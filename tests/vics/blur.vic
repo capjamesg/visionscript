@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+Blur[]
+Save["./tests/output/blur.jpg"]

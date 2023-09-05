@@ -1,0 +1,5 @@
+Load["./tests/images/bus.jpg"]
+
+If [Count["person"] > 2]
+    Say["More than two people!"]
+End

@@ -1,0 +1,3 @@
+Load["./tests/images/ocr.png"]
+GetText[]
+Say[]

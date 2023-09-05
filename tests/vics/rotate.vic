@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+Rotate[90]
+Save["./tests/output/rotate.jpg"]

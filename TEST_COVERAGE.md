@@ -8,60 +8,73 @@ This document does not say which tests are passing. It only says whether a funct
 
 To run the tests, run `pytest tests/` in the root directory of this repository.
 
-## Functions
+## Manual Testing
+
+Some methods need manual testing because they use a webcam. The following functions must be tested manually:
+
+- [ ] `Breakpoint[]`
+- [X] `Compare[]`
+- [X] `GetFPS[]`
+- [X] `Show[]`
+- [X] `ShowText[]`
+- [X] `UseCamera[]`
+
+## Automated Testing
+
+### Functions
 
 - [X] `Blur[]`
-- [ ] `Break[]`
-- [ ] `Breakpoint[]`
+- [X] `Break[]`
 - [X] `Caption[]`
 - [X] `Classify[]`
-- [ ] `Compare[]`
-- [ ] `ComparePose[]`
+- [X] `ComparePose[]`
 - [X] `Count[]`
 - [ ] `CountInRegion[]`
 - [ ] `Cutout[]`
 - [X] `Describe[]`
 - [X] `Detect[]`
-- [ ] `DetectPose[]`
-- [ ] `Exit[]`
+- [X] `DetectPose[]`
+- [X] `Exit[]`
 - [ ] `FilterByClass[]`
-- [ ] `Find[]`
+- [X] `Find[]`
 - [X] `First[]`
 - [ ] `GetDistinctScenes[]`
-- [ ] `GetEdges[]`
-- [ ] `GetFPS[]`
-- [ ] `GetText[]`
+- [X] `GetEdges[]`
+- [X] `GetText[]`
 - [X] `Greyscale[]`
-- [ ] `If[]`
+- [X] `If[]`
 - [X] `Import[]`
 - [X] `In[]` (folder of images)
 - [ ] `In[]` (video file)
-- [ ] `Input[]`
+- [X] `Input[]`
 - [X] `Last[]`
 - [X] `Load[]`
-- [ ] `Make[]`
+- [X] `Make[]`
 - [X] `Not[]`
 - [ ] `Paste[]`
 - [ ] `PasteRandom[]`
-- [ ] `Profile[]`
 - [X] `Random[]`
-- [ ] `Read[]`
-- [ ] `ReadQR[]`
+- [X] `Read[]`
+- [X] `ReadQR[]`
 - [ ] `Replace[]`
 - [X] `Reset[]`
-- [ ] `Resize[]`
-- [ ] `Rotate[]`
-- [ ] `Save[]`
+- [X] `Resize[]`
+- [X] `Rotate[]`
+- [X] `Save[]`
 - [X] `Say[]`
 - [ ] `Search[]`
-- [ ] `Segment[]`
+- [X] `Segment[]`
 - [ ] `Select[]`
-- [ ] `SetBrightness[]`
+- [X] `SetBrightness[]`
 - [ ] `SetConfidence[]`
-- [ ] `Show[]`
-- [ ] `ShowText[]`
 - [X] `Similarity[]`
-- [ ] `Size[]`
+- [X] `Size[]`
 - [X] `Use[]`
-- [ ] `UseCamera[]`
+- [X] `Profile[]`
 - [ ] `Web[]`
+
+### Language Features
+
+- [X] Increment
+- [X] Decrement
+- [X] Comment

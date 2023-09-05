@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+Greyscale[]
+Save["./tests/output/greyscale.jpg"]

@@ -1,0 +1,4 @@
+# Profile[]
+
+Load["./tests/images/bus.jpg"]
+Classify["apple", "banana"]

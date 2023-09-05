@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+GetEdges[]
+Save["./tests/output/bus_edges.jpg"]

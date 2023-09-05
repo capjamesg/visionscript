@@ -1,0 +1,3 @@
+Load["./tests/images/bus.jpg"]
+Resize[200, 200]
+Save["./tests/output/bus_resized.jpg"]

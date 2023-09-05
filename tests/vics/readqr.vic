@@ -1,0 +1,2 @@
+Load["./tests/images/qr.png"]
+ReadQR[]

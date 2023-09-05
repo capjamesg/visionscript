@@ -11,8 +11,14 @@ VALID_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "valid_output/")
 RAISES_EXCEPTIONS_TEST_DIR = os.path.join(os.path.dirname(__file__), "vics/raises_exceptions/")
 
 @pytest.mark.skip
-def test_visionscript_program(file, return_raw_object = False):
+def test_visionscript_program(file, return_raw_object = False, input_variables = {}):
     session = lang.VisionScript()
+
+    if input_variables:
+        session.state["input_variables"] = {
+            **session.state["input_variables"],
+            **input_variables
+        }
     
     file_path = os.path.join(TEST_DIR, file)
     
@@ -31,6 +37,11 @@ def test_path_not_exists():
 
 def test_classify():
     file = "classify_image.vic"
+
+    assert test_visionscript_program(file) == "banana"
+
+def test_comment():
+    file = "comment.vic"
 
     assert test_visionscript_program(file) == "banana"
 
@@ -146,6 +157,21 @@ def test_greyscale():
 
     assert compare_two_images_for_equality(used_file, reference)
 
+def test_blur():
+    file = "rotate.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
+    reference = os.path.join(__file__, "valid_output/rotate.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_profile():
+    file = "profile.vic"
+
+    assert "Total run time:" in test_visionscript_program(file)
+
 def test_size():
     file = "size.vic"
 
@@ -155,3 +181,110 @@ def not_true_or_false():
     file = "not.vic"
 
     assert test_visionscript_program(file) == False
+
+def read_qr_code():
+    file = "readqr.vic"
+
+    assert test_visionscript_program(file) == "https://jamesg.blog"
+
+def test_detect_pose():
+    file = "detect_pose.vic"
+
+    assert test_visionscript_program(file) == open(os.path.join(VALID_OUTPUT_DIR, "detect_pose.vic.txt"), "r").read()
+
+def test_compare_pose():
+    file = "compare_pose.vic"
+
+    assert test_visionscript_program(file) == open(os.path.join(VALID_OUTPUT_DIR, "compare_pose.vic.txt"), "r").read()
+
+def test_save():
+    file = "save.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
+    reference = os.path.join(__file__, "output/bus_cutout_saved.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_cutout():
+    file = "cutout.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
+    reference = os.path.join(__file__, "output/bus_cutout.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_resize():
+    file = "resize.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
+    reference = os.path.join(__file__, "output/bus_resized.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_get_edges():
+    file = "get_edges.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
+    reference = os.path.join(__file__, "output/bus_edges.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_set_brightness():
+    file = "set_brightness.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
+    reference = os.path.join(__file__, "output/bus_brightness.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_if():
+    file = "if.vic"
+
+    assert test_visionscript_program(file) == "More than two people!"
+
+def test_read():
+    file = "read.vic"
+
+    assert test_visionscript_program(file) == "More than two people!"
+
+def test_get_text():
+    file = "get_text.vic"
+
+    assert test_visionscript_program(file) == "Raft Consensus Algorithm"
+
+def test_exit():
+    file = "exit.vic"
+
+    with pytest.raises(SystemExit):
+        test_visionscript_program(file)
+
+def test_increment():
+    file = "increment.vic"
+
+    num_files_in_dir = len(os.listdir(os.path.join(os.path.dirname(__file__), "images/")))
+
+    assert test_visionscript_program(file) == num_files_in_dir
+
+
+def test_decrement():
+    file = "decrement.vic"
+
+    num_files_in_dir = len(os.listdir(os.path.join(os.path.dirname(__file__), "images/")))
+
+    # negative (-) value because the script is counting down
+    assert test_visionscript_program(file) == -num_files_in_dir
+
+def test_input():
+    file = "input.vic"
+
+    assert test_visionscript_program(file, input_variables = {"file": "./tests/images/bus.jpg"}) == 4

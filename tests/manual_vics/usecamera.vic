@@ -1,0 +1,5 @@
+UseCamera[]
+    Load[]
+    Detect["person"]
+    Show[]
+EndCamera

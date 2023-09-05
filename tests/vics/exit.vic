@@ -1,0 +1,4 @@
+Load["./tests/images/ocr.png"]
+Exit[]
+GetText[]
+Say[]

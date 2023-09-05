@@ -1,0 +1,8 @@
+Load["./tests/images/pose.jpg"]
+DetectPose[]
+
+Load["./tests/images/pose.jpg"]
+DetectPose[]
+
+ComparePose[]
+Say[]
