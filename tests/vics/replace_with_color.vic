@@ -1,0 +1,5 @@
+Load["./tests/images/bus.jpg"]
+Find["person"]
+Cutout[]
+Replace["blue"]
+Save["./tests/output/replace_with_color.jpg"]

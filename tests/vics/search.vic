@@ -1,0 +1,5 @@
+In["./tests/images"]
+    Load[]
+End
+
+Search["bus"]

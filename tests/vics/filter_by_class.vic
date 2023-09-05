@@ -1,0 +1,4 @@
+Load["./tests/images/bus.jpg"]
+Detect[]
+FilterByClass["bus"]
+Count[]

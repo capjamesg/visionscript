@@ -1,0 +1,11 @@
+Use["roboflow rock paper scissors"]
+
+UseCamera["background"]
+    Detect[]
+    
+    If["rock"]
+        Break[]
+    End
+
+    Say[]
+EndCamera

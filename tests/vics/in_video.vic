@@ -1,0 +1,7 @@
+counter = 0
+
+In["./tests/videos/cars.mp4"]
+    counter += 1
+End
+
+Say[]

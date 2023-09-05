@@ -1,0 +1,9 @@
+counter = 0
+
+In["./tests/videos/cars.mp4"]
+    Greyscale[]
+End
+
+Save["./tests/output/video.mp4"]
+
+Say[]

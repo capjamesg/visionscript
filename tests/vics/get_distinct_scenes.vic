@@ -1,0 +1,2 @@
+Load["./tests/videos/cars.mp4"]
+GetDistinctScenes[]
