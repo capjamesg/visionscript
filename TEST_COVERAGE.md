@@ -22,6 +22,7 @@ Some methods need manual testing because they use a webcam. The following functi
 
 ## Automated Testing
 
+A [1] indicates a test `.vic` file has been written but the corresponding Python test has not been added to `tests/test_visionscript.py`
 ### Functions
 
 - [X] `Blur[]`
@@ -75,21 +76,21 @@ Some methods need manual testing because they use a webcam. The following functi
 - [X] `Web[]`
 - [ ] `Crop[]`
 - [ ] `Contains[]`
-- [ ] `Get[]`
-- [ ] `Set[]`
-- [ ] `Remove[]`
-- [ ] `Wait[]`
+- [ ] `Get[]` [1]
+- [ ] `Set[]` [1]
+- [ ] `Remove[]` [1]
+- [ ] `Wait[]` [1]
 - [ ] `Track[]`
-- [ ] `Remove[]`
+- [ ] `GetUniqueAppearances[]`
 - [ ] `Apply[]`
 - [ ] `Grid[]`
 - [ ] `Shuffle[]`
-- [ ] `GetColors[]`
-- [ ] `GetColours[]`
+- [ ] `GetColors[]` [1]
+- [ ] `GetColours[]` [1]
 - [ ] `IsItA[]`
-- [ ] `Is[]`
+- [ ] `Is[]` [1]
 - [ ] `Merge[]`
-- [ ] `Say[]`
+- [ ] `Say[]` [1]
 
 ### Language Features
 
@@ -97,15 +98,24 @@ Some methods need manual testing because they use a webcam. The following functi
 - [X] Decrement
 - [X] Comment
 - [X] Assignment
-- [ ] List
-- [ ] Associative array
-- [ ] Greater than
-- [ ] Less than
+- [ ] List [1]
+- [ ] Associative array [1]
+- [ ] Greater than [1]
+- [ ] Less than [1]
 - [ ] Greater than or equal to
 - [ ] Less than or equal to
-- [ ] Equal to
-- [ ] Not equal to
+- [ ] Equal to [1]
+- [ ] Not equal to [1]
 
 ### Exceptions
 
 - [X] `visionscript.errors.PathNotExists`
+- [ ] `visionscript.errors.StackEmpty`
+- [ ] `visionscript.errors.SetFunctionError`
+- [ ] `visionscript.errors.ImageOutOfBounds`
+- [ ] `visionscript.errors.CameraNotAccessible`
+
+### States
+
+- [ ] Ensure a buffer overflow does not occur when loading more than 1000 large images into memory
+- [ ] Ensure the `image_stack` never exceeds 100 images
