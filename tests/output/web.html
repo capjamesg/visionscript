@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    
+      <title>Home | James' Coffee Blog</title>
+    
+
+    <link rel="stylesheet" href="/assets/styles/styles.css" />
+    <link rel="stylesheet" href="/assets/styles/annotate.css" />
+
+    <link rel="webmention" href="https://webmention.io/jamesg.blog/webmention" />
+
+    <link href="mailto:jamesg@jamesg.blog" rel="me">
+
+    <link rel="me" href="https://indieweb.social/@capjamesg">
+
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="https://jamesg.blog/feeds/posts.xml">
+
+    <!-- This link specifies a manifest that states a search engine you can use on my site. -->
+    <link rel="search" type="application/opensearchdescription+xml" title="IndieWeb Search" href="/assets/opensearch.xml">
+
+    <!-- This link contains information that mobile devices use to render progressive web apps (PWAs).
+        PWAs make websites feel more native to some mobile devices when a web page is added to a device home screen
+        or saved as a device app. -->
+    <link rel="manifest" href="/assets/manifest.json">
+
+    
+      <meta name="description" content="Hello! ÐÑÐ¸Ð²ÑÑ! I'm James (/dÍ¡ÊeÉªmz/) (also capjamesg). My pronouns are he/him/his. I am a technical writer. I live in Scotland. This is my blog." />
+    
+    
+    
+      <meta property="og:image" content="https://screenshots.jamesg.blog/?url=https://jamesg.blog/">
+    
+
+    <link rel="icon" href="/favicon.ico" />
+
+    <link rel="apple-touch-icon-precomposed" href="/favicon.ico" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta rel="canonical" href="https://jamesg.blog/" />
+
+    <script type="text/javascript" src="/assets/js/indieconfig.js"></script>
+    <script type="text/javascript" src="/assets/js/webaction.js"></script>
+
+    <link rel="self" href="https://jamesg.blog/" />
+
+    <!-- This script lets someone link directly to a particular piece of text in a page.
+        See https://jamesg.blog/2022/10/11/fragmention-links/ for more information. -->
+    <script src="/assets/js/annotate.js"></script>
+
+    
+
+    <script>
+        if (navigator.serviceWorker) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/assets/js/service-worker.js', {
+                    scope: '/'
+                });
+            });
+        }
+    </script>
+
+    <link href="https://vjs.zencdn.net/5.8.8/video-js.css" rel="stylesheet">
+
+    
+
+    <!-- The styles below show up when a user has dark mode enabled on my site.
+        The logic for when these styles are applied is in a script further down on the page. -->
+    <style id="darkmode" media="none">
+      html, .citation_box, details, summary, .social li {
+        background-color: #1F2937;
+      }
+      .highlight {
+        color: black;
+      }
+      .highlight a {
+        color: blue;
+        border-bottom: 2px dotted blue;
+      }
+      .highlight a:hover {
+        color: violet;
+      }
+      a {
+        color: lightgreen;
+        border-bottom: 2px dotted lightgreen;
+      }
+      a:hover {
+        color: #ccc;
+      }
+      h1, h2, h3 {
+        color: orange;
+      }
+      .social_interaction, .webmention {
+        background: none;
+      }
+      p, li, dt, dd, .indieweb_footer, input, label {
+        color: white;
+      }
+      input, textarea, code, pre, main {
+        background-color: #0c2548;
+        color: #ccc;
+      }
+    </style>
+    <link href="/assets/styles/prism.css" rel="stylesheet" />
+  </head>
+  <body>
+    <main>
+        <!-- Skip link so that screen reader users can skip narration of the navigation bar. -->
+      <a href="#main" class="accessibility_label">Skip to main content</a>
+    	<nav id="top_navigation">
+	<p><a href="https://jamesg.blog" rel="home author" class="p-author">James' Coffee Blog <span aria-hidden="true" class="seasonal_emoji">â</span></a></p>
+	<ul>
+		<li><a href="/indieweb/">IndieWeb</a></li>
+		<li><a href="/coffee/">Coffee</a></li>
+		<li><a href="https://jamesg.blog/category/moments-of-joy-series/">Moments of Joy</a></li>
+		<li><a href="/category/podcast/">Podcast</a></li>
+		<li><a href="/blogroll/">Blogroll</a></li>
+		<li><a href="#" onclick="document.querySelector('command-k').open(); return false;">Search</a></li>
+		<li><a href="/magic" aria-label="Go to a random page" style="border: none;">ðª</a></li>
+	</ul>
+</nav>
+      <!-- This code applies dark mode to a page if:
+            1. A visitor has dark mode enabled on their system and hasn't disabled dark mode using the button
+                in the site site navigation bar.
+            2. A visitor has enabled dark mode using the button in the site navigation bar.
+            Preferences for dark mode are saved across page views.
+            See https://github.com/capjamesg/darkmode.js for more info. -->
+      <script>
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.getElementById('darkmode').media = "all";
+        }
+
+        if (localStorage.getItem('darkmode') == "true") {
+          document.getElementById('darkmode').media = "all";
+        } else if (localStorage.getItem('darkmode') == "false") {
+          document.getElementById('darkmode').media = "none";
+        }
+
+        var navigation = document.getElementById("top_navigation");
+        var ul = navigation.getElementsByTagName("ul")[0];
+        
+        var li = document.createElement("li");
+        var dark_style = document.getElementById("darkmode");
+  
+        if (dark_style.media === "all") {
+          li.innerHTML = "<a onclick='toggleTheme();'>Light Mode</a>";
+        } else {
+          li.innerHTML = "<a onclick='toggleTheme();'>Dark Mode</a>";
+        }
+
+        var last_li = ul.getElementsByTagName("li")[ul.getElementsByTagName("li").length - 1];
+
+        ul.insertBefore(li, last_li);
+  
+        function toggleTheme() {
+          if (dark_style.media === "all") {
+            dark_style.media = "none";
+            li.innerHTML = "<a onclick='toggleTheme();'>Dark Mode</a>";
+            localStorage.setItem('darkmode', 'false');
+          } else {
+            dark_style.media = "all";
+            li.innerHTML = "<a onclick='toggleTheme();'>Light Mode</a>";
+            localStorage.setItem('darkmode', 'true');
+          }
+        }
+      </script>
+      <script>var hovercards = {}</script><div id="main">
+    	 <template>
+    <link rel="stylesheet" href="https://capjamesg.github.io/stories.js/stories.css">
+</template>
+
+<style>
+	.activeStory {
+		cursor: pointer;
+		border: 2px solid #1DA1F2;
+	}
+</style>
+
+<h1>James' Coffee Blog <span aria-hidden="true" class="seasonal_emoji">â</span></h1>
+
+<div>
+	<section class="flex_item h-card p-author">
+		<div class="flex_left_home intro" style="flex: 0 30%;">
+			<img src="/assets/coffeeshop.jpg" class="u-photo main-photo u-logo" id="profile_image" alt="James sitting in a coffee shop, happily staring at a cup of coffee." width="100" height="100" />
+			
+			<p>Hello! ÐÑÐ¸Ð²ÑÑ! I'm <a href="https://jamesg.blog/" class="p-name u-url p-given-name">James</a> (<a rel="pronunciation" class="u-sound p-ipa" href="/assets/pronunciation.m4a">/dÍ¡ÊeÉªmz/</a>) (also <abbr class="p-nickname" title="[cap] = cappuccino, James G.">capjamesg</abbr>). My pronouns are <a href="https://en.pronouns.page/he"><span class="u-pronoun">he</span>/<span class="u-pronoun">him</span>/<span class="u-pronoun">his</span></a>. I am a technical writer. I live in <span class="p-country-name">Scotland</span>. This is my blog.</p>
+
+			<p class="p-note">On this blog, I write about the open web and coffee. Every two weeks, I co-host the <a href="https://hwclondon.co.uk">Europe Homebrew Website Club</a>. I am a co-chair on the <a href="https://www.w3.org/community/socialcg/">W3C Social Web Community Group</a>. I host the <a href="https://60minute.site">60 Minute Website event</a>.</p>
+
+			<p>My email address is <a href="mailto:readers@jamesg.blog" class="u-email">readers@jamesg.blog</a>.</p>
+
+			<p>I am building a programming language called <a href="https://visionscript.dev">VisionScript</a>.</p>
+
+			<p>I contribute to the <a href="https://indieweb.org/User:Jamesg.blog" rel="me">IndieWeb</a> and <a href="https://www.w3.org/wiki/User:Capjamesg">W3C</a> wikis. I have open sourced some code on <a href="https://github.com/capjamesg" rel="me">GitHub</a>. <a href="/currently/">Read my Currently page</a>.</p>
+
+			<p id="funny_story"></p>
+
+			
+            <p><a href="/category/post/">673 Posts</a> <embed class="light_mode" src="/assets/sparkline.svg?0,0,0,1,0,0,0,3,3,1,1,0,5,2,0,0,0,1,1,0,1,0,1,0,1,2,0,0,0,0,0,2,1,0,0,0,0,1,2,1,0,0,1,0,0,0,1,0,0,0,1,1,0,4,1,2,0,2,2,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,6,2,1,0,0,1,0,5,0,6"
+            class="sparkline" width=100 height=15 /></p>
+            <p><a href="https://indieweb.org/User:Jamesg.blog">IndieWeb Wiki Contributions</a> <embed class="light_mode" src="https://sparkline.jamesg.blog/?username=Jamesg.blog&api_url=https://indieweb.org/wiki/api.php&only_image=true&days=30"
+            class="sparkline" width=100 height=15 /></p>
+		</div>
+		<div class="flex_right_home h-feed hfeed">
+			<ul class="blog">
+			
+				
+<li style=" margin-bottom: 15px;" class="social_interaction h-entry">
+    
+        <h3 class="p-name"><a href="/2023/09/04/url-subpaths/" class="u-url">Ensure all subpath layers resolve in URLs</a></h3>
+        <p>Published on <time class="dt-published" datetime="2023-09-04 00:00:00">September 04, 2023</time> under the <a href="/category/web/" class="p-category">Web</a> category.</p>
+        <div class="p-summary e-content" style="max-width: initial;"><p>I was just skimming the W3C "<a href="https://www.w3.org/Provider/Style/">Style Guide for online hypertext</a>" this morning and came across the "<a href="https://www.w3.org/Provider/Style/URI">Cool URIs don't change</a>" document. If you haven't read that post already, please take a moment to do so. My biggest takeaway from the document is that you should spend time thinking about how you want to structure URLs before you make a new site, or during a rearchitecture.</p></div>
+        
+</li>
+
+			
+				
+<li style=" margin-bottom: 15px;" class="social_interaction h-entry">
+    
+        <h3 class="p-name"><a href="/2023/09/04/google-sheets-to-maps/" class="u-url">Brainstorming Google Sheets to maps website</a></h3>
+        <p>Published on <time class="dt-published" datetime="2023-09-04 00:00:00">September 04, 2023</time> under the <a href="/category/coding/" class="p-category">Coding</a> category.</p>
+        <div class="p-summary e-content" style="max-width: initial;"><p>There are websites that let you turn a Google Sheet into a complete website. Such tools are great if you have a spreadsheet of content and want to create an online listing for said content without having to go through a lot of hoops (set up a website, figure out how to import your content, import your content, etc.).</p></div>
+        
+</li>
+
+			
+				
+<li style=" margin-bottom: 15px;" class="social_interaction h-entry">
+    
+        <h3 class="p-name"><a href="/2023/09/04/world-maps/" class="u-url">World Maps</a></h3>
+        <p>Published on <time class="dt-published" datetime="2023-09-04 00:00:00">September 04, 2023</time> under the <a href="/category/web/" class="p-category">Web</a> category.</p>
+        <div class="p-summary e-content" style="max-width: initial;"><p>World maps fill me with wonder. Every so often I will open a world map online, scroll around, and explore. Amsterdam. The Faroe Islands. The UK. The US.</p></div>
+        
+</li>
+
+			
+				
+<li style=" margin-bottom: 15px;" class="social_interaction h-entry">
+    
+        <h3 class="p-name"><a href="/2023/09/04/perspectives/" class="u-url">Perspectives</a></h3>
+        <p>Published on <time class="dt-published" datetime="2023-09-04 00:00:00">September 04, 2023</time> under the <a href="/category/coding/" class="p-category">Coding</a> category.</p>
+        <div class="p-summary e-content" style="max-width: initial;"><p>Last week, I was walking down a familiar street with a friend. I had walked down the street countless times, but this time was different: I was walking on the other side. The other side has narrower pavements, or at least that was my assessment. We were walking, as the sun started to imbue a purple and pink haze in the sky, and I looked up to notice the street from a different perspective. There are a few beautiful buildings on the street, but I had not seen them from the perspective I had that night.</p></div>
+        
+</li>
+
+			
+				
+<li style=" margin-bottom: 15px;" class="social_interaction h-entry">
+    
+        <h3 class="p-name"><a href="/2023/09/04/background-music/" class="u-url">Background music</a></h3>
+        <p>Published on <time class="dt-published" datetime="2023-09-04 00:00:00">September 04, 2023</time> under the <a href="/category/moments-of-joy/" class="p-category">Moments of Joy</a> category.</p>
+        <div class="p-summary e-content" style="max-width: initial;"><p>Good morning, world! It is a sunny Monday morning here. I am looking out the window of a Starbucks onto the street; people walking past, buses going. An orange truck carrying a skip drives past. Does a truck "carry" a thing? I think so! Is "truck" the American term? Positively. But it wasn't a lorry. Terminology aside, good day!</p></div>
+        
+</li>
+
+			
+			</ul>
+			<p><a href="/category/post/">View all blog posts</a></p>
+		</div>
+	</section>
+</div>
+
+<style>
+	#main ul {
+		margin-left: 10px;
+	}
+	video {
+		height: 300px;
+		width: 100%;
+	}
+	.on-air {
+		background: #6BAB54;
+		color: white;
+		border-bottom: none;
+		padding: 2px;
+		border-radius: 3px;
+	}
+	.pinned h3 {
+		margin: 0;
+	}
+	@media screen and (max-width: 750px) {
+		.flex_item {
+			display: block;
+		}
+		#main ul {
+			padding: 0;
+			margin-left: 0;
+		}
+		.social_interaction, .intro {
+			border-bottom: 1px solid lightgray;
+			border-radius: 0;
+			border-color: lightgrey !important;
+		}
+		.pinned h3 {
+			margin-bottom: 20px;
+		}
+	}
+</style>
+
+<script src="https://vjs.zencdn.net/5.8.8/video.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-hls/3.6.12/videojs-contrib-hls.js"></script>
+
+<script>
+	var funny_facts = ["Perpetually curious.", "Spilling crumbly pastries since the 2000s.", "Sarcasm enthusiast.", "Melodica player.", "Happy February 2nd!", "What is coffee multiplied by coffee?", "Analytic and algebraic topology of locally Euclidean metrization of infinitely differentiable Riemannian manifold.", "Taylor Swift superfan.", "Amateur fruit connoisseur.", "It's me. Hi. I'm the problem it's me."];
+
+	var random_fact = funny_facts[Math.floor(Math.random() * funny_facts.length)];
+
+	document.getElementById("funny_story").innerHTML = random_fact;
+
+	function isOnAirLiveStream () {
+		var fetch_data = fetch("https://stream.jamesg.blog/hls/live.m3u8");
+
+		fetch_data.then(function(response) {
+			if (response.ok) {
+				document.getElementById("funny_story").innerHTML = `
+
+				<h2>Live Stream <span role="img" aria-label="camera">ð·</span></h2>
+						<video id="video-player" width="600" height="340" class="video-js vjs-default-skin" controls>
+							<source src="http://stream.jamesg.blog/hls/live.m3u8" type="application/x-mpegURL">
+					</video>
+				`;
+				var player = videojs('video-player');
+				player.play();
+				
+		}});
+	}
+
+	isOnAirLiveStream();
+</script>
+
+<script>
+	var images = [
+			["https://jamesg.blog/assets/paintedladies.jpeg", ""],
+			["https://jamesg.blog/assets/sfbay.jpg", ""]
+	];
+</script>
+<html-story></html-story>
+
+<script src="https://capjamesg.github.io/stories.js/stories.js"></script>
+
+<script>
+var htmlStory = document.querySelector('html-story');
+
+				htmlStory.images = images;
+if (images.length > 0) {
+		var profile_image = document.getElementById("profile_image");
+		profile_image.addEventListener("click", function () {
+			document.querySelector('html-story').show();
+		});
+		profile_image.classList.add("activeStory");
+	}
+</script>
+      </div>
+      <p class="accessibility_label"><a href="#main">Go Back to the Top</a></p>
+      <footer>
+	<ul>
+		<li><a href="/search/?time_machine=true">Time Machine</a></li>
+		<li><a href="/coffee/maps/">Coffee Maps</a></li>
+		<li><a href="https://wiki.jamesg.blog/Projects">Projects</a></li>
+		<li><a href="/talks/">Talks</a></li>
+		<li><a href="/sitemap/">Sitemap</a></li>
+		<li><a href="/archive/">Archive</a></li>
+		<li><a href="https://capjamesg.github.io/index/">Index</a></li>
+		<li><a href="/privacy/" rel="privacy-policy">Privacy</a></li>
+		<li><a href="https://jamesg.coffee">Bookmarks</a></li>
+		<li><a href="/feeds/posts.xml">RSS</a></li>
+	</ul>
+	<div class="indieweb_footer">
+		<a href="https://indieweb.org/Webmention" class="button-link"><img src="/assets/webmention_button.webp" alt="Webmention logo indicating that you can send a webmention to this blog" width="80" height="15" /></a>
+		<a href="https://indieweb.org" class="button-link"><img src="/assets/indieweb_button.webp" alt="IndieWeb logo" width="80" height="15" /></a><br />
+		<a href="https://microformats.org" class="button-link"><img src="/assets/microformats_button.webp" alt="Microformats logo" width="80" height="15" /></a><br />
+		<a href="https://xn--sr8hvo.ws/%F0%9F%98%85%F0%9F%8F%BD%E3%8A%97%EF%B8%8F/previous">â</a>
+		  IndieWeb Webring
+		<a href="https://xn--sr8hvo.ws/%F0%9F%98%85%F0%9F%8F%BD%E3%8A%97%EF%B8%8F/next">â</a>
+		<!-- I use lights.png in my Christmas theme. It takes me a while to re-find the lights every year so I thought I'd leave them commented here. -->
+		<!-- <img src="/assets/lights.png" alt="" /> -->
+	</div>
+</footer>
+
+<script src="/assets/webmention.min.js" async></script>
+<script src="/assets/js/seasonal.js"></script>
+      
+    </main>
+    <template>
+        <style>
+            * {
+                box-sizing: border-box;
+                font-family: sans-serif;
+            }
+            input, input[type="search"] {
+                padding: 0.5em;
+                border: 1px solid #ccc;
+                border-radius: 0.25em;
+                font-size: 1em;
+                width: 100%;
+            }
+            button, input[type="submit"] {
+                background-color: #EEBAB2;
+                color: black;
+                border: none;
+                cursor: pointer;
+                width: 100%;
+                padding: 10px;
+            }
+            menu {
+                margin: 0;
+                padding: 0;
+            }
+            ul {
+                padding: 0;
+            }
+            ul li {
+                list-style: none;
+                padding: 1em;
+                border-bottom: 1px solid #ccc;
+            }
+            ul li:hover {
+                background-color: #eee;
+            }
+            ul li:last-child {
+                border-bottom: none;
+            }
+            a {
+                text-decoration: none;
+                color: black;
+            }
+            input {
+                box-sizing: border-box;
+            }
+            #command-k {
+                max-width: 30em;
+                width: 30em !important;
+                overflow: hidden;
+            }
+            #command-k-search-results {
+                max-height: 200px;
+                overflow-y: scroll;
+                padding: 0;
+                margin-top: 20px;
+                margin-bottom: 20px;
+                list-style: none;
+                border-bottom: 1px solid #ccc;
+            }
+            #command-k-search-results li:hover {
+                background-color: #eee;
+            }
+            .category {
+                background-color: #ccc;
+                margin-left: 0.5em;
+                border-radius: 0.25em;
+                font-size: 0.8em;
+                padding: 3px;
+            }
+        </style>
+    </template>
+    <command-k></command-k>
+    <incoming-links data-api-url="https://webmention.io/api/mentions.jf2?target="></incoming-links>
+    <outgoing-links data-api-url="https://jamesg.blog/lp/outgoing_links"></outgoing-links>
+    <script src="https://capjamesg.github.io/webmemex.js/webmemex.js"></script>
+    <script src="/assets/js/commandk.js"></script>
+    <script>
+        function searchFunction (searchField, shadowRoot) {
+            fetch(`https://jamesg.blog/qs/search?q=${searchField.value}`)
+            .then((response) => response.json())
+            .then((data) => {
+                shadowRoot.querySelector('#command-k-search-results').innerHTML = '';
+                data.forEach((result) => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    const category = document.createElement('span');
+                    a.href = result.url;
+                    category.innerText = result.category;
+                    a.innerText = result.title;
+                    li.appendChild(a);
+                    category.classList.add('category');
+                    li.appendChild(category);
+                    shadowRoot.querySelector('#command-k-search-results').appendChild(li);
+                    shadowRoot.querySelector('#command-k-search-results').appendChild(li);
+                });
+            }).catch((error) => {
+                console.log(error);
+            });
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'k' && e.metaKey) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            if (e.key === 'k' && e.ctrlKey) {
+                e.preventDefault();
+                document.querySelector('command-k').open();
+            }
+        });
+    </script>
+    
+  </body>
+</html>

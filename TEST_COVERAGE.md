@@ -12,12 +12,13 @@ To run the tests, run `pytest tests/` in the root directory of this repository.
 
 Some methods need manual testing because they use a webcam. The following functions must be tested manually:
 
-- [ ] `Breakpoint[]`
+- [X] `Breakpoint[]`
 - [X] `Compare[]`
 - [X] `GetFPS[]`
 - [X] `Show[]`
 - [X] `ShowText[]`
 - [X] `UseCamera[]`
+- [ ] `Deploy[]`
 
 ## Automated Testing
 
@@ -29,23 +30,23 @@ Some methods need manual testing because they use a webcam. The following functi
 - [X] `Classify[]`
 - [X] `ComparePose[]`
 - [X] `Count[]`
-- [ ] `CountInRegion[]`
-- [ ] `Cutout[]`
+- [X] `CountInRegion[]`
+- [X] `Cutout[]`
 - [X] `Describe[]`
 - [X] `Detect[]`
 - [X] `DetectPose[]`
 - [X] `Exit[]`
-- [ ] `FilterByClass[]`
+- [X] `FilterByClass[]`
 - [X] `Find[]`
 - [X] `First[]`
-- [ ] `GetDistinctScenes[]`
+- [x] `GetDistinctScenes[]`
 - [X] `GetEdges[]`
 - [X] `GetText[]`
 - [X] `Greyscale[]`
 - [X] `If[]`
 - [X] `Import[]`
 - [X] `In[]` (folder of images)
-- [ ] `In[]` (video file)
+- [X] `In[]` (video file)
 - [X] `Input[]`
 - [X] `Last[]`
 - [X] `Load[]`
@@ -56,25 +57,55 @@ Some methods need manual testing because they use a webcam. The following functi
 - [X] `Random[]`
 - [X] `Read[]`
 - [X] `ReadQR[]`
-- [ ] `Replace[]`
+- [X] `Replace[]`
 - [X] `Reset[]`
 - [X] `Resize[]`
 - [X] `Rotate[]`
 - [X] `Save[]`
 - [X] `Say[]`
-- [ ] `Search[]`
+- [X] `Search[]`
 - [X] `Segment[]`
-- [ ] `Select[]`
+- [X] `Select[]`
 - [X] `SetBrightness[]`
-- [ ] `SetConfidence[]`
+- [X] `SetConfidence[]`
 - [X] `Similarity[]`
 - [X] `Size[]`
 - [X] `Use[]`
 - [X] `Profile[]`
-- [ ] `Web[]`
+- [X] `Web[]`
+- [ ] `Crop[]`
+- [ ] `Contains[]`
+- [ ] `Get[]`
+- [ ] `Set[]`
+- [ ] `Remove[]`
+- [ ] `Wait[]`
+- [ ] `Track[]`
+- [ ] `Remove[]`
+- [ ] `Apply[]`
+- [ ] `Grid[]`
+- [ ] `Shuffle[]`
+- [ ] `GetColors[]`
+- [ ] `GetColours[]`
+- [ ] `IsItA[]`
+- [ ] `Is[]`
+- [ ] `Merge[]`
+- [ ] `Say[]`
 
 ### Language Features
 
 - [X] Increment
 - [X] Decrement
 - [X] Comment
+- [X] Assignment
+- [ ] List
+- [ ] Associative array
+- [ ] Greater than
+- [ ] Less than
+- [ ] Greater than or equal to
+- [ ] Less than or equal to
+- [ ] Equal to
+- [ ] Not equal to
+
+### Exceptions
+
+- [X] `visionscript.errors.PathNotExists`

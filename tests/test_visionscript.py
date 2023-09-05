@@ -1,7 +1,8 @@
 import visionscript as lang
-import warnings
 import os
 import pytest
+from PIL import Image
+import supervision as sv
 
 from visionscript.state import init_state
 from visionscript import error_handling
@@ -24,6 +25,7 @@ def test_visionscript_program(file, return_raw_object = False, input_variables =
     
     with open(file_path, "r") as f:
         session.parse_tree(lang.parser.parse(f.read() + "\n"))
+
         if return_raw_object is False:
             return session.state["output"]["text"]
         else:
@@ -69,6 +71,16 @@ def test_count():
     file = "count.vic"
 
     assert test_visionscript_program(file) == 4
+
+def test_count_in_region():
+    file = "count_in_region.vic"
+
+    assert test_visionscript_program(file) == 4
+
+def test_filter_by_class():
+    file = "filter_by_class.vic"
+
+    assert test_visionscript_program(file) == 1
 
 def test_random():
     file = "random.vic"
@@ -157,6 +169,34 @@ def test_greyscale():
 
     assert compare_two_images_for_equality(used_file, reference)
 
+def test_replace():
+    file = "replace.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "output/replace_with_color.jpg")
+    reference = os.path.join(__file__, "valid_output/replace_with_color.jpg")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_web():
+    file = "web.vic"
+
+    with open(os.path.join(os.path.dirname(__file__), "output/web.html"), "w") as f:
+        f.write(test_visionscript_program(file))
+
+    assert test_visionscript_program(file) == open(os.path.join(VALID_OUTPUT_DIR, "web.html"), "r").read()
+
+def test_paste():
+    file = "paste.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "output/paste.jpg")
+    reference = os.path.join(__file__, "valid_output/paste.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
 def test_blur():
     file = "rotate.vic"
 
@@ -175,12 +215,17 @@ def test_profile():
 def test_size():
     file = "size.vic"
 
-    assert test_visionscript_program(file) == (800, 600)
+    assert test_visionscript_program(file) == (1080, 810)
 
 def not_true_or_false():
     file = "not.vic"
 
     assert test_visionscript_program(file) == False
+
+def in_video():
+    file = "in_video.vic"
+
+    assert test_visionscript_program(file) == 240
 
 def read_qr_code():
     file = "readqr.vic"
@@ -204,6 +249,26 @@ def test_save():
 
     used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
     reference = os.path.join(__file__, "output/bus_cutout_saved.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_replace_in_images():
+    file = "replace_in_images.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "output/replace_in_images.jpg")
+    reference = os.path.join(__file__, "valid_output/replace_in_images.png")
+
+    assert compare_two_images_for_equality(used_file, reference)
+
+def test_replace_with_color():
+    file = "replace_with_color.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "output/replace_with_color.jpg")
+    reference = os.path.join(__file__, "valid_output/replace_with_color.jpg")
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -288,3 +353,44 @@ def test_input():
     file = "input.vic"
 
     assert test_visionscript_program(file, input_variables = {"file": "./tests/images/bus.jpg"}) == 4
+
+def test_setconfidence():
+    file = "setconfidence.vic"
+
+    assert test_visionscript_program(file) == 1
+
+def test_select():
+    file = "select.vic"
+
+    result = test_visionscript_program(file)
+
+    assert isinstance(result, sv.Detections) and len(result) == 1 and len(result.xyxy) > 0
+
+def test_search():
+    file = "search.vic"
+
+    bus_image = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
+    bus_image_as_pil = Image.open(bus_image)
+
+    assert test_visionscript_program(file, True).state["image_stack"][-1] == bus_image_as_pil
+
+def get_distinct_scenes():
+    file = "get_distinct_scenes.vic"
+
+    with open(os.path.join(os.path.dirname(__file__), "output/get_distinct_scenes.txt"), "w") as f:
+        f.write(test_visionscript_program(file))
+
+    assert test_visionscript_program(file) == open(os.path.join(VALID_OUTPUT_DIR, "get_distinct_scenes.txt"), "r").read()
+
+def say():
+    file = "say.vic"
+
+    with open(os.path.join(os.path.dirname(__file__), "output/say.txt"), "w") as f:
+        f.write(test_visionscript_program(file))
+
+    assert test_visionscript_program(file) == open(os.path.join(VALID_OUTPUT_DIR, "say.txt"), "r").read()
+
+def variable_assignment():
+    file = "variable_assignment.vic"
+
+    assert test_visionscript_program(file) == 6
