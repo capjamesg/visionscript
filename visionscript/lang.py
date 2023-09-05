@@ -36,6 +36,7 @@ import psutil
 import supervision as sv
 import torch
 import watchdog
+import PIL
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from watchdog.observers import Observer
@@ -743,17 +744,22 @@ class VisionScript:
 
             self.state["last_loaded_image_name"] = filename
 
+        extension = filename.split(".")[-1]
+
+        if extension not in ("jpg", "png", "jpeg"):
+            raise error_handling.ImageNotSupported(extension)
+        
         try:
             if self.notebook and (
                 not validators.url(filename) or filename.endswith(".png")
             ):
                 filename = os.path.join("tmp", self.state["session_id"], filename)
 
-            image = Image.open(filename)  # .convert("RGB")
-        except Exception as e:
-            print(e)
-            print(f"Could not load image {filename}.")
-            return
+            image = Image.open(filename).convert("RGB")
+        except PIL.UnidentifiedImageError:
+            raise error_handling.ImageNotSupported(extension)
+        except OSError:
+            raise error_handling.ImageCorrupted(extension)
 
         self.state["last_loaded_image_name"] = filename
 
@@ -1444,8 +1450,7 @@ class VisionScript:
             # use bytetrack for object tracking
             detections = self.state["tracker"].update_with_detections(detections)
 
-        # load last_loaded_image_name
-        image = cv2.imread(self.state["last_loaded_image_name"])
+        image = self._get_item(-1, "image_stack")
 
         # cut out all detections and save them to the state
         for _, detection in enumerate(detections.xyxy):

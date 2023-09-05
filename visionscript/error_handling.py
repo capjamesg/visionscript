@@ -61,6 +61,22 @@ class CameraNotAccessible(Exception):
         return "The camera is not accessible."
 
 
+class ImageNotSupported(Exception):
+    def __init__(self, image):
+        sys.excepthook = visionscript_exception_handler
+        self.image = image
+
+    def __str__(self):
+        return f"The image '{self.image}' is in an unsupported format. Supported formats are: .jpg, .jpeg, and .png"
+
+class ImageCorrupted(Exception):
+    def __init__(self, image):
+        sys.excepthook = visionscript_exception_handler
+        self.image = image
+
+    def __str__(self):
+        return f"The image '{self.image}' is corrupt and cannot be opened."
+
 spell = SpellChecker()
 
 
