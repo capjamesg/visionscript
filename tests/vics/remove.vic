@@ -1,0 +1,4 @@
+x = ["coffee", "tea", "cookies"]
+
+Remove[x, "coffee"]
+Say[x]

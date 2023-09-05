@@ -326,10 +326,13 @@ def test_replace_in_images():
 def test_replace_with_color():
     file = "replace_with_color.vic"
 
-    test_visionscript_program(file)
+    result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "output/replace_with_color.jpg")
     reference = os.path.join(__file__, "valid_output/replace_with_color.jpg")
+
+    # save result as PIL
+    result.save(used_file)
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -337,10 +340,13 @@ def test_replace_with_color():
 def test_cutout():
     file = "cutout.vic"
 
-    test_visionscript_program(file)
+    result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
     reference = os.path.join(__file__, "output/bus_cutout.png")
+
+    # save result as PIL
+    result.save(used_file)
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -348,10 +354,13 @@ def test_cutout():
 def test_resize():
     file = "resize.vic"
 
-    test_visionscript_program(file)
+    result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
     reference = os.path.join(__file__, "output/bus_resized.png")
+
+    # save result as PIL
+    result.save(used_file)
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -359,10 +368,13 @@ def test_resize():
 def test_get_edges():
     file = "get_edges.vic"
 
-    test_visionscript_program(file)
+    result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
     reference = os.path.join(__file__, "output/bus_edges.png")
+
+    # save result as PIL
+    result.save(used_file)
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -370,10 +382,13 @@ def test_get_edges():
 def test_set_brightness():
     file = "set_brightness.vic"
 
-    test_visionscript_program(file)
+    result = test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "images/bus.jpg")
     reference = os.path.join(__file__, "output/bus_brightness.png")
+    
+    # save result as PIL
+    result.save(used_file)
 
     assert compare_two_images_for_equality(used_file, reference)
 
