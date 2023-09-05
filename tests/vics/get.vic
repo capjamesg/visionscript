@@ -4,3 +4,4 @@ Get[images, "image1"]
 Load[]
 
 Find["person"]
+Count[]

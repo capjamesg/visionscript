@@ -1,6 +1,6 @@
 counter = 0
 
-In["./images"]
+In["./tests/images"]
     counter += 1
 
     Read[]

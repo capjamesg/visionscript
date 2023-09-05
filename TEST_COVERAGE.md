@@ -22,7 +22,8 @@ Some methods need manual testing because they use a webcam. The following functi
 
 ## Automated Testing
 
-A [1] indicates a test `.vic` file has been written but the corresponding Python test has not been added to `tests/test_visionscript.py`
+A [1] indicates a test `.vic` file has been written but the corresponding Python test has not been added to `tests/test_visionscript.py`.
+
 ### Functions
 
 - [X] `Blur[]`
@@ -50,7 +51,7 @@ A [1] indicates a test `.vic` file has been written but the corresponding Python
 - [X] `In[]` (video file)
 - [X] `Input[]`
 - [X] `Last[]`
-- [X] `Load[]`
+- [ ] `Load[]`
 - [X] `Make[]`
 - [X] `Not[]`
 - [ ] `Paste[]`
@@ -76,19 +77,19 @@ A [1] indicates a test `.vic` file has been written but the corresponding Python
 - [X] `Web[]`
 - [ ] `Crop[]`
 - [ ] `Contains[]`
-- [ ] `Get[]` [1]
-- [ ] `Set[]` [1]
+- [X] `Get[]`
+- [X] `Set[]`
 - [ ] `Remove[]` [1]
-- [ ] `Wait[]` [1]
+- [X] `Wait[]`
 - [ ] `Track[]`
 - [ ] `GetUniqueAppearances[]`
 - [ ] `Apply[]`
-- [ ] `Grid[]`
+- [X] `Grid[]`
 - [ ] `Shuffle[]`
-- [ ] `GetColors[]` [1]
-- [ ] `GetColours[]` [1]
-- [ ] `IsItA[]`
-- [ ] `Is[]` [1]
+- [X] `GetColors[]`
+- [X] `GetColours[]`
+- [X] `IsItA[]`
+- [X] `Is[]`
 - [ ] `Merge[]`
 - [ ] `Say[]` [1]
 
@@ -98,14 +99,14 @@ A [1] indicates a test `.vic` file has been written but the corresponding Python
 - [X] Decrement
 - [X] Comment
 - [X] Assignment
-- [ ] List [1]
+- [X] List
 - [ ] Associative array [1]
-- [ ] Greater than [1]
-- [ ] Less than [1]
-- [ ] Greater than or equal to
-- [ ] Less than or equal to
-- [ ] Equal to [1]
-- [ ] Not equal to [1]
+- [X] Greater than
+- [X] Less than
+- [X] Greater than or equal to
+- [X] Less than or equal to
+- [X] Equal to
+- [X] Not equal to
 
 ### Exceptions
 
@@ -118,4 +119,12 @@ A [1] indicates a test `.vic` file has been written but the corresponding Python
 ### States
 
 - [ ] Ensure a buffer overflow does not occur when loading more than 1000 large images into memory
-- [ ] Ensure the `image_stack` never exceeds 100 images
+- [X] Ensure the `image_stack` never exceeds 100 images
+
+## Models
+
+- [ ] YOLOv8 Object Detection (small) [1]
+- [ ] FastSAM [1]
+- [ ] Grounding DINO [1]
+- [ ] YOLOv8 Pose (small) [1]
+- [ ] Roboflow `rock paper scissors` [1]

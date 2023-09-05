@@ -1,8 +1,10 @@
 images = []
 
-Set[images, "image1", "./tests/images/pose.jpg"]
+Set[images, "image1", "./tests/images/bus.jpg"]
 
 Get[images, "image1"]
+
 Load[]
 
 Find["person"]
+Count[]

@@ -1,7 +1,7 @@
 counter = 0
 
-In["./images"]
-    counter -= 1
+In["./tests/images"]
+    counter--
 EndIn
 
 Read[]
