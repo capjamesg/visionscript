@@ -2,10 +2,12 @@ import signal
 
 from visionscript.constants import KEYBOARD_INTERRUPT_CODE
 
+
 def signal_handler(signal, frame):
     print(KEYBOARD_INTERRUPT_CODE, "You stopped the program.")
     sys.exit(0)
-    
+
+
 signal.signal(signal.SIGINT, signal_handler)
 
 import warnings
@@ -40,22 +42,30 @@ from watchdog.observers import Observer
 from threading import Event, Thread
 from dataclasses import dataclass
 
-from visionscript.config import (CACHE_DIRECTORY,
-                                 CONCURRENT_VIDEO_TRANSFORMATIONS, DATA_TYPES,
-                                 DEVICE, FASTSAM_DIR, FASTSAM_WEIGHTS_DIR,
-                                 MAX_FILE_SIZE, STACK_MAXIMUM,
-                                 SUPPORTED_INFERENCE_MODELS,
-                                 SUPPORTED_TRAIN_MODELS, VIDEO_STRIDE, ALIASED_FUNCTIONS)
-from visionscript.error_handling import (handle_unexpected_characters,
-                                         handle_unexpected_token)
+from visionscript.config import (
+    CACHE_DIRECTORY,
+    CONCURRENT_VIDEO_TRANSFORMATIONS,
+    DATA_TYPES,
+    DEVICE,
+    FASTSAM_DIR,
+    FASTSAM_WEIGHTS_DIR,
+    MAX_FILE_SIZE,
+    STACK_MAXIMUM,
+    SUPPORTED_INFERENCE_MODELS,
+    SUPPORTED_TRAIN_MODELS,
+    VIDEO_STRIDE,
+    ALIASED_FUNCTIONS,
+)
+from visionscript.error_handling import (
+    handle_unexpected_characters,
+    handle_unexpected_token,
+)
 from visionscript.grammar import grammar
-from visionscript.paper_ocr_correction import (line_processing,
-                                               syntax_correction)
+from visionscript.paper_ocr_correction import line_processing, syntax_correction
 from visionscript.pose import Pose
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
 import visionscript.error_handling as error_handling
-
 
 
 # retrieve rf_models.json from ~/.cache/visionscript
@@ -79,7 +89,12 @@ if not importlib.util.find_spec("clip"):
 
 CUSTOM_SET_VALUES = ["background"]
 
-ALLOWED_SET_FUNCTION_VALUES = list(SUPPORTED_INFERENCE_MODELS.keys()) + list(SUPPORTED_TRAIN_MODELS.keys()) + CUSTOM_SET_VALUES
+ALLOWED_SET_FUNCTION_VALUES = (
+    list(SUPPORTED_INFERENCE_MODELS.keys())
+    + list(SUPPORTED_TRAIN_MODELS.keys())
+    + CUSTOM_SET_VALUES
+)
+
 
 @dataclass
 class Pose:
@@ -115,11 +130,7 @@ VIDEO_STRIDE = 2
 
 CACHE_DIRECTORY = os.path.join(os.path.expanduser("~"), ".visionscript")
 
-CONCURRENT_VIDEO_TRANSFORMATIONS = [
-    "showtext",
-    "greyscale",
-    "show"
-]
+CONCURRENT_VIDEO_TRANSFORMATIONS = ["showtext", "greyscale", "show"]
 
 if not os.path.exists(CACHE_DIRECTORY):
     os.makedirs(CACHE_DIRECTORY)
@@ -205,7 +216,7 @@ class VisionScript:
             "comment": lambda x: None,
             "expr": lambda x: None,
             "show": lambda x: self.show(x),
-            "exit": lambda x: exit(0),
+            "exit": lambda x: self.exit(x),
             "help": lambda x: print(language_grammar_reference[x]["body"]),
             "train": lambda x: self.train(x),
             "compare": lambda x: self.show(x),
@@ -282,10 +293,13 @@ class VisionScript:
             "apply": lambda x: self.apply(x),
         }
 
+    def exit(self, _):
+        raise SystemExit()
+
     def use(self, args):
         if args[0] not in ALLOWED_SET_FUNCTION_VALUES:
             raise error_handling.SetFunctionError(args[0])
-        
+
         if args[0] == "background":
             self.set_state("run_video_in_background", True),
         else:
@@ -2123,7 +2137,7 @@ class VisionScript:
         # cast tensor to float
         as_float = similarity.item()
 
-        print('x', as_float)
+        print("x", as_float)
 
         self.state["last"] = as_float
         self.state["output"]["text"] = as_float

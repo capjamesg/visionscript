@@ -2,11 +2,15 @@ from spellchecker import SpellChecker
 import sys
 
 from visionscript.constants import ERROR_CODE
-from visionscript.usage import (language_grammar_reference,
-                                lowercase_language_grammar_reference)
+from visionscript.usage import (
+    language_grammar_reference,
+    lowercase_language_grammar_reference,
+)
+
 
 def visionscript_exception_handler(_, exception, _1):
     print(ERROR_CODE, exception)
+
 
 class PathNotExists(Exception):
     def __init__(self, path):
@@ -15,7 +19,8 @@ class PathNotExists(Exception):
 
     def __str__(self):
         return f"The file '{self.path}' does not exist."
-    
+
+
 class StackEmpty(Exception):
     def __init__(self, stack):
         sys.excepthook = visionscript_exception_handler
@@ -27,6 +32,7 @@ class StackEmpty(Exception):
         elif self.stack == "pose_stack":
             return "You need to run DetectPose[] before you can use the pose stack."
 
+
 class SetFunctionError(Exception):
     def __init__(self, function):
         sys.excepthook = visionscript_exception_handler
@@ -34,6 +40,7 @@ class SetFunctionError(Exception):
 
     def __str__(self):
         return f"The '{self.function}' model is not available."
+
 
 class ImageOutOfBounds(Exception):
     def __init__(self, image, x, y):
@@ -45,12 +52,14 @@ class ImageOutOfBounds(Exception):
     def __str__(self):
         return f"The image is out of bounds at ({self.x}, {self.y})."
 
+
 class CameraNotAccessible(Exception):
     def __init__(self):
         sys.excepthook = visionscript_exception_handler
 
     def __str__(self):
         return "The camera is not accessible."
+
 
 spell = SpellChecker()
 
@@ -104,7 +113,10 @@ def handle_unexpected_characters(e, code, interactive=False):
         print(ERROR_CODE, f"Function {function_name} does not exist.")
         exit(1)
 
-    print(ERROR_CODE, f"Function '{function_name}' does not exist. Did you mean one of these?")
+    print(
+        ERROR_CODE,
+        f"Function '{function_name}' does not exist. Did you mean one of these?",
+    )
     print("-" * 10)
 
     for item in list(alternatives):
