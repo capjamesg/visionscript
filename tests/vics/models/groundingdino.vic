@@ -1,0 +1,5 @@
+Use["groundingdino"]
+
+Load["./tests/images/bus.jpg"]
+Detect["bus"]
+Count[]

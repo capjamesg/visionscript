@@ -1,2 +1,3 @@
 Load[Input["file"]]
 Count["person"]
+Say[]

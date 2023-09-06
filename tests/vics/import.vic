@@ -1,1 +1,1 @@
-Import["classify_image.vic"]
+Import["./tests/vics/classify_image.vic"]

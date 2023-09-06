@@ -1,0 +1,5 @@
+Use["fastsam"]
+
+Load["./tests/images/bus.jpg"]
+Segment["bus"]
+Count[]

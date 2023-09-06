@@ -11,7 +11,7 @@ def init_state():
         "poses_stack": [],
         "history": [],
         "search_index_stack": [],
-        # "current_active_model": None,
+        "current_active_model": None,
         "output": None,
         "input_variables": {},
         "last_classes": [],

@@ -1,0 +1,5 @@
+Load["./tests/images/cat.jpeg"]
+Load["./tests/images/bus.jpg"]
+Load["./tests/images/pose.jpg"]
+
+Grid[]

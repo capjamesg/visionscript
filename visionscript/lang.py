@@ -233,7 +233,6 @@ class VisionScript:
             "getcolours": lambda x: self.getcolours(x),
             "get_text": lambda x: self.get_text(x),
             "greyscale": lambda x: self.greyscale(x),
-            "select": lambda x: self.select(x),
             "paste": lambda x: self.paste(x),
             "pasterandom": lambda x: self.pasterandom(x),
             "resize": lambda x: self.resize(x),
@@ -298,13 +297,13 @@ class VisionScript:
         raise SystemExit()
 
     def use(self, args):
-        if args[0] not in ALLOWED_SET_FUNCTION_VALUES:
-            raise error_handling.SetFunctionError(args[0])
+        if args not in ALLOWED_SET_FUNCTION_VALUES and not args.startswith("roboflow"):
+            raise error_handling.SetFunctionError(args)
 
-        if args[0] == "background":
+        if args == "background":
             self.set_state("run_video_in_background", True),
         else:
-            self.set_state("current_active_model", args[0])
+            self.set_state("current_active_model", args)
 
     def random(self, args):
         return random.choice(args)
@@ -610,7 +609,10 @@ class VisionScript:
 
         # if session_id and notebook, concatenate tmp/session_id/ to filename
         # if no filename, read from stack
-        if not filename:
+
+        # add to load queue
+
+        if filename is None:
             filename = self.state["last"]
 
         # if not file, raise UnexpectedToken
@@ -755,11 +757,11 @@ class VisionScript:
             ):
                 filename = os.path.join("tmp", self.state["session_id"], filename)
 
-            image = Image.open(filename).convert("RGB")
+            image = Image.open(filename)
         except PIL.UnidentifiedImageError:
             raise error_handling.ImageNotSupported(extension)
         except OSError:
-            raise error_handling.ImageCorrupted(extension)
+            raise error_handling.ImageCorrupted(filename)
 
         self.state["last_loaded_image_name"] = filename
 
@@ -777,17 +779,20 @@ class VisionScript:
         Import a module from another file.
         """
 
-        file_name = "".join(
-            [
-                letter
-                for letter in args
-                if letter.isalpha() or letter == "-" or letter.isdigit()
-            ]
-        )
+        file_name = args
+
+        # safe
+        # from werkzeug.utils import secure_filename
+
+        # print(args[0], "0")
+
+        # file_name = secure_filename(args)
 
         # inference algorithm:
         # search in local folder
         # search in visionscript stdlib
+
+        print(file_name)
 
         stdlib = os.path.join(os.path.dirname(__file__), "stdlib")
 
@@ -796,8 +801,12 @@ class VisionScript:
         elif os.path.exists(file_name + ".vic"):
             with open(file_name + ".vic", "r") as f:
                 code = f.read()
+        elif file_name.endswith(".vic"):
+            code = open(file_name, "r").read()
         else:
             code = ""
+
+        print(code)
 
         tree = parser.parse(code.strip() + "\n")
 
@@ -859,25 +868,6 @@ class VisionScript:
         Create a variable.
         """
         return self.state["functions"][args[0]]
-
-    def select(self, args):
-        """
-        Select a detection from a sv.Detections object.
-        """
-        # if detect, select from detections
-        if self.state.get("last_function_type", None) in (
-            "detect",
-            "segment",
-            "classify",
-        ):
-            detections = self.state["last"]
-
-            detections = self._filter_controller(detections)
-
-            if len(args) == 0:
-                self.state["last"] = detections
-            else:
-                self.state["last"] = detections[args[0]]
 
     def paste(self, args):
         """
@@ -1061,7 +1051,12 @@ class VisionScript:
                     f"ffmpeg -i {filename}.avi -vcodec h264 -acodec mp2 {filename}.mp4 > /dev/null 2>&1"
                 )
 
-        Image.fromarray(self._get_item(-1, "image_stack")).save(filename)
+        image = Image.fromarray(self._get_item(-1, "image_stack"))
+        
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        
+        image.save(filename)
 
         self.state["output"] = {"text": "Saved to " + filename}
 
@@ -1085,6 +1080,7 @@ class VisionScript:
         image = self._get_item(-1, "image_stack")
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
         self._add_to_stack("image_stack", image)
 
         self.state["output"] = {"image": image}
@@ -1155,7 +1151,11 @@ class VisionScript:
             import easyocr
 
             reader = easyocr.Reader(["en"])
-            result = reader.readtext(self.state["last_loaded_image_name"], detail=0)
+            # create tmp file of image at top of stack
+            with tempfile.NamedTemporaryFile(suffix=".png") as f:
+                cv2.imwrite(f.name, self._get_item(-1, "image_stack"))
+
+                result = reader.readtext(f.name, detail=0)
 
         self.state["output"] = {"text": result}
         self.state["last"] = result
@@ -1178,6 +1178,8 @@ class VisionScript:
             image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
         else:
             image = image
+
+        image = Image.fromarray(image)
 
         self.state["output"] = {"image": image}
         self._add_to_stack("image_stack", image)
@@ -1242,8 +1244,6 @@ class VisionScript:
             ]
 
         results = results[results.confidence > self.state["confidence"] / 100]
-
-        # self.state["last"] = results
 
         return results
 
@@ -1314,6 +1314,9 @@ class VisionScript:
             model = "roboflow"
         else:
             model = self.state["current_active_model"]
+
+        if model == "blip":
+            model = "yolov8"
 
         results, inference_classes, classes = SUPPORTED_INFERENCE_MODELS[model](
             self, classes
@@ -1490,6 +1493,13 @@ class VisionScript:
         in a notebook.
         """
 
+        self.state["output"] = {"text": statement}
+        self.state["last"] = statement
+
+        # if pose, say vector
+        if isinstance(statement, Pose):
+            return statement.keypoints
+
         # if statement, return
         # if int, convert to str
         if (
@@ -1551,9 +1561,6 @@ class VisionScript:
         if statement:
             print(statement.strip())
 
-        self.state["output"] = {"text": statement}
-        self.state["last"] = statement
-
     def show_text(self, text):
         if not text or len(text) == 0:
             text = str(self.state["last"])
@@ -1606,7 +1613,7 @@ class VisionScript:
         """
         Replace a detection or list of detections with an image or color.
         """
-        detections = self.state["last"]
+        detections = self._get_item(-1, "detections_stack")
 
         detections = self._filter_controller(detections)
 
@@ -1809,7 +1816,7 @@ class VisionScript:
     def _get_item(self, n=1, stack="image_stack"):
         # get() overwrites n
 
-        if self.state.get("get", None):
+        if self.state.get("get", None) and isinstance(self.state["get"], int):
             n = self.state["get"]
 
         self._enforce_stack_maximums(stack, None)
@@ -1823,7 +1830,7 @@ class VisionScript:
 
         if len(self.state[stack]) == 0:
             raise error_handling.StackEmpty(stack)
-
+        
         return self.state[stack][n]
 
     def show(self, _):
@@ -2114,7 +2121,7 @@ class VisionScript:
         if not n:
             n = 2
 
-        if len(self.state["image_stack"]) < 2 or len(self.state["image_stack"]) < n:
+        if len(self.state["image_stack"]) < n and len(self.state["load_queue"]) < n:
             print("Not enough images to compare.")
             return
 
@@ -2124,7 +2131,9 @@ class VisionScript:
 
         images = []
 
-        for image in self.state["image_stack"][-n:]:
+        for image in range(n):
+            image = self._get_item(-1 - image, "image_stack")
+
             image = preprocess(Image.fromarray(image)).unsqueeze(0).to(DEVICE)
             images.append(image)
 
@@ -2142,10 +2151,10 @@ class VisionScript:
         # cast tensor to float
         as_float = similarity.item()
 
-        print("x", as_float)
+        print(self.state)
 
         self.state["last"] = as_float
-        self.state["output"]["text"] = as_float
+        self.state["output"] = {"text": as_float}
 
         return as_float
 
@@ -2245,9 +2254,9 @@ class VisionScript:
             if node.data == "input":
                 self.state["input_variables"][node.children[0].value] = "image"
 
-    def parse_tree(self, tree, main_video_thread=False):
+    def parse_tree(self, tree, main_video_thread=False, defer_variable_evaluation = False):
         try:
-            return self.evaluate_tree(tree, main_video_thread)
+            return self.evaluate_tree(tree, main_video_thread, defer_variable_evaluation)
         except MemoryError:
             print("The program has ran out of memory.")
             exit()
@@ -2258,13 +2267,13 @@ class VisionScript:
         #     print("An unexpected error has occured.")
         #     exit()
 
-    def evaluate_tree(self, tree, main_video_thread=False):
+    def evaluate_tree(self, tree, main_video_thread=False, defer_variable_evaluation = False):
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
 
         if not hasattr(tree, "children"):
-            if hasattr(tree, "value") and tree.value.isdigit():
+            if hasattr(tree, "value") and (isinstance(tree.value, int) or tree.value.isdigit()):
                 return int(tree.value)
             elif hasattr(tree, "value") and tree.value in (False, "False"):
                 return False
@@ -2290,7 +2299,7 @@ class VisionScript:
             if node == "\n" or node == "    ":
                 continue
 
-            # print(node)
+            print(node)
 
             # if node is apply, defer to apply()
             if hasattr(node, "data") and node.data == "apply":
@@ -2335,11 +2344,13 @@ h - help
                     else:
                         print("Command not recognized.")
 
-            if hasattr(node, "value") and node.value in self.state["functions"]:
+            if hasattr(node, "value") and node.value in self.state["functions"] and not defer_variable_evaluation:
                 # literals like in Set[] need to remain literal to be used as keys
                 # print(node.value)
                 # return node.value
                 return self.state["functions"][node.value]
+            elif defer_variable_evaluation and hasattr(node, "value") and node.value in self.state["functions"]:
+                return node.value
 
             if node == "True":
                 return True
@@ -2404,6 +2415,7 @@ h - help
             token = node.data if hasattr(node, "data") else node
 
             if token == "increment":
+                print("increment", node.children[0].children[0].value)
                 self.state["functions"][node.children[0].children[0].value] += 1
                 continue
 
@@ -2498,6 +2510,7 @@ h - help
                 ] = self.state[node.children[0].children[0].value]
                 self.state["last"] = self.state[node.children[0].children[0].value]
                 return
+            
             elif token == "associative_array":
                 associative_array = {}
 
@@ -2518,7 +2531,6 @@ h - help
 
             # if __ANON_40, return
             if token.value == "variable":
-                print("xxxx")
                 self.state["last"] = self.state["functions"][token.value]
                 return self.state["functions"][token.value]
 
@@ -2597,10 +2609,15 @@ h - help
                 return self.state["last"]
 
             if token.value == "literal":
+                print("literal", node.children[0].value)
+                # print()
                 # evaluate the arguments
                 # if len children == 0
                 if len(node.children) == 1:
                     to_parse = node.children[0]
+
+                    if defer_variable_evaluation:
+                        return to_parse.value
 
                     # if in functions, evaluate the function
                     if to_parse.value in self.state["functions"]:
@@ -2617,6 +2634,9 @@ h - help
 
                     return self.state["last"]
                 else:
+                    if defer_variable_evaluation:
+                        return node.children[0].value
+                    
                     to_parse = node.children[1]
 
                     self.parse_tree(to_parse)
@@ -2640,7 +2660,9 @@ h - help
 
             if token.value == "set":
                 # three args: associative array, key, and value
-                associative_array = self.parse_tree(node.children[0].children[0])
+                associative_array = self.parse_tree(node.children[0].children[0], defer_variable_evaluation = True)
+
+                print(associative_array)
                 key = self.parse_tree(node.children[1])
                 value = self.parse_tree(node.children[2])
 
@@ -2946,14 +2968,19 @@ h - help
 
                 value = value if node.children != [] else self.state["last"]
                 self._add_to_stack("load_queue", value)
+
                 # this blank value ensures that Is[] can
                 # run type inference
                 self.state["last"] = np.ndarray([])
                 continue
 
             if token.value == "literal":
+                print("literal", value)
                 if value[0] is None:
                     return
+                
+                if defer_variable_evaluation:
+                    return value[0].value
 
                 result = self.parse_tree(value[0])
             else:

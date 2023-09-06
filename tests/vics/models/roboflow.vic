@@ -1,0 +1,7 @@
+# this model comes out of the box
+# with VisionScript
+# but an API key is needed for use
+Use["roboflow rock paper scissors"]
+
+Detect["rock"]
+Count[]

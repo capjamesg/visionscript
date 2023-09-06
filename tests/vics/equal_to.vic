@@ -1,6 +1,5 @@
 x = 1
 
 If[x == 1]
-    x = "x is equal to 1"
-    Read[x]
+    Say["x is equal to 1"]
 End

@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (set | var | make | in | if | break | random | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | isita | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | select | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | apply | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
+expr: (set | var | make | in | if | break | random | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | apply | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 merge: "Merge" "[" (variable | list | associative_array) ("," (variable | list | associative_array))* "]"
 var: variable "=" (expr | STRING | INT)
@@ -30,12 +30,11 @@ filterbyclass: "FilterByClass" "[" STRING ("," STRING)* "]" | "FilterByClass[]"
 describe: "Describe[]"
 setregion: "SetRegion" "[" INT "," INT "," INT "," INT "]" | "SetRegion[]"
 readqr: "ReadQR[]"
-setconfidence: "SetConfidence" "[" FLOAT "]" | "SetConfidence[]"
+setconfidence: "SetConfidence" "[" INT "]" | "SetConfidence[]"
 rotate: "Rotate" "[" (INT | STRING) "]"
 resize: "Resize" "[" INT "," INT "]"
 getcolors: "GetColors[]" | "GetColors" "[" INT "]"
 getcolours: "GetColours[]" | "GetColours" "[" INT "]"
-isita: "Is it a " (("," STRING)* | ("or" STRING)*)? EOL
 find: "Find" "[" STRING "]"
 args: ((STRING | INT | FLOAT | expr) ("," (STRING | INT | FLOAT | expr))*) | (STRING | INT | FLOAT | expr)?
 make: "Make " literal ("[" args "]") EOL (INDENT (expr+))* "End" EOL
@@ -46,7 +45,6 @@ run: "Run" "[" "]"
 shuffle: "Shuffle[]"
 grid: "Grid" ("[" INT "]")?
 show: "Show[]"
-select: "Select[]" | "Select" "[" INT "]"
 paste: "Paste" "[" INT "," INT "]"
 pasterandom: "PasteRandom[]"
 cutout: "Cutout[]"
@@ -80,7 +78,7 @@ reset: "Reset[]"
 negate: "Not" "[" expr "]"
 math: expr (OPERAND expr)*
 OPERAND: "+" | "-" | "*" | "/" | "^"
-equality: (expr | INT | STRING | FLOAT | BOOL) "==" (expr INT | STRING | FLOAT | BOOL)
+equality: (expr | INT | STRING | FLOAT | BOOL) "==" (expr | INT | STRING | FLOAT | BOOL)
 not_equality: (INT | STRING | expr | BOOL) "!=" (INT | STRING | expr | BOOL)
 train: "Train" "[" STRING "," STRING "]" | "Train" "[" STRING "]"
 label: "Label" "[" STRING "," STRING ("," STRING )*  "]"

@@ -1,0 +1,5 @@
+Use["yolov8s-pose"]
+
+Load["./tests/images/pose.jpg"]
+DetectPose[]
+Count[]

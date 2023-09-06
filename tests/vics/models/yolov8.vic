@@ -1,0 +1,5 @@
+Use["yolov8"]
+
+Load["./tests/images/bus.jpg"]
+Detect["bus"]
+Count[]
