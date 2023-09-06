@@ -1,2 +1,2 @@
 Load["./tests/images/bus.jpg"]
-Crop[1000, 1000]
+Crop[1000, 1000, 1000, 1000]

@@ -1,3 +1,4 @@
 Load["./tests/images/bus.jpg"]
 SetConfidence[75]
 Find["person"]
+Say[]

@@ -1,1 +1,2 @@
 Load["./tests/images/corrupted_image.jpg"]
+Show[]

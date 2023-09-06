@@ -851,8 +851,8 @@ class VisionScript:
             x0, y0, x1, y1 = args
 
             # if args are out of bounds, raise error
-            if x0 > image.size[0] or x1 > image.size[0]:
-                raise error_handling.OutOfBoundsError(x0, x1)
+            if x0 > image.size[0] or x1 > image.size[0] or y0 > image.size[1] or y1 > image.size[1]:
+                raise error_handling.ImageOutOfBounds(x=x0, y=y0)
 
             x0 = int(x0) if isinstance(x0, str) else x0
             y0 = int(y0) if isinstance(y0, str) else y0
@@ -1179,8 +1179,6 @@ class VisionScript:
         else:
             image = image
 
-        image = Image.fromarray(image)
-
         self.state["output"] = {"image": image}
         self._add_to_stack("image_stack", image)
 
@@ -1493,8 +1491,10 @@ class VisionScript:
         in a notebook.
         """
 
+        if not statement:
+            statement = self.state["last"]
+
         self.state["output"] = {"text": statement}
-        self.state["last"] = statement
 
         # if pose, say vector
         if isinstance(statement, Pose):
@@ -2299,7 +2299,7 @@ class VisionScript:
             if node == "\n" or node == "    ":
                 continue
 
-            print(node)
+            # print(node)
 
             # if node is apply, defer to apply()
             if hasattr(node, "data") and node.data == "apply":
@@ -2415,7 +2415,6 @@ h - help
             token = node.data if hasattr(node, "data") else node
 
             if token == "increment":
-                print("increment", node.children[0].children[0].value)
                 self.state["functions"][node.children[0].children[0].value] += 1
                 continue
 
@@ -2609,8 +2608,6 @@ h - help
                 return self.state["last"]
 
             if token.value == "literal":
-                print("literal", node.children[0].value)
-                # print()
                 # evaluate the arguments
                 # if len children == 0
                 if len(node.children) == 1:
@@ -2661,8 +2658,6 @@ h - help
             if token.value == "set":
                 # three args: associative array, key, and value
                 associative_array = self.parse_tree(node.children[0].children[0], defer_variable_evaluation = True)
-
-                print(associative_array)
                 key = self.parse_tree(node.children[1])
                 value = self.parse_tree(node.children[2])
 

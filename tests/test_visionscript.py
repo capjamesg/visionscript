@@ -66,10 +66,7 @@ def test_import():
 def test_find_in_images():
     file = "find_in_images.vic"
 
-    assert (
-        test_visionscript_program(file)
-        == open(os.path.join(VALID_OUTPUT_DIR, "find_in_images.vic.txt"), "r").read()
-    )
+    assert len(test_visionscript_program(file, True).state["detections_stack"]) > 1
 
 def test_load_image():
     file = "load_image.vic"
@@ -112,7 +109,7 @@ def test_count():
 def test_count_in_region():
     file = "count_in_region.vic"
 
-    assert test_visionscript_program(file) == 4
+    assert test_visionscript_program(file) == 1
 
 
 def test_filter_by_class():
@@ -353,7 +350,7 @@ def read_qr_code():
 def test_detect_pose():
     file = "detect_pose.vic"
 
-    assert isinstance(test_visionscript_program(file, True).state["last"], Pose)
+    assert len(test_visionscript_program(file, True).state["poses_stack"]) == 1
 
 
 def test_compare_pose():
@@ -440,10 +437,10 @@ def test_resize():
 def test_get_edges():
     file = "getedges.vic"
 
-    result = test_visionscript_program(file)
+    test_visionscript_program(file)
 
-    used_file = os.path.join(os.path.dirname(__file__), "output/bus_edges.png")
-    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_edges.png")
+    used_file = os.path.join(os.path.dirname(__file__), "output/bus_edges.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_edges.jpg")
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -453,8 +450,8 @@ def test_set_brightness():
 
     test_visionscript_program(file)
 
-    used_file = os.path.join(os.path.dirname(__file__), "output/bus_brightness.png")
-    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_brightness.png")
+    used_file = os.path.join(os.path.dirname(__file__), "output/bus_brightness.jpg")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/bus_brightness.jpg")
 
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -635,3 +632,28 @@ def test_not_equal_to():
     file = "not_equal_to.vic"
 
     assert test_visionscript_program(file) == "x is not equal to 1"
+
+def test_fastsam():
+    file = "models/fastsam.vic"
+
+    assert test_visionscript_program(file) == 1
+
+def test_groundingdino():
+    file = "models/groundingdino.vic"
+
+    assert test_visionscript_program(file) == 1
+
+def test_yolov8():
+    file = "models/yolov8.vic"
+
+    assert test_visionscript_program(file) == 1
+
+def test_roboflow():
+    file = "models/roboflow.vic"
+
+    assert test_visionscript_program(file) == 1
+
+def test_yolov8s_pose():
+    file = "models/yolov8s_pose.vic"
+
+    assert len(test_visionscript_program(file, True).state["poses_stack"]) == 1

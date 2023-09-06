@@ -6,6 +6,7 @@ Pillow
 requests
 ultralytics
 autodistill
+autodistill_fastsam
 autodistill_grounded_sam
 autodistill_blip
 autodistill_vit

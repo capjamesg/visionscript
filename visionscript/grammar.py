@@ -1,7 +1,7 @@
 grammar = """
 start: (expr | EOL)*
 
-expr: (set | var | make | in | if | break | random | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | apply | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
+expr: (count | set | var | make | in | if | break | random | train | label | detect | countinregion | help | get | exit | read | compare | count | cutout | show | size | caption | say | save | load | use | replace | var | classify | segment | comment | contains | if | else | end | run | find | describe | import | rotate | getcolours | getcolors | get_text | greyscale | paste | pasterandom | resize | blur | literal | setbrightness | search | similarity | readqr | reset | negate | BOOL | INT | equality | not_equality | input | deploy | getedges | setconfidence | setregion | filterbyclass | crop | shuffle | grid | run | camera | showtext | getfps | gt | lt | expr | increment | decrement | track | getdistinctscenes | getuniqueappearances | usecamera | breakpoint | profile | math | first | last | is | merge | remove | web | wait | apply | opposite | detectpose | comparepose | associative_array | list | STRING | EOL)
 classify: "Classify" "[" STRING ("," STRING)* "]"
 merge: "Merge" "[" (variable | list | associative_array) ("," (variable | list | associative_array))* "]"
 var: variable "=" (expr | STRING | INT)
@@ -48,8 +48,8 @@ show: "Show[]"
 paste: "Paste" "[" INT "," INT "]"
 pasterandom: "PasteRandom[]"
 cutout: "Cutout[]"
-crop: "Crop" ("[" (INT | STRING) "," (INT | STRING) "," (INT | STRING) "," (INT | STRING) "]")?
-count: "Count" ("[" STRING "]")? | "Count[]"
+crop: "Crop" "[" (INT | STRING) "," (INT | STRING) "," (INT | STRING) "," (INT | STRING) "]"
+count: "Count" "[" STRING "]" | "Count[]"
 input: "Input" ("[" STRING "]")?
 contains: "Contains" "[" STRING "]"
 compare: "Compare[]"

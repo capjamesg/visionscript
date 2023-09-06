@@ -43,9 +43,8 @@ class SetFunctionError(Exception):
 
 
 class ImageOutOfBounds(Exception):
-    def __init__(self, image, x, y):
+    def __init__(self, x, y):
         sys.excepthook = visionscript_exception_handler
-        self.image = image
         self.x = x
         self.y = y
 
