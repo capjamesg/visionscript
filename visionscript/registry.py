@@ -11,6 +11,7 @@ import torch
 from PIL import Image
 from roboflow import Roboflow
 
+from visionscript.error_handling import ModelNotAvailable
 from visionscript.rf_models import STANDARD_ROBOFLOW_MODELS
 
 if os.environ.get("ROBOFLOW_API_KEY"):
@@ -41,7 +42,7 @@ ROBOFLOW_MODELS = {**ROBOFLOW_MODELS, **STANDARD_ROBOFLOW_MODELS}
 def use_roboflow_hosted_inference(self, _) -> list:
     with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
         if not rf:
-            return sv.Detections.empty(), [], ""
+            raise ModelNotAvailable("The model you have tried to use requires an API key. Run export ROBOFLOW_API_KEY='' with your API key and run your script again.")
 
         # base64 image
 

@@ -1,4 +1,4 @@
-In["./tests/images"]
+In["./tests/directory_list_test"]
     Load[]
     Detect["person"]
     Say[]

@@ -43,7 +43,7 @@ size: "Size[]"
 import: "Import" "[" STRING "]"
 run: "Run" "[" "]"
 shuffle: "Shuffle[]"
-grid: "Grid" ("[" INT "]")?
+grid: "Grid" "[" INT "]"
 show: "Show[]"
 paste: "Paste" "[" INT "," INT "]"
 pasterandom: "PasteRandom[]"

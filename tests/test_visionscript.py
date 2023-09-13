@@ -6,8 +6,8 @@ import supervision as sv
 import time
 
 from visionscript.state import init_state
-from visionscript.pose import Pose
 from visionscript import error_handling
+import numpy as np
 
 TEST_DIR = os.path.join(os.path.dirname(__file__), "vics")
 VALID_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "valid_output/")
@@ -44,6 +44,11 @@ def test_path_not_exists():
     with pytest.raises(error_handling.PathNotExists):
         test_visionscript_program(file)
 
+def test_undefined_variable_or_function():
+    file = "raises_exceptions/undefined_variable_or_function.vic"
+
+    with pytest.raises(error_handling.UndefinedVariableOrFunction):
+        test_visionscript_program(file)
 
 def test_classify():
     file = "classify_image.vic"
@@ -78,6 +83,11 @@ def test_load_video():
 
     assert len(test_visionscript_program(file, True).state["load_queue"]) == 1
 
+def test_load_folder():
+    file = "load_folder.vic"
+
+    assert len(test_visionscript_program(file, True).state["load_queue"]) == 3
+
 def test_buffer_overload_prevention():
     file = "buffer_overload_prevention.vic"
 
@@ -86,7 +96,7 @@ def test_buffer_overload_prevention():
     for i in range(0, 101):
         test_visionscript_program(file, session = session)
 
-    assert len(session.state["image_queue"]) == 100
+    assert len(session.state["load_queue"]) == 100
 
 def test_load_detect_save():
     file = "load_detect_save.vic"
@@ -218,13 +228,10 @@ def test_blur():
 def test_grid():
     file = "grid.vic"
 
-    result = test_visionscript_program(file)
+    test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "valid_output/grid.jpg")
     reference = os.path.join(os.path.dirname(__file__), "valid_output/grid.jpg")
-
-    with open(reference, "wb") as f:
-        Image.fromarray(result).save(f)
  
     assert compare_two_images_for_equality(used_file, reference)
 
@@ -270,24 +277,18 @@ def test_greyscale():
 
 
 def test_replace():
-    file = "replace.vic"
+    file = "replace_with_color.vic"
 
-    result = test_visionscript_program(file)
+    test_visionscript_program(file)
 
     used_file = os.path.join(os.path.dirname(__file__), "output/replace_with_color.jpg")
     reference = os.path.join(os.path.dirname(__file__), "valid_output/replace_with_color.jpg")
-
-    with open(reference, "wb") as f:
-        Image.fromarray(result).save(f)
 
     assert compare_two_images_for_equality(used_file, reference)
 
 
 def test_web():
     file = "web.vic"
-
-    with open(os.path.join(os.path.dirname(__file__), "output/web.html"), "w") as f:
-        f.write(test_visionscript_program(file))
 
     assert (
         test_visionscript_program(file)
@@ -376,6 +377,26 @@ def test_save():
 
     assert compare_two_images_for_equality(used_file, reference)
 
+def test_save_to_csv():
+    file = "save_to_csv.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "output/predictions.csv")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/predictions.csv")
+
+    assert open(used_file, "r").read() == open(reference, "r").read()
+
+def test_save_to_json():
+    file = "save_to_json.vic"
+
+    test_visionscript_program(file)
+
+    used_file = os.path.join(os.path.dirname(__file__), "output/predictions.json")
+    reference = os.path.join(os.path.dirname(__file__), "valid_output/predictions.json")
+
+    # compare two jsons
+    assert open(used_file, "r").read() == open(reference, "r").read()
 
 def test_replace_in_images():
     file = "replace_in_images.vic"
@@ -485,7 +506,7 @@ def test_increment():
     file = "increment.vic"
 
     num_files_in_dir = len(
-        os.listdir(os.path.join(os.path.dirname(__file__), "images/"))
+        os.listdir(os.path.join(os.path.dirname(__file__), "directory_list_test/"))
     )
 
     assert test_visionscript_program(file) == num_files_in_dir
@@ -495,7 +516,7 @@ def test_decrement():
     file = "decrement.vic"
 
     num_files_in_dir = len(
-        os.listdir(os.path.join(os.path.dirname(__file__), "images/"))
+        os.listdir(os.path.join(os.path.dirname(__file__), "directory_list_test/"))
     )
 
     # negative (-) value because the script is counting down
@@ -654,6 +675,40 @@ def test_roboflow():
     assert test_visionscript_program(file) == 1
 
 def test_yolov8s_pose():
-    file = "models/yolov8s_pose.vic"
+    file = "models/yolov8s-pose.vic"
 
     assert len(test_visionscript_program(file, True).state["poses_stack"]) == 1
+
+def test_empty_file():
+    file = "empty_file.vic"
+
+    # we are checking that the program does not raise an error, not for any
+    # particular output
+    assert test_visionscript_program(file)
+
+@pytest.mark.skip
+def _test_sorted(self, items):
+    """
+    Test whether a list is sorted.
+    """
+    assert np.all(np.diff(items) >= 0)
+
+@pytest.mark.skip
+def _test_all_elements_in_list(self, unsorted, sorted):
+    assert not np.all(np.isin(unsorted, sorted))
+
+def test_detections_by_confidence_ordering(self, unsorted_detections, sorted_detections):
+    """
+    Test whether detections are ordered by confidence.
+    """
+    _test_sorted(sorted_detections.xyxy)
+    _test_sorted(sorted_detections.mask)
+    _test_sorted(sorted_detections.confidence)
+    _test_sorted(sorted_detections.class_id)
+    _test_sorted(sorted_detections.tracker_id)
+
+    _test_all_elements_in_list(unsorted_detections.xyxy, sorted_detections.xyxy)
+    _test_all_elements_in_list(unsorted_detections.mask, sorted_detections.mask)
+    _test_all_elements_in_list(unsorted_detections.confidence, sorted_detections.confidence)
+    _test_all_elements_in_list(unsorted_detections.class_id, sorted_detections.class_id)
+    _test_all_elements_in_list(unsorted_detections.tracker_id, sorted_detections.tracker_id)

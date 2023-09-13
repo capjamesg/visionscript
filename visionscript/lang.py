@@ -106,6 +106,7 @@ class Pose:
     keypoints: list
     confidence: float
 
+SUPPORTED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg"]
 
 DATA_TYPES = {
     sv.Detections: "Detection",
@@ -723,6 +724,18 @@ class VisionScript:
 
         filename = filename.strip()
 
+        # if filename ends with .search
+        if filename.endswith(".search"):
+            import faiss
+
+            # load index
+            index = faiss.read_index(filename)
+
+            self.state["last"] = index
+            self.state["search_index_stack"].append(index)
+
+            return index
+
         # if extension is not in jpg, png, jpeg, do fuzzy
         if not filename.endswith((".jpg", ".png", ".jpeg")):
             # fuzzy search
@@ -759,7 +772,7 @@ class VisionScript:
 
             image = Image.open(filename)
         except PIL.UnidentifiedImageError:
-            raise error_handling.ImageNotSupported(extension)
+            raise error_handling.ImageCorrupted(extension)
         except OSError:
             raise error_handling.ImageCorrupted(filename)
 
@@ -867,6 +880,7 @@ class VisionScript:
         """
         Create a variable.
         """
+        print(args[0], "e")
         return self.state["functions"][args[0]]
 
     def paste(self, args):
@@ -936,6 +950,10 @@ class VisionScript:
         index = self.state["search_index_stack"][-1]
 
         index.add(image)
+
+        image_idx = self._get_item(-1, "image_stack").index(image)
+        
+        self._add_to_stack("search_index_stack_content_idxes", image_idx)
 
     def search(self, label):
         """
@@ -1010,6 +1028,22 @@ class VisionScript:
             self._get_item(-1, "image_stack"), (x, y)
         )
 
+    def save_search_index(self, filename):
+        """
+        Save the search index to a file.
+        """
+        import faiss
+
+        index = self.state["search_index_stack"][-1]
+
+        faiss.write_index(index, filename)
+
+        filename_without_extension = ".".join(filename.split(".")[:-1]) + ".search"
+
+        # save search_index_stack_content_idxes as json
+        with open(filename_without_extension + ".json", "w") as f:
+            json.dump(self.state["search_index_stack_content_idxes"], f)
+
     def save(self, filename):
         """
         Save an image to a file.
@@ -1026,8 +1060,18 @@ class VisionScript:
                 "".join(random.choice(string.ascii_letters) for _ in range(10)),
             )
 
+        if filename.endswith(".search"):
+            self.save_search_index(filename)
+
+            return
+
         if filename.endswith(".csv"):
             self.write_to_csv(filename)
+
+            return
+        
+        if filename.endswith(".json"):
+            self.write_to_json(filename)
 
             return
 
@@ -1153,9 +1197,9 @@ class VisionScript:
             reader = easyocr.Reader(["en"])
             # create tmp file of image at top of stack
             with tempfile.NamedTemporaryFile(suffix=".png") as f:
-                cv2.imwrite(f.name, self._get_item(-1, "image_stack"))
+                Image.fromarray(self._get_item(-1, "image_stack")).save(f.name)
 
-                result = reader.readtext(f.name, detail=0)
+                result = " ".join(reader.readtext(f.name, detail=0)).strip()
 
         self.state["output"] = {"text": result}
         self.state["last"] = result
@@ -1371,6 +1415,29 @@ class VisionScript:
                     )
 
                 writer.writerows(csv_record)
+
+    def write_to_json(self, name):
+        if isinstance(self.state["last"], sv.Detections):
+            xyxy = self.state["last"].xyxy
+            conf = self.state["last"].confidence
+            class_ids = self.state["last"].class_id
+            class_names = [self.state["last_classes"][i].lower() for i in class_ids]
+
+            # make json record with {xyxy, conf, class_ids, class_names} for each
+            detections = []
+
+            for i in range(len(xyxy)):
+                detections.append(
+                    {
+                        "xyxy": xyxy[i].tolist(),
+                        "confidence": conf[i].tolist(),
+                        "class_id": class_ids[i].tolist(),
+                        "class_names": class_names[i]
+                    }
+                )
+
+            with open(name, "w") as f:
+                json.dump(detections, f)
 
     def classify(self, labels):
         """
@@ -1824,7 +1891,16 @@ class VisionScript:
         # if len() of load_queue > image_stack, load next image
         if len(self.state["load_queue"]) > len(self.state["image_stack"]):
             for filename in self.state["load_queue"][len(self.state["image_stack"]) :]:
-                image = cv2.imread(filename)
+                extension = filename.split(".")[-1]
+
+                if extension not in SUPPORTED_IMAGE_EXTENSIONS:
+                    raise error_handling.ImageNotSupported(filename)
+                
+                try:
+                    image = cv2.imread(filename)
+                except cv2.error:
+                    raise error_handling.ImageCorrupted(extension)
+                
                 # convert to rgb
                 self.state["image_stack"].append(image)
 
@@ -2299,7 +2375,7 @@ class VisionScript:
             if node == "\n" or node == "    ":
                 continue
 
-            # print(node)
+            print(node)
 
             # if node is apply, defer to apply()
             if hasattr(node, "data") and node.data == "apply":
@@ -2379,6 +2455,7 @@ h - help
 
                 continue
             elif hasattr(node, "data") and node.data == "variable":
+                print(node.children[0].value, "accessing variable")
                 return self.state["functions"][node.children[0].value]
             elif hasattr(node, "data") and node.data == "equality":
                 return self.parse_tree(node.children[0]) == self.parse_tree(
@@ -2416,6 +2493,9 @@ h - help
 
             if token == "increment":
                 self.state["functions"][node.children[0].children[0].value] += 1
+                continue
+            elif token == "decrement":
+                self.state["functions"][node.children[0].children[0].value] -= 1
                 continue
 
             # if Profile[] command executed, calculate runtime
@@ -2504,9 +2584,11 @@ h - help
                 self.state[node.children[0].children[0].value] = self.parse_tree(
                     node.children[1]
                 )
+
                 self.state["functions"][
                     node.children[0].children[0].value
                 ] = self.state[node.children[0].children[0].value]
+                
                 self.state["last"] = self.state[node.children[0].children[0].value]
                 return
             
@@ -2530,6 +2612,7 @@ h - help
 
             # if __ANON_40, return
             if token.value == "variable":
+                print("declaring variable")
                 self.state["last"] = self.state["functions"][token.value]
                 return self.state["functions"][token.value]
 
@@ -2610,11 +2693,15 @@ h - help
             if token.value == "literal":
                 # evaluate the arguments
                 # if len children == 0
+
                 if len(node.children) == 1:
                     to_parse = node.children[0]
 
                     if defer_variable_evaluation:
                         return to_parse.value
+                    
+                    if to_parse.value not in self.state["functions"]:
+                        raise error_handling.UndefinedVariableOrFunction(variable=to_parse.value)
 
                     # if in functions, evaluate the function
                     if to_parse.value in self.state["functions"]:
@@ -2622,7 +2709,7 @@ h - help
                             self.state["functions"][to_parse.value]
                         )
                         return self.state["last"]
-
+                    
                     self.parse_tree(to_parse)
 
                     self.state["last"] = self.state["functions"].get(
@@ -2635,6 +2722,9 @@ h - help
                         return node.children[0].value
                     
                     to_parse = node.children[1]
+
+                    if to_parse.value not in self.state["functions"]:
+                        raise error_handling.UndefinedVariableOrFunction(variable=to_parse.value)
 
                     self.parse_tree(to_parse)
 
@@ -2726,6 +2816,10 @@ h - help
                 detection_ctx = False
 
                 if token.value == "usecamera":
+                    # if already in use camera context, raise error
+                    if self.state.get("ctx") and self.state["ctx"].get("camera"):
+                        raise error_handling.NestedCameraNotAllowed()
+                    
                     # if usecamera's first arg is "background", set run_video_in_background to True
                     if (
                         len(node.children) > 0
@@ -2883,12 +2977,12 @@ h - help
 
                 # first child is expression to evaluate, so skip
 
-                for item in node.children[1:]:
-                    if self.state["ctx"].get("break"):
-                        self.state["ctx"]["break"] = False
-                        break
+                # for item in node.children[1:]:
+                #     if self.state["ctx"].get("break"):
+                #         self.state["ctx"]["break"] = False
+                #         break
 
-                    self.parse_tree(item)
+                #     self.parse_tree(item)
 
                 for file_name in self.state["ctx"].get("in", []):
                     # must be image
@@ -2932,8 +3026,10 @@ h - help
                             literal_eval(node.children[0]), file_name
                         )
 
+                        # print(node.children[])
+
                         # ignore first 2, then do rest
-                        context = node.children[3:]
+                        context = node.children[2:]
 
                         for item in context:
                             if self.state["ctx"].get("break"):
@@ -2961,7 +3057,12 @@ h - help
             if token.value == "load":
                 # if value is none, load from last
 
-                value = value if node.children != [] else self.state["last"]
+                # if in "in" context, value is a file name
+                if self.state["ctx"].get("in"):
+                    value = self.state["ctx"]["active_file"]
+                else:
+                    value = value if node.children != [] else self.state["last"]
+                
                 self._add_to_stack("load_queue", value)
 
                 # this blank value ensures that Is[] can
