@@ -6,11 +6,11 @@ import os
 import sys
 
 import numpy as np
-import supervision as sv
 import torch
 from PIL import Image
 from roboflow import Roboflow
 
+import supervision as sv
 from visionscript.error_handling import ModelNotAvailable
 from visionscript.rf_models import STANDARD_ROBOFLOW_MODELS
 
@@ -42,7 +42,9 @@ ROBOFLOW_MODELS = {**ROBOFLOW_MODELS, **STANDARD_ROBOFLOW_MODELS}
 def use_roboflow_hosted_inference(self, _) -> list:
     with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
         if not rf:
-            raise ModelNotAvailable("The model you have tried to use requires an API key. Run export ROBOFLOW_API_KEY='' with your API key and run your script again.")
+            raise ModelNotAvailable(
+                "The model you have tried to use requires an API key. Run export ROBOFLOW_API_KEY='' with your API key and run your script again."
+            )
 
         # base64 image
 
@@ -159,8 +161,8 @@ def grounding_dino_base(self, classes) -> sv.Detections:
 
 
 def fast_sam_base(self, text_prompt) -> sv.Detections:
-    from autodistill_fastsam import FastSAM
     from autodistill.detection import CaptionOntology
+    from autodistill_fastsam import FastSAM
 
     mapped_items = {item: item for item in text_prompt}
 

@@ -2,10 +2,10 @@ import os
 
 import numpy as np
 import psutil
-import supervision as sv
 import torch
 from PIL import Image
 
+import supervision as sv
 from visionscript import registry
 from visionscript.pose import Pose
 

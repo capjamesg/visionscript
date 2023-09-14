@@ -27,23 +27,25 @@ import string
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
+from threading import Event, Thread
 
 import click
 import cv2
 import lark
 import numpy as np
+import PIL
 import psutil
-import supervision as sv
 import torch
 import watchdog
-import PIL
 from lark import Lark, UnexpectedCharacters, UnexpectedToken
 from PIL import Image
 from watchdog.observers import Observer
-from threading import Event, Thread
-from dataclasses import dataclass
 
+import supervision as sv
+import visionscript.error_handling as error_handling
 from visionscript.config import (
+    ALIASED_FUNCTIONS,
     CACHE_DIRECTORY,
     CONCURRENT_VIDEO_TRANSFORMATIONS,
     DATA_TYPES,
@@ -55,7 +57,6 @@ from visionscript.config import (
     SUPPORTED_INFERENCE_MODELS,
     SUPPORTED_TRAIN_MODELS,
     VIDEO_STRIDE,
-    ALIASED_FUNCTIONS,
 )
 from visionscript.error_handling import (
     handle_unexpected_characters,
@@ -66,8 +67,6 @@ from visionscript.paper_ocr_correction import line_processing, syntax_correction
 from visionscript.pose import Pose
 from visionscript.state import init_state
 from visionscript.usage import USAGE, language_grammar_reference
-import visionscript.error_handling as error_handling
-
 
 # retrieve rf_models.json from ~/.cache/visionscript
 # this is where the user keeps a registry of custom models
@@ -105,6 +104,7 @@ class Pose:
 
     keypoints: list
     confidence: float
+
 
 SUPPORTED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg"]
 
@@ -610,7 +610,6 @@ class VisionScript:
 
         # if session_id and notebook, concatenate tmp/session_id/ to filename
         # if no filename, read from stack
-
         # add to load queue
 
         if filename is None:
@@ -763,7 +762,7 @@ class VisionScript:
 
         if extension not in ("jpg", "png", "jpeg"):
             raise error_handling.ImageNotSupported(extension)
-        
+
         try:
             if self.notebook and (
                 not validators.url(filename) or filename.endswith(".png")
@@ -864,7 +863,12 @@ class VisionScript:
             x0, y0, x1, y1 = args
 
             # if args are out of bounds, raise error
-            if x0 > image.size[0] or x1 > image.size[0] or y0 > image.size[1] or y1 > image.size[1]:
+            if (
+                x0 > image.size[0]
+                or x1 > image.size[0]
+                or y0 > image.size[1]
+                or y1 > image.size[1]
+            ):
                 raise error_handling.ImageOutOfBounds(x=x0, y=y0)
 
             x0 = int(x0) if isinstance(x0, str) else x0
@@ -952,7 +956,7 @@ class VisionScript:
         index.add(image)
 
         image_idx = self._get_item(-1, "image_stack").index(image)
-        
+
         self._add_to_stack("search_index_stack_content_idxes", image_idx)
 
     def search(self, label):
@@ -1069,7 +1073,7 @@ class VisionScript:
             self.write_to_csv(filename)
 
             return
-        
+
         if filename.endswith(".json"):
             self.write_to_json(filename)
 
@@ -1096,10 +1100,10 @@ class VisionScript:
                 )
 
         image = Image.fromarray(self._get_item(-1, "image_stack"))
-        
+
         if image.mode != "RGB":
             image = image.convert("RGB")
-        
+
         image.save(filename)
 
         self.state["output"] = {"text": "Saved to " + filename}
@@ -1307,6 +1311,7 @@ class VisionScript:
             del self.state["functions"][variable][to_remove]
 
     def _order_detections_by_confidence(self, detections):
+        self._add_to_stack("raw_detections_stack", detections)
         return detections[np.argsort(detections.confidence)[::-1]]
 
     def comparepose(self, args):
@@ -1432,7 +1437,7 @@ class VisionScript:
                         "xyxy": xyxy[i].tolist(),
                         "confidence": conf[i].tolist(),
                         "class_id": class_ids[i].tolist(),
-                        "class_names": class_names[i]
+                        "class_names": class_names[i],
                     }
                 )
 
@@ -1895,18 +1900,18 @@ class VisionScript:
 
                 if extension not in SUPPORTED_IMAGE_EXTENSIONS:
                     raise error_handling.ImageNotSupported(filename)
-                
+
                 try:
                     image = cv2.imread(filename)
                 except cv2.error:
                     raise error_handling.ImageCorrupted(extension)
-                
+
                 # convert to rgb
                 self.state["image_stack"].append(image)
 
         if len(self.state[stack]) == 0:
             raise error_handling.StackEmpty(stack)
-        
+
         return self.state[stack][n]
 
     def show(self, _):
@@ -2330,9 +2335,13 @@ class VisionScript:
             if node.data == "input":
                 self.state["input_variables"][node.children[0].value] = "image"
 
-    def parse_tree(self, tree, main_video_thread=False, defer_variable_evaluation = False):
+    def parse_tree(
+        self, tree, main_video_thread=False, defer_variable_evaluation=False
+    ):
         try:
-            return self.evaluate_tree(tree, main_video_thread, defer_variable_evaluation)
+            return self.evaluate_tree(
+                tree, main_video_thread, defer_variable_evaluation
+            )
         except MemoryError:
             print("The program has ran out of memory.")
             exit()
@@ -2343,13 +2352,17 @@ class VisionScript:
         #     print("An unexpected error has occured.")
         #     exit()
 
-    def evaluate_tree(self, tree, main_video_thread=False, defer_variable_evaluation = False):
+    def evaluate_tree(
+        self, tree, main_video_thread=False, defer_variable_evaluation=False
+    ):
         """
         Abstract Syntax Tree (AST) parser for VisionScript.
         """
 
         if not hasattr(tree, "children"):
-            if hasattr(tree, "value") and (isinstance(tree.value, int) or tree.value.isdigit()):
+            if hasattr(tree, "value") and (
+                isinstance(tree.value, int) or tree.value.isdigit()
+            ):
                 return int(tree.value)
             elif hasattr(tree, "value") and tree.value in (False, "False"):
                 return False
@@ -2420,12 +2433,20 @@ h - help
                     else:
                         print("Command not recognized.")
 
-            if hasattr(node, "value") and node.value in self.state["functions"] and not defer_variable_evaluation:
+            if (
+                hasattr(node, "value")
+                and node.value in self.state["functions"]
+                and not defer_variable_evaluation
+            ):
                 # literals like in Set[] need to remain literal to be used as keys
                 # print(node.value)
                 # return node.value
                 return self.state["functions"][node.value]
-            elif defer_variable_evaluation and hasattr(node, "value") and node.value in self.state["functions"]:
+            elif (
+                defer_variable_evaluation
+                and hasattr(node, "value")
+                and node.value in self.state["functions"]
+            ):
                 return node.value
 
             if node == "True":
@@ -2588,10 +2609,10 @@ h - help
                 self.state["functions"][
                     node.children[0].children[0].value
                 ] = self.state[node.children[0].children[0].value]
-                
+
                 self.state["last"] = self.state[node.children[0].children[0].value]
                 return
-            
+
             elif token == "associative_array":
                 associative_array = {}
 
@@ -2699,9 +2720,11 @@ h - help
 
                     if defer_variable_evaluation:
                         return to_parse.value
-                    
+
                     if to_parse.value not in self.state["functions"]:
-                        raise error_handling.UndefinedVariableOrFunction(variable=to_parse.value)
+                        raise error_handling.UndefinedVariableOrFunction(
+                            variable=to_parse.value
+                        )
 
                     # if in functions, evaluate the function
                     if to_parse.value in self.state["functions"]:
@@ -2709,7 +2732,7 @@ h - help
                             self.state["functions"][to_parse.value]
                         )
                         return self.state["last"]
-                    
+
                     self.parse_tree(to_parse)
 
                     self.state["last"] = self.state["functions"].get(
@@ -2720,11 +2743,13 @@ h - help
                 else:
                     if defer_variable_evaluation:
                         return node.children[0].value
-                    
+
                     to_parse = node.children[1]
 
                     if to_parse.value not in self.state["functions"]:
-                        raise error_handling.UndefinedVariableOrFunction(variable=to_parse.value)
+                        raise error_handling.UndefinedVariableOrFunction(
+                            variable=to_parse.value
+                        )
 
                     self.parse_tree(to_parse)
 
@@ -2747,7 +2772,9 @@ h - help
 
             if token.value == "set":
                 # three args: associative array, key, and value
-                associative_array = self.parse_tree(node.children[0].children[0], defer_variable_evaluation = True)
+                associative_array = self.parse_tree(
+                    node.children[0].children[0], defer_variable_evaluation=True
+                )
                 key = self.parse_tree(node.children[1])
                 value = self.parse_tree(node.children[2])
 
@@ -2819,7 +2846,7 @@ h - help
                     # if already in use camera context, raise error
                     if self.state.get("ctx") and self.state["ctx"].get("camera"):
                         raise error_handling.NestedCameraNotAllowed()
-                    
+
                     # if usecamera's first arg is "background", set run_video_in_background to True
                     if (
                         len(node.children) > 0
@@ -3062,7 +3089,7 @@ h - help
                     value = self.state["ctx"]["active_file"]
                 else:
                     value = value if node.children != [] else self.state["last"]
-                
+
                 self._add_to_stack("load_queue", value)
 
                 # this blank value ensures that Is[] can
@@ -3074,7 +3101,7 @@ h - help
                 print("literal", value)
                 if value[0] is None:
                     return
-                
+
                 if defer_variable_evaluation:
                     return value[0].value
 

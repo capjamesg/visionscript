@@ -1,5 +1,6 @@
-from spellchecker import SpellChecker
 import sys
+
+from spellchecker import SpellChecker
 
 from visionscript.constants import ERROR_CODE
 from visionscript.usage import (
@@ -68,6 +69,7 @@ class ImageNotSupported(Exception):
     def __str__(self):
         return f"The image '{self.image}' is in an unsupported format. Supported formats are: .jpg, .jpeg, and .png"
 
+
 class ImageCorrupted(Exception):
     def __init__(self, image):
         sys.excepthook = visionscript_exception_handler
@@ -76,6 +78,7 @@ class ImageCorrupted(Exception):
     def __str__(self):
         return f"The image '{self.image}' is corrupt and cannot be opened."
 
+
 class ModelNotAvailable(Exception):
     def __init__(self, message):
         sys.excepthook = visionscript_exception_handler
@@ -83,7 +86,8 @@ class ModelNotAvailable(Exception):
 
     def __str__(self):
         return self.message
-    
+
+
 class UndefinedVariableOrFunction(Exception):
     def __init__(self, variable):
         sys.excepthook = visionscript_exception_handler
@@ -92,12 +96,14 @@ class UndefinedVariableOrFunction(Exception):
     def __str__(self):
         return f"The variable or function '{self.variable}' is undefined."
 
+
 class NestedCameraNotAllowed(Exception):
     def __init__(self):
         sys.excepthook = visionscript_exception_handler
 
     def __str__(self):
         return "You cannot use UseCamera[] inside another UseCamera[] statement."
+
 
 spell = SpellChecker()
 

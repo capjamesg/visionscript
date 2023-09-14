@@ -25,4 +25,5 @@ def init_state():
         "ctx": {},
         "tracker": None,
         "run_video_in_background": False,
+        "raw_detections_stack": [],
     }
