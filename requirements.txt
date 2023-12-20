@@ -18,7 +18,7 @@ torch
 easyocr
 scikit-learn
 webcolors
-transformers==4.30.2
+transformers==4.36.0
 matplotlib
 watchdog
 qrcode
