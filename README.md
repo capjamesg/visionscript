@@ -47,6 +47,16 @@ visionscript --notebook
 
 This will open a notebook in your browser. Notebooks are ephermal. You will need to copy your code to a file to save it.
 
+When you run the notebook or cloud server behind a reverse proxy or need a fixed public URL, set the canonical base URL so all such URLs use your domain:
+
+```bash
+export VISIONSCRIPT_BASE_URL="https://your-domain.com/"
+# AND
+export API_URL="https://your-domain.com/"
+```
+
+If unset, the app uses relative URLs only (no Host-derived URLs), so it is safe by default and requires no configuration.
+
 ## Quickstart 🚀
 
 ### Find people in an image using object detection

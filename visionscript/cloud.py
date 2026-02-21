@@ -14,6 +14,14 @@ app = Flask(__name__)
 
 API_KEY = uuid.uuid4().hex
 
+# Same env as notebook: VISIONSCRIPT_BASE_URL or API_URL; when unset, "" (relative).
+_raw = os.environ.get("VISIONSCRIPT_BASE_URL", "").strip() or os.environ.get("API_URL", "").strip()
+API_URL = (_raw.rstrip("/") + "/") if _raw else ""
+
+if not API_URL:
+    print('API_URL and VISIONSCRIPT_BASE_URL must be set.')
+    exit()
+
 if not os.path.exists("scripts.json"):
     with open("scripts.json", "w") as f:
         json.dump({}, f)
@@ -37,7 +45,8 @@ print("Keep it safe and don't share it with anyone!")
 
 @app.route("/")
 def index_page():
-    return render_template("deployintro.html", url_root=request.url_root.strip("/"))
+    url_root = API_URL.rstrip("/") if API_URL else ""
+    return render_template("deployintro.html", url_root=url_root)
 
 
 @app.route("/<id>", methods=["GET", "POST"])
@@ -180,14 +189,16 @@ def notebook(id):
     else:
         template = "public_notebook.html"
 
+    url_root = API_URL.rstrip("/") if API_URL else ""
+    notebook_url = (url_root + "/notebook/" + id) if url_root else ("/notebook/" + id)
     return render_template(
         template,
         cells=cells,
-        url_root=request.url_root.strip("/"),
+        url_root=url_root,
         title=notebook_data["title"],
         description=notebook_data["description"],
         id=id,
-        notebook_url=request.url_root.strip("/") + "/notebook/" + id,
+        notebook_url=notebook_url,
     )
 
 
@@ -224,7 +235,7 @@ def create():
         with open("notebooks.json", "w") as f:
             json.dump(notebooks, f)
 
-        return jsonify({"id": request.url_root + "notebook/" + id})
+        return jsonify({"id": API_URL + "notebook/" + id})
 
     with open("scripts.json", "r") as f:
         scripts = json.load(f)
@@ -249,7 +260,7 @@ def create():
 
     scripts = json.load(open("scripts.json", "r"))
 
-    return jsonify({"id": request.url_root + id})
+    return jsonify({"id": API_URL + id})
 
 
 @app.errorhandler(404)

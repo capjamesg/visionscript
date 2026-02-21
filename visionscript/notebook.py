@@ -18,7 +18,13 @@ from visionscript.lang import parser
 
 app = Flask(__name__)
 
-API_URL = None
+# Set via env VISIONSCRIPT_BASE_URL or API_URL; when unset, use "" (relative URLs).
+_raw = os.environ.get("VISIONSCRIPT_BASE_URL", "").strip() or os.environ.get("API_URL", "").strip()
+API_URL = (_raw.rstrip("/") + "/") if _raw else None
+
+if not API_URL:
+    print('API_URL and VISIONSCRIPT_BASE_URL must be set.')
+    exit()
 
 notebooks = {}
 
@@ -166,11 +172,14 @@ def notebook():
 
     notebooks[state_id] = init_notebook()
 
+    # CVE-2025-69882: use API_URL only, never request.url_root.
+    url_root = API_URL.rstrip("/") if API_URL else ""
+
     return render_template(
         "notebook.html",
         state_id=state_id,
-        api_url=API_URL or request.url_root,
-        url_root=request.url_root.strip("/"),
+        api_url=API_URL,
+        url_root=url_root,
     )
 
 

@@ -44,6 +44,8 @@ visionscript --notebook # run an interactive notebook
 visionscript --cloud # create a HTTP server to which you can deploy VisionScript code
 ```
 
+For production or reverse-proxy deployments, you can set `VISIONSCRIPT_BASE_URL` (or `API_URL`) to the canonical base URL (e.g. `https://your-domain.com/`); if unset, the app uses relative URLs and requires no configuration.
+
 ## How the Language Works
 
 VisionScript is a programming language. Suppose a user writes a program like this:
